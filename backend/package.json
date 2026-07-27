@@ -1,0 +1,51 @@
+{
+  "name": "sales-radar-ai-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend API for Sales Radar AI",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "seed": "tsx prisma/seed.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "test:agent-reach": "tsx scripts/test-agent-reach-provider.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "6.7.0",
+    "bcryptjs": "2.4.3",
+    "dotenv": "16.5.0",
+    "express": "4.21.2",
+    "jsonwebtoken": "9.0.2",
+    "pg": "8.16.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "2.4.6",
+    "@types/express": "4.17.21",
+    "@types/jsonwebtoken": "9.0.9",
+    "@types/node": "22.15.3",
+    "@types/pg": "8.15.1",
+    "prisma": "6.7.0",
+    "tsx": "4.19.4",
+    "typescript": "5.8.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "allowScripts": {
+    "@prisma/client@6.7.0": true,
+    "@prisma/engines@6.7.0": true,
+    "esbuild@0.28.1": true,
+    "esbuild@0.25.12": true,
+    "prisma@6.7.0": true
+  }
+}

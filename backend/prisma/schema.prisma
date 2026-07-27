@@ -1,0 +1,315 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+enum Platform {
+  Reddit
+  X
+  Instagram
+  Facebook
+  TikTok
+  LinkedIn
+  Xiaohongshu
+  YouTube
+}
+
+enum Region {
+  USA
+  Europe
+  SoutheastAsia
+  China
+  MiddleEast
+}
+
+enum CustomerType {
+  Buyer
+  Agent
+  Company
+  Individual
+}
+
+enum IntentLevel {
+  high
+  medium
+  low
+}
+
+enum Industry {
+  IndustrialManufacturing
+  ConsumerElectronics
+  MedicalHealth
+  SaaSSoftware
+  TradeExport
+  BeautyIndustry
+}
+
+enum FollowUpStatus {
+  new
+  contacted
+  engaging
+  won
+  lost
+}
+
+enum RecommendedAction {
+  contact_now
+  follow_up
+  monitor
+  nurture
+}
+
+enum SearchTaskStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum AIAnalysisStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  name         String?
+  avatarUrl    String?
+  role         UserRole     @default(user)
+  leads        Lead[]
+  searchTasks  SearchTask[]
+  productProfiles ProductProfile[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([createdAt])
+}
+
+model ProductProfile {
+  id                   String   @id @default(cuid())
+  userId               String
+  productName          String
+  category             String
+  industry             String
+  applications         String[] @default([])
+  keywords             String[] @default([])
+  relatedProducts      String[] @default([])
+  buyerPersona         Json
+  decisionMakerRoles   Json
+  buyerKeywords        String[] @default([])
+  channelKeywords      String[] @default([])
+  targetCountries      String[] @default([])
+  targetLanguages      String[] @default([])
+  recommendedPlatforms String[] @default([])
+  buyingSignals        String[] @default([])
+  painPoints           String[] @default([])
+  valueAngles          String[] @default([])
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([userId, productName])
+  @@index([userId, updatedAt])
+}
+
+model Lead {
+  id                String             @id @default(cuid())
+  userId            String
+  searchTaskId      String?
+  provider          String             @default("mock")
+  externalId        String
+  sourceMetadata    Json?
+  username          String
+  displayName       String
+  avatarUrl         String?
+  initials          String
+  platform          Platform
+  customerType      CustomerType
+  postContent       String             @db.Text
+  postedAt          DateTime?
+  country           String
+  region            Region
+  industry          Industry
+  jobTitle          String?
+  company           String?
+  sourceUrl         String
+  profileUrl        String
+  interestTags      String[]           @default([])
+  intentScore       Int                @default(0)
+  contactStatus     FollowUpStatus     @default(new)
+  recommendedAction RecommendedAction?
+  isFavorited       Boolean            @default(false)
+  customTags        String[]           @default([])
+  note              String?            @db.Text
+  lastContactedAt   DateTime?
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  searchTask        SearchTask?        @relation(fields: [searchTaskId], references: [id], onDelete: SetNull)
+  analyses          AIAnalysis[]
+  research          LeadResearch?
+  outreachMessages  OutreachMessage[]
+  contacts          ContactProfile[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, intentScore])
+  @@index([userId, contactStatus])
+  @@index([searchTaskId])
+  @@index([platform, profileUrl])
+  @@index([sourceUrl])
+  @@unique([userId, provider, externalId])
+}
+
+model ContactProfile {
+  id          String   @id @default(cuid())
+  leadId      String
+  name        String   @default("Unknown")
+  jobTitle    String   @default("Unknown")
+  company     String   @default("Unknown")
+  source      String
+  profileUrl  String   @default("Unknown")
+  email       String   @default("Unknown")
+  phone       String   @default("Unknown")
+  contactRole String   @default("unknown")
+  confidence  Int      @default(0)
+  evidence    Json
+  contactScore Int?
+  priorityRank Int?
+  recommendationReason String? @db.Text
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([leadId, name, jobTitle, profileUrl])
+  @@index([leadId, confidence])
+  @@index([leadId, priorityRank])
+}
+
+model OutreachMessage {
+  id          String   @id @default(cuid())
+  leadId      String
+  channel     String
+  content     Json
+  generatedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, generatedAt])
+  @@index([leadId, channel])
+}
+
+model ChannelProfile {
+  id                     String   @id @default(cuid())
+  leadId                 String   @unique
+  channelType            String   @default("unknown")
+  companyName            String   @default("Unknown")
+  industry               String   @default("Unknown")
+  region                 String   @default("Unknown")
+  website                String   @default("Unknown")
+  evidence               Json
+  channelScore           Int      @default(0)
+  confidence             Int      @default(0)
+  recommendationReason   String   @db.Text
+  cooperationStrategy    String   @db.Text
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([channelType, channelScore])
+}
+
+model LeadResearch {
+  id                  String   @id @default(cuid())
+  leadId              String   @unique
+  companySummary      String   @db.Text
+  industry            String
+  companyType         String
+  customerPersona     String   @db.Text
+  painPoints          Json
+  buyingSignals       Json
+  communicationStyle  String   @db.Text
+  recommendedApproach String   @db.Text
+  confidenceScore     Int
+  leadQuality         String   @default("low")
+  leadCategory        String   @default("content")
+  salesRecommendation String   @default("ignore")
+  qualityReason       String   @default("Unknown") @db.Text
+  companyProfile      Json?
+  buyingSignalDetails Json?
+  salesAngle          Json?
+  outreachPlan        Json?
+  priority            String   @default("C")
+  intelligenceVersion Int      @default(1)
+  lead                Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+model SearchTask {
+  id           String           @id @default(cuid())
+  userId       String
+  keyword      String
+  platforms    Platform[]       @default([])
+  regions      Region[]         @default([])
+  provider     String           @default("mock")
+  status       SearchTaskStatus @default(PENDING)
+  progress     Int              @default(0)
+  resultCount  Int              @default(0)
+  retryCount   Int              @default(0)
+  parameters   Json?
+  errorCode    String?
+  errorMessage String?          @db.Text
+  startedAt    DateTime?
+  completedAt  DateTime?
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leads        Lead[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model AIAnalysis {
+  id                  String           @id @default(cuid())
+  leadId              String
+  status              AIAnalysisStatus @default(PENDING)
+  provider            String           @default("mock")
+  model               String?
+  promptVersion       String?
+  intentType          String?
+  intentScore         Int?
+  tags                String[]         @default([])
+  suggestion          String?          @db.Text
+  background          String?          @db.Text
+  need                String?          @db.Text
+  purchaseProbability IntentLevel?
+  salesStrategy       String?          @db.Text
+  reasoning           String?          @db.Text
+  needKeywords        String[]         @default([])
+  recommendedScript   String?          @db.Text
+  contactAdvice       String?          @db.Text
+  profile             Json?
+  rawResponse         Json?
+  errorMessage        String?          @db.Text
+  lead                Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([leadId, createdAt])
+  @@index([status])
+}
