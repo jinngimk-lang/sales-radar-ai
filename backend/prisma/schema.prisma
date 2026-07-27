@@ -278,11 +278,24 @@ model LeadResearch {
   outreachPlan        Json?
   priority            String   @default("C")
   intelligenceVersion Int      @default(1)
+  productProfileId    String?
+  matchScore          Int?
+  purchaseLikelihood  String?
+  industryFit         String?  @db.Text
+  businessFit         String?  @db.Text
+  recommendedAngle    String?  @db.Text
+  contactReason       String?  @db.Text
+  riskFactors         Json?
+  evidence            Json?
+  provider            String?
+  model               String?
+  generatedAt         DateTime?
   lead                Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   @@index([createdAt])
+  @@index([productProfileId])
 }
 
 model SearchTask {

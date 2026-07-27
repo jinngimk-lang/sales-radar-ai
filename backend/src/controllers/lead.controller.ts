@@ -77,7 +77,15 @@ export const researchLeadController: RequestHandler = async (
   request,
   response,
 ) => {
-  const research = await leadResearch.research(request.params.id)
+  const productProfileId =
+    typeof request.body?.productProfileId === 'string' &&
+    request.body.productProfileId.trim()
+      ? request.body.productProfileId.trim()
+      : undefined
+  const research = await leadResearch.researchAI(
+    request.params.id,
+    productProfileId,
+  )
   response.json({ data: research })
 }
 

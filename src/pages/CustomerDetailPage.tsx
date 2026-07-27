@@ -27,6 +27,8 @@ import {
 } from 'lucide-react'
 import type {
   ChannelProfile,
+  LeadResearch,
+  ProductProfile,
   ContactProfile,
   Customer,
   OutreachChannel,
@@ -40,7 +42,10 @@ import {
   getRankedContacts,
   getCustomerById,
   getChannelProfile,
+  getLeadResearch,
+  getProductProfiles,
   rankContacts,
+  researchLead,
 } from '@/services/api'
 import { Avatar } from '@/components/ui/Avatar'
 import { PlatformIcon } from '@/components/ui/PlatformIcon'
@@ -93,6 +98,11 @@ export function CustomerDetailPage() {
     null,
   )
   const [channelLoading, setChannelLoading] = useState(false)
+  const [leadResearchResult, setLeadResearchResult] =
+    useState<LeadResearch | null>(null)
+  const [leadResearchLoading, setLeadResearchLoading] = useState(false)
+  const [researchProducts, setResearchProducts] = useState<ProductProfile[]>([])
+  const [researchProductId, setResearchProductId] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -115,6 +125,15 @@ export function CustomerDetailPage() {
     getChannelProfile(id)
       .then(setChannelProfile)
       .catch(() => setChannelProfile(null))
+    getLeadResearch(id)
+      .then(setLeadResearchResult)
+      .catch(() => setLeadResearchResult(null))
+    getProductProfiles()
+      .then((products) => {
+        setResearchProducts(products)
+        setResearchProductId((current) => current || products[0]?.id || '')
+      })
+      .catch(() => setResearchProducts([]))
   }, [id])
 
   const handleDiscoverContacts = async () => {
@@ -167,6 +186,18 @@ export function CustomerDetailPage() {
       'channel',
     )
     setModal({ channel: 'email', content, loading: false })
+  }
+
+  const handleLeadResearch = async () => {
+    if (!customer || leadResearchLoading) return
+    setLeadResearchLoading(true)
+    try {
+      setLeadResearchResult(
+        await researchLead(customer.id, researchProductId || undefined),
+      )
+    } finally {
+      setLeadResearchLoading(false)
+    }
   }
 
   const handleGenerate = async (channel: Channel) => {
@@ -357,6 +388,94 @@ export function CustomerDetailPage() {
           </div>
 
           {/* 销售触达 + 跟进计划 */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-brand-600" />
+                <h2 className="text-lg font-semibold text-ink-900">
+                  Lead Research
+                </h2>
+              </div>
+              <button
+                onClick={handleLeadResearch}
+                disabled={leadResearchLoading}
+                className="btn-secondary text-xs"
+              >
+                {leadResearchLoading && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                )}
+                {leadResearchResult?.generatedAt ? '重新研究' : 'AI研究客户'}
+              </button>
+            </div>
+            {researchProducts.length > 0 && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-ink-600">
+                <label htmlFor="lead-research-product" className="font-semibold">
+                  对比产品：
+                </label>
+                <select
+                  id="lead-research-product"
+                  value={researchProductId}
+                  onChange={(event) => setResearchProductId(event.target.value)}
+                  className="rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs text-ink-800 focus:border-brand-400 focus:outline-none"
+                >
+                  {researchProducts.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.productName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {leadResearchResult?.matchScore != null ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-brand-50/60 p-4 ring-1 ring-brand-100">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+                    AI匹配评分
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-brand-700">
+                    {leadResearchResult.matchScore}/100
+                  </p>
+                  <p className="mt-1 text-xs text-ink-500">
+                    购买可能性：{leadResearchResult.purchaseLikelihood ?? 'Unknown'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-ink-50 p-4">
+                  <p className="text-xs font-semibold text-ink-500">
+                    为什么值得联系
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-700">
+                    {leadResearchResult.contactReason ?? 'Unknown'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-ink-50 p-4">
+                  <p className="text-xs font-semibold text-ink-500">
+                    推荐销售角度
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-700">
+                    {leadResearchResult.recommendedAngle ?? 'Unknown'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-amber-50/60 p-4 ring-1 ring-amber-100">
+                  <p className="text-xs font-semibold text-amber-700">
+                    风险提醒
+                  </p>
+                  <ul className="mt-1 space-y-1 text-sm text-amber-900">
+                    {(leadResearchResult.riskFactors?.length
+                      ? leadResearchResult.riskFactors
+                      : ['Unknown']
+                    ).map((risk) => (
+                      <li key={risk}>· {risk}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-4 rounded-xl bg-ink-50 p-3 text-sm text-ink-400">
+                尚未生成结构化客户研究。AI只会使用现有 Lead 和产品证据。
+              </p>
+            )}
+          </div>
+
           <div className="card p-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">

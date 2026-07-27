@@ -7,9 +7,19 @@ import {
 import { prisma } from '../prisma/client.js'
 import { AppError } from '../utils/app-error.js'
 import { toSafeJson } from './safe-json.service.js'
+import type { AIProvider } from '../providers/ai-platform/ai-provider.interface.js'
+import { aiProviderFactory } from '../providers/ai-platform/ai-provider.factory.js'
+import { AITaskType } from '../providers/ai-platform/ai-task-type.js'
+import { aiResponseParser, type AIResponseParser } from './ai-response-parser.service.js'
+import { aiUsageLogs, type AIUsageLogService } from './ai-usage-log.service.js'
+import {
+  promptTemplates,
+  type PromptTemplateService,
+} from './prompt-template.service.js'
 
 export interface ResearchableLead {
   id: string
+  userId?: string
   company: string | null
   industry: Industry
   customerType: CustomerType
@@ -19,6 +29,32 @@ export interface ResearchableLead {
   country: string
   postContent: string
   sourceMetadata: Prisma.JsonValue | null
+}
+
+export interface LeadResearchAIResult {
+  matchScore: number
+  purchaseLikelihood: string
+  industryFit: string
+  businessFit: string
+  recommendedAngle: string
+  contactReason: string
+  riskFactors: string[]
+  evidence: string[]
+}
+
+export interface ProductResearchContext {
+  id: string
+  userId: string
+  productName: string
+  category: string
+  industry: string
+  applications: string[]
+  keywords: string[]
+  buyerPersona: Prisma.JsonValue
+  buyerKeywords: string[]
+  buyingSignals: string[]
+  painPoints: string[]
+  valueAngles: string[]
 }
 
 export interface LeadResearchResult {
@@ -65,9 +101,21 @@ export interface LeadResearchResult {
   }
   priority: 'A' | 'B' | 'C'
   intelligenceVersion: 1
+  productProfileId?: string | null
+  matchScore?: number
+  purchaseLikelihood?: string
+  industryFit?: string
+  businessFit?: string
+  recommendedAngle?: string
+  contactReason?: string
+  riskFactors?: string[]
+  evidence?: string[]
+  provider?: string
+  model?: string
+  generatedAt?: Date
 }
 
-interface LeadResearchRepository {
+export interface LeadResearchRepository {
   findLead(id: string): Promise<ResearchableLead | null>
   findResearch(leadId: string): Promise<unknown | null>
   createResearch(
@@ -78,6 +126,10 @@ interface LeadResearchRepository {
     leadId: string,
     result: LeadResearchResult,
   ): Promise<unknown>
+  findProductProfile?(
+    id: string,
+    userId?: string,
+  ): Promise<ProductResearchContext | null>
 }
 
 const UNKNOWN = 'Unknown'
@@ -100,6 +152,14 @@ const prismaRepository: LeadResearchRepository = {
         buyingSignalDetails: toSafeJson(result.buyingSignalDetails),
         salesAngle: toSafeJson(result.salesAngle),
         outreachPlan: toSafeJson(result.outreachPlan),
+        riskFactors:
+          result.riskFactors === undefined
+            ? undefined
+            : toSafeJson(result.riskFactors),
+        evidence:
+          result.evidence === undefined
+            ? undefined
+            : toSafeJson(result.evidence),
       },
     })
   },
@@ -114,6 +174,22 @@ const prismaRepository: LeadResearchRepository = {
         buyingSignalDetails: toSafeJson(result.buyingSignalDetails),
         salesAngle: toSafeJson(result.salesAngle),
         outreachPlan: toSafeJson(result.outreachPlan),
+        riskFactors:
+          result.riskFactors === undefined
+            ? undefined
+            : toSafeJson(result.riskFactors),
+        evidence:
+          result.evidence === undefined
+            ? undefined
+            : toSafeJson(result.evidence),
+      },
+    })
+  },
+  findProductProfile(id, userId) {
+    return prisma.productProfile.findFirst({
+      where: {
+        id,
+        ...(userId ? { userId } : {}),
       },
     })
   },
@@ -122,6 +198,14 @@ const prismaRepository: LeadResearchRepository = {
 export class LeadResearchService {
   constructor(
     private readonly repository: LeadResearchRepository = prismaRepository,
+    private readonly provider: AIProvider = aiProviderFactory.resolve(
+      AITaskType.LEAD_RESEARCH,
+    ),
+    private readonly fallbackProvider: AIProvider =
+      aiProviderFactory.getFallback(),
+    private readonly promptService: PromptTemplateService = promptTemplates,
+    private readonly parser: AIResponseParser = aiResponseParser,
+    private readonly usageLogs: AIUsageLogService = aiUsageLogs,
   ) {}
 
   async get(leadId: string): Promise<unknown> {
@@ -157,6 +241,248 @@ export class LeadResearchService {
         if (concurrent) return concurrent
       }
       throw error
+    }
+  }
+
+  async researchAI(
+    leadId: string,
+    productProfileId?: string,
+  ): Promise<unknown> {
+    const existing = await this.repository.findResearch(leadId)
+    const lead = await this.repository.findLead(leadId)
+    if (!lead) throw new AppError(404, 'LEAD_NOT_FOUND', 'Lead not found')
+
+    const product = productProfileId
+      ? await this.repository.findProductProfile?.(
+          productProfileId,
+          lead.userId,
+        )
+      : null
+    if (productProfileId && !product) {
+      throw new AppError(
+        404,
+        'PRODUCT_PROFILE_NOT_FOUND',
+        'Product profile not found for this Lead owner',
+      )
+    }
+
+    const baseResult = this.analyze(lead)
+    const fallbackResult = this.buildAIFallback(lead, product, baseResult)
+    const generated = await this.generateAIResult(
+      lead,
+      product,
+      fallbackResult,
+    )
+    const result: LeadResearchResult = {
+      ...baseResult,
+      ...generated.result,
+      productProfileId: product?.id ?? null,
+      provider: generated.provider,
+      model: generated.model,
+      generatedAt: new Date(),
+    }
+
+    if (existing) return this.repository.updateResearch(leadId, result)
+    try {
+      return await this.repository.createResearch(leadId, result)
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        return this.repository.updateResearch(leadId, result)
+      }
+      throw error
+    }
+  }
+
+  private async generateAIResult(
+    lead: ResearchableLead,
+    product: ProductResearchContext | null | undefined,
+    fallbackResult: LeadResearchAIResult,
+  ): Promise<{
+    result: LeadResearchAIResult
+    provider: string
+    model: string
+  }> {
+    const prompt = await this.promptService
+      .getByTaskType(AITaskType.LEAD_RESEARCH)
+      .then(
+        (template) =>
+          template?.template ??
+          'Analyze Lead and ProductProfile evidence for B2B sales fit. Return structured JSON only and use Unknown when evidence is insufficient.',
+      )
+      .catch(
+        () =>
+          'Analyze Lead and ProductProfile evidence for B2B sales fit. Return structured JSON only and use Unknown when evidence is insufficient.',
+      )
+    const request = {
+      taskType: AITaskType.LEAD_RESEARCH,
+      prompt,
+      context: {
+        lead: {
+          company: lead.company ?? UNKNOWN,
+          industry: lead.industry,
+          customerType: lead.customerType,
+          jobTitle: lead.jobTitle ?? UNKNOWN,
+          platform: lead.platform,
+          country: lead.country || UNKNOWN,
+          sourceUrl: lead.sourceUrl,
+          originalContent: lead.postContent || UNKNOWN,
+          sourceMetadata: lead.sourceMetadata,
+        },
+        product: product
+          ? {
+              productName: product.productName,
+              category: product.category,
+              industry: product.industry,
+              applications: product.applications,
+              keywords: product.keywords,
+              buyerPersona: product.buyerPersona,
+              buyingSignals: product.buyingSignals,
+              painPoints: product.painPoints,
+              valueAngles: product.valueAngles,
+            }
+          : null,
+        fallbackResponse: fallbackResult,
+      },
+    }
+
+    if (this.provider !== this.fallbackProvider) {
+      const startedAt = Date.now()
+      try {
+        const response = await this.provider.generate(request)
+        const parsed = this.parser.parseWithStatus(
+          response.output,
+          isLeadResearchAIResult,
+          fallbackResult,
+        )
+        await this.usageLogs.safeRecord({
+          taskType: AITaskType.LEAD_RESEARCH,
+          provider: response.provider,
+          model: response.model,
+          success: !parsed.usedFallback,
+          latencyMs: Date.now() - startedAt,
+        })
+        if (!parsed.usedFallback) {
+          return {
+            result: parsed.value,
+            provider: response.provider,
+            model: response.model,
+          }
+        }
+      } catch {
+        await this.usageLogs.safeRecord({
+          taskType: AITaskType.LEAD_RESEARCH,
+          provider: this.provider.name,
+          model: this.provider.model,
+          success: false,
+          latencyMs: Date.now() - startedAt,
+        })
+      }
+    }
+
+    const fallbackStartedAt = Date.now()
+    const response = await this.fallbackProvider.generate(request)
+    const result = this.parser.parse(
+      response.output,
+      isLeadResearchAIResult,
+      fallbackResult,
+    )
+    await this.usageLogs.safeRecord({
+      taskType: AITaskType.LEAD_RESEARCH,
+      provider: response.provider,
+      model: response.model,
+      success: true,
+      latencyMs: Date.now() - fallbackStartedAt,
+    })
+    return { result, provider: response.provider, model: response.model }
+  }
+
+  private buildAIFallback(
+    lead: ResearchableLead,
+    product: ProductResearchContext | null | undefined,
+    base: LeadResearchResult,
+  ): LeadResearchAIResult {
+    const content = lead.postContent.trim()
+    const productTerms = product
+      ? [
+          product.productName,
+          product.category,
+          product.industry,
+          ...product.applications,
+          ...product.keywords,
+        ]
+      : []
+    const matchingTerms = productTerms.filter(
+      (term) =>
+        term.length > 2 &&
+        content.toLowerCase().includes(term.toLowerCase()),
+    )
+    const hasCompany = Boolean(lead.company)
+    const hasEvidence = Boolean(
+      hasCompany || content || base.buyingSignals.length,
+    )
+    const matchScore = product
+      ? Math.min(
+          100,
+          (matchingTerms.length > 0 ? 45 : 10) +
+            (lead.industry === product.industry ? 30 : 0) +
+            (base.buyingSignals.length > 0 ? 25 : 0),
+        )
+      : 0
+    const industryFit = !product
+      ? UNKNOWN
+      : matchingTerms.length > 0 || lead.industry === product.industry
+        ? `Verified Lead content or industry aligns with ${product.productName}.`
+        : 'No verified product-to-industry match was found.'
+    const businessFit = hasCompany
+      ? `${lead.company} is a verified company subject in the Lead evidence.`
+      : UNKNOWN
+    const contactReason =
+      base.buyingSignalDetails[0]?.evidence ??
+      (hasCompany && content
+        ? `The source contains verifiable activity from ${lead.company}.`
+        : UNKNOWN)
+    const recommendedAngle =
+      hasEvidence && product
+        ? base.salesAngle.valueProposition
+        : UNKNOWN
+    const riskFactors = [
+      !product ? 'No ProductProfile was selected.' : null,
+      !hasCompany ? 'No verified company subject.' : null,
+      base.buyingSignals.length === 0
+        ? 'No explicit buying signal or procurement event.'
+        : null,
+      !content ? 'No original Lead content.' : null,
+    ].filter((value): value is string => Boolean(value))
+    const evidence = [
+      lead.company ? `Lead company: ${lead.company}` : null,
+      lead.industry ? `Lead industry: ${lead.industry}` : null,
+      lead.country ? `Lead location: ${lead.country}` : null,
+      content ? `Lead content: ${content.slice(0, 300)}` : null,
+      product ? `Selected product: ${product.productName}` : null,
+      ...base.buyingSignalDetails.map(
+        (signal) => `Buying signal evidence: ${signal.evidence}`,
+      ),
+    ].filter((value): value is string => Boolean(value))
+
+    return {
+      matchScore,
+      purchaseLikelihood:
+        base.buyingSignals.length > 0
+          ? base.priority === 'A'
+            ? 'High'
+            : 'Medium'
+          : hasEvidence
+            ? 'Low'
+            : UNKNOWN,
+      industryFit,
+      businessFit,
+      recommendedAngle,
+      contactReason,
+      riskFactors,
+      evidence,
     }
   }
 
@@ -594,6 +920,30 @@ export class LeadResearchService {
     }
     return []
   }
+}
+
+function isLeadResearchAIResult(
+  value: unknown,
+): value is LeadResearchAIResult {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const result = value as Record<string, unknown>
+  return (
+    typeof result.matchScore === 'number' &&
+    Number.isFinite(result.matchScore) &&
+    result.matchScore >= 0 &&
+    result.matchScore <= 100 &&
+    typeof result.purchaseLikelihood === 'string' &&
+    typeof result.industryFit === 'string' &&
+    typeof result.businessFit === 'string' &&
+    typeof result.recommendedAngle === 'string' &&
+    typeof result.contactReason === 'string' &&
+    isStringArray(result.riskFactors) &&
+    isStringArray(result.evidence)
+  )
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
 export const leadResearch = new LeadResearchService()

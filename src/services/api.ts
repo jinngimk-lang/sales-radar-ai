@@ -472,10 +472,16 @@ export async function getLeadResearch(id: string): Promise<LeadResearch | null> 
   }
 }
 
-export async function researchLead(id: string): Promise<LeadResearch> {
+export async function researchLead(
+  id: string,
+  productProfileId?: string,
+): Promise<LeadResearch> {
   const response = await request<ApiEnvelope<LeadResearch>>(
     `/leads/${id}/research`,
-    { method: 'POST' },
+    {
+      method: 'POST',
+      body: JSON.stringify({ productProfileId }),
+    },
   )
   return response.data
 }

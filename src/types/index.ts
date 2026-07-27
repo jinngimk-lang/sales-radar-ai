@@ -116,6 +116,18 @@ export interface LeadResearch {
   }
   priority: 'A' | 'B' | 'C'
   intelligenceVersion: number
+  productProfileId?: string | null
+  matchScore?: number | null
+  purchaseLikelihood?: string | null
+  industryFit?: string | null
+  businessFit?: string | null
+  recommendedAngle?: string | null
+  contactReason?: string | null
+  riskFactors?: string[]
+  evidence?: string[]
+  provider?: string | null
+  model?: string | null
+  generatedAt?: string | null
 }
 
 /** 客户线索（搜索结果卡片） */

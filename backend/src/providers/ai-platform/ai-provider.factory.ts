@@ -50,7 +50,12 @@ export class AIProviderFactory {
   }
 
   resolve(taskType?: AITaskType): AIProvider {
-    if (taskType !== AITaskType.PRODUCT_UNDERSTANDING) return this.fallback
+    if (
+      taskType !== AITaskType.PRODUCT_UNDERSTANDING &&
+      taskType !== AITaskType.LEAD_RESEARCH
+    ) {
+      return this.fallback
+    }
     return (
       this.providers.get(this.config.provider.toLowerCase()) ?? this.fallback
     )
