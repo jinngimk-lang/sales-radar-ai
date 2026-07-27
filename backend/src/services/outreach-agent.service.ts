@@ -1,17 +1,23 @@
 import { Prisma } from '@prisma/client'
 import type {
-  AIProvider,
   BuyerRole,
   BuyingStage,
   OutreachContent,
   OutreachContext,
   SalesAngle,
 } from '../providers/ai/ai-provider.interface.js'
-import { ruleBasedOutreachProvider } from '../providers/ai/rule-based-outreach.provider.js'
+import type { AIProvider } from '../providers/ai-platform/ai-provider.interface.js'
+import { aiProviderFactory } from '../providers/ai-platform/ai-provider.factory.js'
+import { AITaskType } from '../providers/ai-platform/ai-task-type.js'
 import { prisma } from '../prisma/client.js'
 import { AppError } from '../utils/app-error.js'
 import { leadResearch } from './lead-research.service.js'
 import { toSafeJson } from './safe-json.service.js'
+import { aiResponseParser } from './ai-response-parser.service.js'
+import {
+  promptTemplates,
+  type PromptTemplateService,
+} from './prompt-template.service.js'
 
 interface IntelligenceResearch {
   priority: 'A' | 'B' | 'C'
@@ -35,7 +41,10 @@ export interface OutreachGeneration {
 
 export class OutreachAgentService {
   constructor(
-    private readonly provider: AIProvider = ruleBasedOutreachProvider,
+    private readonly provider: AIProvider = aiProviderFactory.resolve(),
+    private readonly fallbackProvider: AIProvider =
+      aiProviderFactory.getFallback(),
+    private readonly promptService: PromptTemplateService = promptTemplates,
   ) {}
 
   async generate(
@@ -86,7 +95,8 @@ export class OutreachAgentService {
           }
         : undefined,
     }
-    const content = await this.provider.generateOutreach(context)
+    const generated = await this.generateContent(context)
+    const content = generated.content
     this.assertSafeContent(content)
 
     const generatedAt = new Date()
@@ -109,7 +119,7 @@ export class OutreachAgentService {
     )
 
     return {
-      provider: this.provider.name,
+      provider: generated.provider,
       generatedAt: generatedAt.toISOString(),
       context: {
         role: context.role,
@@ -118,6 +128,51 @@ export class OutreachAgentService {
         priority: context.priority,
       },
       content,
+    }
+  }
+
+  async generateContent(
+    context: OutreachContext,
+  ): Promise<{ content: OutreachContent; provider: string }> {
+    const template = await this.promptService
+      .getByTaskType(AITaskType.OUTREACH_GENERATION)
+      .catch(() => null)
+    const prompt =
+      template?.template ??
+      'Generate structured B2B outreach using only verified context. Return JSON matching the requested outreach schema.'
+    const request = {
+      taskType: AITaskType.OUTREACH_GENERATION,
+      prompt,
+      context: {
+        outreachContext: context as unknown as Record<string, unknown>,
+      },
+    }
+    const fallbackResult = await this.fallbackProvider.generate(request)
+    const fallback = aiResponseParser.parse(
+      fallbackResult.output,
+      (value): value is OutreachContent => this.isOutreachContent(value),
+      this.safeOutreachFallback(),
+    )
+
+    if (this.provider === this.fallbackProvider) {
+      return { content: fallback, provider: fallbackResult.provider }
+    }
+
+    try {
+      const result = await this.provider.generate(request)
+      const parsed = aiResponseParser.parseWithStatus(
+        result.output,
+        (value): value is OutreachContent => this.isOutreachContent(value),
+        fallback,
+      )
+      return {
+        content: parsed.value,
+        provider: parsed.usedFallback
+          ? fallbackResult.provider
+          : result.provider,
+      }
+    } catch {
+      return { content: fallback, provider: fallbackResult.provider }
     }
   }
 
@@ -229,6 +284,43 @@ export class OutreachAgentService {
         'UNSAFE_OUTREACH_CONTENT',
         'Outreach provider returned a prohibited template phrase',
       )
+    }
+  }
+
+  private isOutreachContent(value: unknown): value is OutreachContent {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+    const result = value as Record<string, unknown>
+    const email = this.record(result.email)
+    const linkedin = this.record(result.linkedin)
+    const whatsapp = this.record(result.whatsapp)
+    const callScript = this.record(result.callScript)
+    return (
+      Array.isArray(email.subjectOptions) &&
+      typeof email.opening === 'string' &&
+      typeof email.body === 'string' &&
+      typeof email.cta === 'string' &&
+      typeof linkedin.connectionMessage === 'string' &&
+      typeof linkedin.firstMessage === 'string' &&
+      typeof whatsapp.message === 'string' &&
+      typeof callScript.opening === 'string' &&
+      Array.isArray(callScript.questions)
+    )
+  }
+
+  private safeOutreachFallback(): OutreachContent {
+    const advice =
+      'AI output could not be validated. Review the Lead evidence before contacting this account.'
+    return {
+      email: {
+        subjectOptions: [],
+        opening: 'Unknown',
+        body: advice,
+        cta: 'Reassess the verified evidence.',
+      },
+      linkedin: { connectionMessage: 'Unknown', firstMessage: advice },
+      whatsapp: { message: advice },
+      callScript: { opening: 'Unknown', questions: [] },
+      observationAdvice: advice,
     }
   }
 

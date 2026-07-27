@@ -125,6 +125,19 @@ model ProductProfile {
   @@index([userId, updatedAt])
 }
 
+model PromptTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  taskType  String
+  template  String   @db.Text
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([taskType, version])
+  @@index([taskType, updatedAt])
+}
+
 model Lead {
   id                String             @id @default(cuid())
   userId            String
