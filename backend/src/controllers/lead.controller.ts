@@ -1,4 +1,4 @@
-import { Industry } from '@prisma/client'
+import { Industry, LeadOutcomeStatus } from '@prisma/client'
 import type { RequestHandler } from 'express'
 import { analyzeLead } from '../services/ai-analysis.service.js'
 import { contactDiscovery } from '../services/contact-discovery.service.js'
@@ -6,6 +6,12 @@ import { contactRanking } from '../services/contact-ranking.service.js'
 import { channelDiscovery } from '../services/channel-discovery.service.js'
 import { getLeadById, listLeads } from '../services/lead.service.js'
 import { leadResearch } from '../services/lead-research.service.js'
+import { leadOutcomes } from '../services/lead-outcome.service.js'
+import {
+  leadResearchFeedback,
+  LEAD_RESEARCH_FEEDBACK_TYPES,
+  type LeadResearchFeedbackType,
+} from '../services/lead-research-feedback.service.js'
 import { outreachAgent } from '../services/outreach-agent.service.js'
 import { AppError } from '../utils/app-error.js'
 
@@ -87,6 +93,112 @@ export const researchLeadController: RequestHandler = async (
     productProfileId,
   )
   response.json({ data: research })
+}
+
+interface LeadResearchFeedbackSubmitter {
+  submit(
+    leadId: string,
+    input: {
+      rating: number
+      feedbackType: LeadResearchFeedbackType
+      comment?: string
+    },
+  ): Promise<unknown>
+}
+
+export function createSubmitLeadResearchFeedbackController(
+  service: LeadResearchFeedbackSubmitter = leadResearchFeedback,
+): RequestHandler {
+  return async (request, response) => {
+  const rating = request.body?.rating
+  const feedbackType = request.body?.feedbackType
+
+  if (
+    typeof rating !== 'number' ||
+    typeof feedbackType !== 'string' ||
+    !LEAD_RESEARCH_FEEDBACK_TYPES.includes(
+      feedbackType as LeadResearchFeedbackType,
+    )
+  ) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'rating and a supported feedbackType are required',
+    )
+  }
+
+  const feedback = await service.submit(request.params.id, {
+    rating,
+    feedbackType: feedbackType as LeadResearchFeedbackType,
+    comment:
+      typeof request.body?.comment === 'string'
+        ? request.body.comment
+        : undefined,
+  })
+
+  response.status(201).json({ data: feedback })
+  }
+}
+
+export const submitLeadResearchFeedbackController =
+  createSubmitLeadResearchFeedbackController()
+
+function readLeadOutcomeInput(body: unknown): {
+  status: LeadOutcomeStatus
+  note?: string
+} {
+  const input =
+    body && typeof body === 'object'
+      ? (body as { status?: unknown; note?: unknown })
+      : {}
+
+  if (
+    typeof input.status !== 'string' ||
+    !Object.values(LeadOutcomeStatus).includes(
+      input.status as LeadOutcomeStatus,
+    )
+  ) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'A supported outcome status is required',
+    )
+  }
+
+  return {
+    status: input.status as LeadOutcomeStatus,
+    note: typeof input.note === 'string' ? input.note : undefined,
+  }
+}
+
+export const createLeadOutcomeController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const outcome = await leadOutcomes.create(
+    request.params.id,
+    readLeadOutcomeInput(request.body),
+  )
+  response.status(201).json({ data: outcome })
+}
+
+export const getLeadOutcomeController: RequestHandler = async (
+  request,
+  response,
+) => {
+  response.json({ data: await leadOutcomes.get(request.params.id) })
+}
+
+export const updateLeadOutcomeController: RequestHandler = async (
+  request,
+  response,
+) => {
+  response.json({
+    data: await leadOutcomes.update(
+      request.params.id,
+      readLeadOutcomeInput(request.body),
+    ),
+  })
 }
 
 export const generateOutreachController: RequestHandler = async (

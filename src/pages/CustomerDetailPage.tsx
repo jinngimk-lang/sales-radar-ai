@@ -24,10 +24,15 @@ import {
   Phone,
   Users,
   Network,
+  ThumbsUp,
+  ThumbsDown,
+  Check,
 } from 'lucide-react'
 import type {
   ChannelProfile,
   LeadResearch,
+  LeadOutcome,
+  LeadOutcomeStatus,
   ProductProfile,
   ContactProfile,
   Customer,
@@ -37,15 +42,19 @@ import type {
 import {
   discoverContacts,
   discoverChannel,
+  createLeadOutcome,
   generateFollowUpPlan,
   generateOutreach,
   getRankedContacts,
   getCustomerById,
   getChannelProfile,
   getLeadResearch,
+  getLeadOutcome,
   getProductProfiles,
   rankContacts,
   researchLead,
+  submitLeadResearchFeedback,
+  updateLeadOutcome,
 } from '@/services/api'
 import { Avatar } from '@/components/ui/Avatar'
 import { PlatformIcon } from '@/components/ui/PlatformIcon'
@@ -82,6 +91,28 @@ const CHANNEL_LABEL: Record<FollowUpStep['channel'], string> = {
   call: '电话',
 }
 
+const OUTCOME_LABELS: Record<LeadOutcomeStatus, string> = {
+  NEW: '待推进',
+  CONTACTED: '已联系',
+  REPLIED: '已回复',
+  MEETING: '已约会议',
+  QUALIFIED: '已确认机会',
+  PROPOSAL: '已提交方案',
+  WON: '已成交',
+  LOST: '不匹配',
+}
+
+const OUTCOME_ACTIONS: Array<{
+  status: LeadOutcomeStatus
+  label: string
+}> = [
+  { status: 'CONTACTED', label: '已联系' },
+  { status: 'REPLIED', label: '已回复' },
+  { status: 'MEETING', label: '会议' },
+  { status: 'WON', label: '成交' },
+  { status: 'LOST', label: '不匹配' },
+]
+
 /** 客户详情页 */
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -103,6 +134,14 @@ export function CustomerDetailPage() {
   const [leadResearchLoading, setLeadResearchLoading] = useState(false)
   const [researchProducts, setResearchProducts] = useState<ProductProfile[]>([])
   const [researchProductId, setResearchProductId] = useState('')
+  const [researchFeedback, setResearchFeedback] = useState<
+    'useful' | 'not_useful' | null
+  >(null)
+  const [researchFeedbackComment, setResearchFeedbackComment] = useState('')
+  const [researchFeedbackLoading, setResearchFeedbackLoading] = useState(false)
+  const [leadOutcome, setLeadOutcome] = useState<LeadOutcome | null>(null)
+  const [outcomeNote, setOutcomeNote] = useState('')
+  const [outcomeLoading, setOutcomeLoading] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -128,6 +167,12 @@ export function CustomerDetailPage() {
     getLeadResearch(id)
       .then(setLeadResearchResult)
       .catch(() => setLeadResearchResult(null))
+    getLeadOutcome(id)
+      .then((outcome) => {
+        setLeadOutcome(outcome)
+        setOutcomeNote(outcome?.note ?? '')
+      })
+      .catch(() => setLeadOutcome(null))
     getProductProfiles()
       .then((products) => {
         setResearchProducts(products)
@@ -195,8 +240,42 @@ export function CustomerDetailPage() {
       setLeadResearchResult(
         await researchLead(customer.id, researchProductId || undefined),
       )
+      setResearchFeedback(null)
+      setResearchFeedbackComment('')
     } finally {
       setLeadResearchLoading(false)
+    }
+  }
+
+  const handleResearchFeedback = async (
+    feedbackType: 'useful' | 'not_useful',
+  ) => {
+    if (!customer || researchFeedbackLoading) return
+    setResearchFeedbackLoading(true)
+    try {
+      await submitLeadResearchFeedback(customer.id, {
+        rating: feedbackType === 'useful' ? 5 : 2,
+        feedbackType,
+        comment: researchFeedbackComment || undefined,
+      })
+      setResearchFeedback(feedbackType)
+    } finally {
+      setResearchFeedbackLoading(false)
+    }
+  }
+
+  const handleOutcomeChange = async (status: LeadOutcomeStatus) => {
+    if (!customer || outcomeLoading) return
+    setOutcomeLoading(true)
+    try {
+      const input = { status, note: outcomeNote || undefined }
+      const saved = leadOutcome
+        ? await updateLeadOutcome(customer.id, input)
+        : await createLeadOutcome(customer.id, input)
+      setLeadOutcome(saved)
+      setOutcomeNote(saved.note ?? '')
+    } finally {
+      setOutcomeLoading(false)
     }
   }
 
@@ -427,6 +506,7 @@ export function CustomerDetailPage() {
               </div>
             )}
             {leadResearchResult?.matchScore != null ? (
+              <>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl bg-brand-50/60 p-4 ring-1 ring-brand-100">
                   <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
@@ -469,11 +549,106 @@ export function CustomerDetailPage() {
                   </ul>
                 </div>
               </div>
+              <div className="mt-4 border-t border-ink-100 pt-4">
+                {researchFeedback ? (
+                  <div className="flex items-center gap-2 text-sm text-emerald-700">
+                    <Check className="h-4 w-4" />
+                    已记录，谢谢你的反馈
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-ink-700">
+                      这个判断有帮助吗？
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleResearchFeedback('useful')}
+                        disabled={researchFeedbackLoading}
+                        className="btn-secondary text-xs"
+                      >
+                        <ThumbsUp className="h-3.5 w-3.5" />
+                        有帮助
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleResearchFeedback('not_useful')}
+                        disabled={researchFeedbackLoading}
+                        className="btn-secondary text-xs"
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5" />
+                        需要改进
+                      </button>
+                      {researchFeedbackLoading && (
+                        <Loader2 className="h-4 w-4 animate-spin text-ink-400" />
+                      )}
+                    </div>
+                    <input
+                      value={researchFeedbackComment}
+                      onChange={(event) =>
+                        setResearchFeedbackComment(event.target.value)
+                      }
+                      maxLength={1000}
+                      placeholder="补充说明（可选）"
+                      className="mt-2 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-xs text-ink-700 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none"
+                    />
+                  </>
+                )}
+              </div>
+              </>
             ) : (
               <p className="mt-4 rounded-xl bg-ink-50 p-3 text-sm text-ink-400">
                 尚未生成结构化客户研究。AI只会使用现有 Lead 和产品证据。
               </p>
             )}
+          </div>
+
+          <div className="card p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  <h2 className="text-lg font-semibold text-ink-900">
+                    销售进展
+                  </h2>
+                </div>
+                <p className="mt-1 text-sm text-ink-500">
+                  记录这次判断之后，机会实际推进到了哪里。
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-2 rounded-full bg-ink-50 px-3 py-1.5 text-sm font-semibold text-ink-700">
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                {OUTCOME_LABELS[leadOutcome?.status ?? 'NEW']}
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {OUTCOME_ACTIONS.map((action) => (
+                <button
+                  key={action.status}
+                  type="button"
+                  onClick={() => handleOutcomeChange(action.status)}
+                  disabled={outcomeLoading}
+                  className={cn(
+                    'rounded-lg border px-3 py-2 text-xs font-semibold transition-colors',
+                    leadOutcome?.status === action.status
+                      ? 'border-brand-200 bg-brand-50 text-brand-700'
+                      : 'border-ink-200 bg-white text-ink-600 hover:border-ink-300 hover:text-ink-900',
+                  )}
+                >
+                  {action.label}
+                </button>
+              ))}
+              {outcomeLoading && (
+                <Loader2 className="h-4 w-4 self-center animate-spin text-ink-400" />
+              )}
+            </div>
+            <input
+              value={outcomeNote}
+              onChange={(event) => setOutcomeNote(event.target.value)}
+              maxLength={2000}
+              placeholder="补充下一步或结果（可选）"
+              className="mt-3 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-700 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none"
+            />
           </div>
 
           <div className="card p-6">

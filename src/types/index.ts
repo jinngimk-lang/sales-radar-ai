@@ -130,6 +130,43 @@ export interface LeadResearch {
   generatedAt?: string | null
 }
 
+export type LeadResearchFeedbackType =
+  | 'accurate'
+  | 'inaccurate'
+  | 'useful'
+  | 'not_useful'
+
+export interface LeadResearchFeedback {
+  id: string
+  leadResearchId: string
+  userId: string
+  rating: number
+  feedbackType: LeadResearchFeedbackType
+  comment?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type LeadOutcomeStatus =
+  | 'NEW'
+  | 'CONTACTED'
+  | 'REPLIED'
+  | 'MEETING'
+  | 'QUALIFIED'
+  | 'PROPOSAL'
+  | 'WON'
+  | 'LOST'
+
+export interface LeadOutcome {
+  id: string
+  leadId: string
+  userId: string
+  status: LeadOutcomeStatus
+  note?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 /** 客户线索（搜索结果卡片） */
 export type ContactRole =
   | 'decision_maker'

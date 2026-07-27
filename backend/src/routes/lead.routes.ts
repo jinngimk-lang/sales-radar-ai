@@ -1,9 +1,11 @@
 import { Router } from 'express'
 import {
   analyzeLeadController,
+  createLeadOutcomeController,
   discoverContactsController,
   discoverChannelController,
   getLeadController,
+  getLeadOutcomeController,
   getLeadResearchController,
   getChannelController,
   generateOutreachController,
@@ -12,6 +14,8 @@ import {
   listRankedContactsController,
   listLeadsController,
   researchLeadController,
+  submitLeadResearchFeedbackController,
+  updateLeadOutcomeController,
   rankContactsController,
 } from '../controllers/lead.controller.js'
 import { asyncRoute } from '../middleware/async-route.js'
@@ -23,6 +27,13 @@ leadRouter.get('/:id', asyncRoute(getLeadController))
 leadRouter.post('/:id/analyze', asyncRoute(analyzeLeadController))
 leadRouter.get('/:id/research', asyncRoute(getLeadResearchController))
 leadRouter.post('/:id/research', asyncRoute(researchLeadController))
+leadRouter.post(
+  '/:id/research/feedback',
+  asyncRoute(submitLeadResearchFeedbackController),
+)
+leadRouter.post('/:id/outcome', asyncRoute(createLeadOutcomeController))
+leadRouter.get('/:id/outcome', asyncRoute(getLeadOutcomeController))
+leadRouter.put('/:id/outcome', asyncRoute(updateLeadOutcomeController))
 leadRouter.get('/:id/outreach', asyncRoute(listOutreachHistoryController))
 leadRouter.post('/:id/outreach', asyncRoute(generateOutreachController))
 leadRouter.get('/:id/contacts', asyncRoute(listContactsController))

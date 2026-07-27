@@ -33,6 +33,10 @@ import type {
   Industry,
   LeadType,
   LeadResearch,
+  LeadResearchFeedback,
+  LeadResearchFeedbackType,
+  LeadOutcome,
+  LeadOutcomeStatus,
   ContactProfile,
   ChannelProfile,
   SearchStrategy,
@@ -481,6 +485,59 @@ export async function researchLead(
     {
       method: 'POST',
       body: JSON.stringify({ productProfileId }),
+    },
+  )
+  return response.data
+}
+
+export async function submitLeadResearchFeedback(
+  id: string,
+  input: {
+    rating: number
+    feedbackType: LeadResearchFeedbackType
+    comment?: string
+  },
+): Promise<LeadResearchFeedback> {
+  const response = await request<ApiEnvelope<LeadResearchFeedback>>(
+    `/leads/${id}/research/feedback`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  )
+  return response.data
+}
+
+export async function getLeadOutcome(id: string): Promise<LeadOutcome | null> {
+  const response = await request<ApiEnvelope<LeadOutcome | null>>(
+    `/leads/${id}/outcome`,
+  )
+  return response.data
+}
+
+export async function createLeadOutcome(
+  id: string,
+  input: { status: LeadOutcomeStatus; note?: string },
+): Promise<LeadOutcome> {
+  const response = await request<ApiEnvelope<LeadOutcome>>(
+    `/leads/${id}/outcome`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  )
+  return response.data
+}
+
+export async function updateLeadOutcome(
+  id: string,
+  input: { status: LeadOutcomeStatus; note?: string },
+): Promise<LeadOutcome> {
+  const response = await request<ApiEnvelope<LeadOutcome>>(
+    `/leads/${id}/outcome`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(input),
     },
   )
   return response.data

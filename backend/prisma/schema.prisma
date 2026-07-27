@@ -82,6 +82,17 @@ enum AIAnalysisStatus {
   FAILED
 }
 
+enum LeadOutcomeStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  MEETING
+  QUALIFIED
+  PROPOSAL
+  WON
+  LOST
+}
+
 model User {
   id           String       @id @default(cuid())
   email        String       @unique
@@ -92,6 +103,8 @@ model User {
   leads        Lead[]
   searchTasks  SearchTask[]
   productProfiles ProductProfile[]
+  leadResearchFeedbacks LeadResearchFeedback[]
+  leadOutcomes LeadOutcome[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -118,6 +131,7 @@ model ProductProfile {
   painPoints           String[] @default([])
   valueAngles          String[] @default([])
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadResearches       LeadResearch[]
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -187,6 +201,8 @@ model Lead {
   research          LeadResearch?
   outreachMessages  OutreachMessage[]
   contacts          ContactProfile[]
+  channelProfile    ChannelProfile?
+  outcome           LeadOutcome?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -250,6 +266,7 @@ model ChannelProfile {
   confidence             Int      @default(0)
   recommendationReason   String   @db.Text
   cooperationStrategy    String   @db.Text
+  lead                   Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
@@ -291,11 +308,45 @@ model LeadResearch {
   model               String?
   generatedAt         DateTime?
   lead                Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  productProfile      ProductProfile? @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
+  feedbacks           LeadResearchFeedback[]
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   @@index([createdAt])
   @@index([productProfileId])
+}
+
+model LeadResearchFeedback {
+  id             String       @id @default(cuid())
+  leadResearchId String
+  userId         String
+  rating         Int
+  feedbackType   String
+  comment        String?      @db.Text
+  leadResearch   LeadResearch @relation(fields: [leadResearchId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([leadResearchId, userId])
+  @@index([userId, createdAt])
+  @@index([feedbackType, createdAt])
+}
+
+model LeadOutcome {
+  id        String            @id @default(cuid())
+  leadId    String            @unique
+  userId    String
+  status    LeadOutcomeStatus @default(NEW)
+  note      String?           @db.Text
+  lead      Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, updatedAt])
 }
 
 model SearchTask {
