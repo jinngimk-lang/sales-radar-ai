@@ -13,6 +13,7 @@ enum UserRole {
 }
 
 enum Platform {
+  Website
   Reddit
   X
   Instagram
@@ -93,6 +94,37 @@ enum LeadOutcomeStatus {
   LOST
 }
 
+enum LeadIdentityStatus {
+  UNVERIFIED
+  VERIFIED
+  REJECTED
+}
+
+enum LeadEvidenceStatus {
+  UNKNOWN
+  VALID
+  INVALID
+}
+
+enum LeadQualificationStatus {
+  UNQUALIFIED
+  QUALIFIED
+  REJECTED
+}
+
+enum SearchEvidenceExtractionStatus {
+  PENDING
+  PROCESSED
+  REJECTED
+  FAILED
+}
+
+enum OpportunityType {
+  COMPANY_EXPANSION
+  INVESTMENT
+  DIGITAL_UPGRADE
+}
+
 model User {
   id           String       @id @default(cuid())
   email        String       @unique
@@ -105,6 +137,7 @@ model User {
   productProfiles ProductProfile[]
   leadResearchFeedbacks LeadResearchFeedback[]
   leadOutcomes LeadOutcome[]
+  opportunities Opportunity[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -185,6 +218,12 @@ model Lead {
   industry          Industry
   jobTitle          String?
   company           String?
+  normalizedDomain  String?
+  identityStatus    LeadIdentityStatus      @default(UNVERIFIED)
+  evidenceStatus    LeadEvidenceStatus      @default(UNKNOWN)
+  productRelevancePassed Boolean            @default(false)
+  qualificationStatus LeadQualificationStatus @default(UNQUALIFIED)
+  qualificationVersion String               @default("v1")
   sourceUrl         String
   profileUrl        String
   interestTags      String[]           @default([])
@@ -203,13 +242,18 @@ model Lead {
   contacts          ContactProfile[]
   channelProfile    ChannelProfile?
   outcome           LeadOutcome?
+  searchTaskLinks   SearchTaskLead[]
+  searchEvidence    SearchEvidence[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
   @@index([userId, createdAt])
   @@index([userId, intentScore])
   @@index([userId, contactStatus])
+  @@index([userId, qualificationStatus, updatedAt])
+  @@index([userId, qualificationVersion, qualificationStatus, updatedAt])
   @@index([searchTaskId])
+  @@index([normalizedDomain])
   @@index([platform, profileUrl])
   @@index([sourceUrl])
   @@unique([userId, provider, externalId])
@@ -367,11 +411,108 @@ model SearchTask {
   completedAt  DateTime?
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   leads        Lead[]
+  resultLinks  SearchTaskLead[]
+  searchEvidence SearchEvidence[]
+  opportunities Opportunity[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+model SearchEvidence {
+  id                     String                         @id @default(cuid())
+  searchTaskId           String
+  leadId                 String?
+  provider               String
+  externalId             String
+  platform               Platform
+  rawUrl                 String
+  profileUrl             String?
+  title                  String?
+  content                String                         @db.Text
+  rawMetadata            Json?
+  extractionStatus       SearchEvidenceExtractionStatus @default(PENDING)
+  companyName            String?
+  normalizedDomain       String?
+  website                String?
+  identityConfidence     Int                            @default(0)
+  identityReasoning      Json?
+  identityStatus         LeadIdentityStatus             @default(UNVERIFIED)
+  evidenceStatus         LeadEvidenceStatus             @default(UNKNOWN)
+  productRelevancePassed Boolean                        @default(false)
+  qualificationStatus    LeadQualificationStatus        @default(UNQUALIFIED)
+  qualificationVersion   String                         @default("v1")
+  qualificationReasons   Json?
+  searchTask             SearchTask                     @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
+  lead                   Lead?                          @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  opportunityEvidence    OpportunityEvidence[]
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+
+  @@unique([searchTaskId, provider, externalId])
+  @@index([searchTaskId, extractionStatus])
+  @@index([leadId])
+  @@index([qualificationStatus, createdAt])
+  @@index([qualificationVersion, qualificationStatus, createdAt])
+}
+
+model Opportunity {
+  id                     String                @id @default(cuid())
+  userId                 String
+  searchTaskId           String
+  type                   OpportunityType
+  dedupeKey              String
+  companyName            String?
+  title                  String
+  summary                String                @db.Text
+  whyItMatters           String                @db.Text
+  recommendedNextStep    String                @db.Text
+  confidence             Int
+  productContextSnapshot Json
+  detectionVersion       String                @default("v1")
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  searchTask             SearchTask            @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
+  evidence               OpportunityEvidence[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  @@unique([searchTaskId, dedupeKey])
+  @@index([userId, createdAt])
+  @@index([userId, type, createdAt])
+  @@index([searchTaskId, confidence])
+}
+
+model OpportunityEvidence {
+  id               String         @id @default(cuid())
+  opportunityId    String
+  searchEvidenceId String
+  excerpt          String         @db.Text
+  isPrimary        Boolean        @default(false)
+  confidence       Int
+  opportunity      Opportunity    @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  searchEvidence   SearchEvidence @relation(fields: [searchEvidenceId], references: [id], onDelete: Restrict)
+  createdAt        DateTime       @default(now())
+
+  @@unique([opportunityId, searchEvidenceId])
+  @@index([searchEvidenceId])
+}
+
+model SearchTaskLead {
+  id            String     @id @default(cuid())
+  searchTaskId  String
+  leadId        String
+  rankScore     Int        @default(0)
+  matchReason   String?    @db.Text
+  matchEvidence Json?
+  searchTask    SearchTask @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
+  lead          Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+
+  @@unique([searchTaskId, leadId])
+  @@index([searchTaskId, rankScore])
+  @@index([leadId])
 }
 
 model AIAnalysis {

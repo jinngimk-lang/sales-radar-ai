@@ -19,13 +19,23 @@ export class SearchKeywordExpansionService {
     if (intent.targetType === 'buyer' || intent.targetType === 'both') {
       keywords.push({
         language: 'en',
-        query: `${product} procurement buyers${suffix}`.trim(),
+        query: this.buyerQuery(intent, product, suffix),
       })
     }
     if (intent.targetType === 'channel' || intent.targetType === 'both') {
       keywords.push({
         language: 'en',
-        query: `${product} ${this.englishChannelTerm(intent.relationship)}${suffix}`.trim(),
+        query: [
+          product,
+          intent.industry === 'Unknown' ? '' : intent.industry,
+          this.englishChannelTerm(intent.relationship),
+          'official company website',
+          suffix,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim(),
       })
     }
 
@@ -56,6 +66,75 @@ export class SearchKeywordExpansionService {
     }
 
     return this.unique(keywords)
+  }
+
+  private buyerQuery(
+    intent: SearchIntent,
+    product: string,
+    locationSuffix: string,
+  ): string {
+    const customerType = this.customerTypeTerm(intent)
+    const industry =
+      intent.industry === 'Unknown' ? '' : intent.industry
+    const businessProblem =
+      intent.businessProblem === 'Unknown' ? '' : intent.businessProblem
+    const buyingSignals = intent.buyingSignals.slice(0, 2).join(' ')
+    const productRelevance = this.productRelevanceTerm(product)
+
+    return [
+      industry,
+      `end-user ${customerType}`,
+      productRelevance,
+      businessProblem,
+      buyingSignals,
+      'official company website',
+      locationSuffix,
+      '-vendor',
+      '-supplier',
+      '-reseller',
+      '-distributor',
+      '-case-study',
+      '-whitepaper',
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  private productRelevanceTerm(product: string): string {
+    if (/industrial automation.*(?:saas|software)/i.test(product)) {
+      return `${product} factory operations digital transformation`
+    }
+    if (/\bcrm\b.*\b(?:saas|software)\b/i.test(product)) {
+      return `${product} customer relationship management adoption`
+    }
+    if (/\b(?:saas|software)\b/i.test(product)) {
+      return `${product} adoption business operations`
+    }
+    return `${product} application`
+  }
+
+  private customerTypeTerm(intent: SearchIntent): string {
+    const value = intent.customerType.toLowerCase()
+    if (value.includes('manufacturer') || value.includes('manufacturing')) {
+      return 'manufacturing companies'
+    }
+    if (
+      value.includes('small business') ||
+      value.includes('small compan') ||
+      value.includes('smb') ||
+      value.includes('sme')
+    ) {
+      return 'small businesses'
+    }
+    if (value.includes('factory operator')) return 'factory operators'
+    if (value.includes('supplier')) return 'supplier companies'
+    if (value.includes('logistics')) return 'logistics companies'
+    if (value.includes('buyer') || value.includes('company')) {
+      return 'companies'
+    }
+    return `${intent.customerType} companies`
   }
 
   private englishChannelTerm(relationship: string): string {

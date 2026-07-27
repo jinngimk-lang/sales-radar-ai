@@ -8,6 +8,7 @@ import { searchRouter } from './routes/search.routes.js'
 import { productRouter } from './routes/product.routes.js'
 import { productsRouter } from './routes/products.routes.js'
 import { learningRouter } from './routes/learning.routes.js'
+import { assistantRouter } from './routes/assistant.routes.js'
 
 export const app = express()
 
@@ -20,6 +21,7 @@ app.use('/api/search', searchRouter)
 app.use('/api/product', productRouter)
 app.use('/api/products', productsRouter)
 app.use('/api/leads', leadRouter)
+app.use('/api/assistant', assistantRouter)
 app.use('/api/learning', learningRouter)
 
 app.use(notFound)

@@ -55,7 +55,9 @@ describe('Global Search Intelligence v1', () => {
     assert.deepEqual(strategy.languages, ['en', 'de', 'zh'])
     assert.ok(
       strategy.keywords.some((keyword) =>
-        /packaging machinery procurement buyers Germany/i.test(keyword.query),
+        /packaging machinery.*official company website.*Germany/i.test(
+          keyword.query,
+        ),
       ),
     )
     assert.ok(

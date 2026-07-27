@@ -7,7 +7,9 @@ import type {
   OutreachChannel,
   ProductUnderstandingResult,
   ProductProfile,
+  SearchProductContextDraft,
   SearchStrategy,
+  SalesOpportunity,
 } from '@/types'
 import {
   analyzeSearchIntent,
@@ -18,6 +20,7 @@ import {
 } from '@/services/api'
 import { FilterSidebar } from '@/components/discover/FilterSidebar'
 import { CustomerCard, CustomerCardSkeleton } from '@/components/discover/CustomerCard'
+import { OpportunityCard } from '@/components/discover/OpportunityCard'
 import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
 
@@ -32,6 +35,7 @@ const DEFAULT_FILTERS: SearchFilters = {
 }
 
 type SortKey = 'intent' | 'time'
+type ResultCategory = 'opportunities' | 'leads'
 
 const CHANNELS: { key: OutreachChannel; label: string; icon: typeof Mail }[] = [
   { key: 'email', label: '开发信', icon: Mail },
@@ -47,7 +51,11 @@ export function DiscoverPage() {
     query: searchParams.get('q') || '',
   })
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([])
+  const [resultCategory, setResultCategory] =
+    useState<ResultCategory>('opportunities')
   const [loading, setLoading] = useState(true)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [showMobileFilter, setShowMobileFilter] = useState(false)
   const [sortBy, setSortBy] = useState<SortKey>('intent')
   const [searchStrategy, setSearchStrategy] =
@@ -70,7 +78,11 @@ export function DiscoverPage() {
   // 搜索
   const runSearch = useCallback(async (currentFilters: SearchFilters) => {
     setLoading(true)
+    setSearchError(null)
+    setCustomers([])
+    setOpportunities([])
     try {
+      let productContext: SearchProductContextDraft | undefined
       if (currentFilters.query.trim()) {
         const [intentResult, productResult] = await Promise.allSettled([
           analyzeSearchIntent(currentFilters.query.trim()),
@@ -82,12 +94,51 @@ export function DiscoverPage() {
         setProductInsight(
           productResult.status === 'fulfilled' ? productResult.value : null,
         )
+        productContext = {
+          product:
+            productResult.status === 'fulfilled'
+              ? productResult.value.productUnderstanding.productName
+              : currentFilters.query.trim(),
+          industry:
+            productResult.status === 'fulfilled'
+              ? productResult.value.productUnderstanding.industry
+              : undefined,
+          region:
+            currentFilters.regions[0] ??
+            (intentResult.status === 'fulfilled' &&
+            intentResult.value.intent.region !== 'Unknown'
+              ? intentResult.value.intent.region
+              : undefined),
+          customerType:
+            intentResult.status === 'fulfilled'
+              ? intentResult.value.targetType
+              : undefined,
+          businessProblem:
+            productResult.status === 'fulfilled'
+              ? productResult.value.salesPreparation.customerPainPoints
+                  .slice(0, 2)
+                  .join('; ')
+              : undefined,
+          buyingSignals:
+            productResult.status === 'fulfilled'
+              ? productResult.value.salesPreparation.buyingSignals
+              : undefined,
+        }
       } else {
         setSearchStrategy(null)
         setProductInsight(null)
       }
-      const results = await searchCustomers(currentFilters)
-      setCustomers(results)
+      const result = await searchCustomers(currentFilters, productContext)
+      setCustomers(result.customers)
+      setOpportunities(result.opportunities)
+    } catch (error) {
+      setCustomers([])
+      setOpportunities([])
+      setSearchError(
+        error instanceof Error
+          ? error.message
+          : 'Search could not be completed.',
+      )
     } finally {
       setLoading(false)
     }
@@ -251,16 +302,11 @@ export function DiscoverPage() {
                   <span>
                     推荐寻找：
                     <strong className="ml-1 text-ink-800">
-                      {[
-                        productInsight.searchStrategy.buyerKeywords.length > 0
-                          ? 'Buyer'
-                          : null,
-                        productInsight.searchStrategy.channelKeywords.length > 0
-                          ? 'Distributor'
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' + ')}
+                      {searchStrategy.targetType === 'both'
+                        ? 'Buyer + Channel'
+                        : searchStrategy.targetType === 'channel'
+                          ? 'Channel'
+                          : 'Buyer'}
                     </strong>
                   </span>
                 </>
@@ -277,11 +323,11 @@ export function DiscoverPage() {
             {loading ? (
               <span className="flex items-center gap-1.5">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                正在扫描全球客户...
+                正在扫描全球销售机会...
               </span>
             ) : (
               <>
-                找到 <span className="font-semibold text-brand-600">{customers.length}</span> 个潜在客户
+                发现 <span className="font-semibold text-brand-600">{opportunities.length + customers.length}</span> 项销售情报
                 {filters.query && (
                   <>
                     {' '}
@@ -291,6 +337,7 @@ export function DiscoverPage() {
               </>
             )}
           </p>
+          {resultCategory === 'leads' && (
           <div className="flex items-center gap-1 text-xs">
             <span className="hidden text-ink-400 sm:inline">排序：</span>
             <button
@@ -310,6 +357,7 @@ export function DiscoverPage() {
               最新发布
             </button>
           </div>
+          )}
         </div>
       </div>
 
@@ -319,26 +367,66 @@ export function DiscoverPage() {
           {/* 左侧筛选（桌面端） */}
           <div className="hidden w-64 shrink-0 lg:block">
             <div className="sticky top-6">
-              <FilterSidebar filters={filters} onChange={setFilters} resultCount={customers.length} />
+              <FilterSidebar filters={filters} onChange={setFilters} resultCount={opportunities.length + customers.length} />
             </div>
           </div>
 
           {/* 右侧结果 */}
           <div className="min-w-0 flex-1">
+            {!loading && !searchError && (
+              <div className="mb-4 flex gap-1 rounded-xl bg-ink-100 p-1">
+                <button
+                  onClick={() => setResultCategory('opportunities')}
+                  className={cn(
+                    'flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all',
+                    resultCategory === 'opportunities'
+                      ? 'bg-white text-brand-600 shadow-sm'
+                      : 'text-ink-500 hover:text-ink-700',
+                  )}
+                >
+                  销售机会 {opportunities.length}
+                </button>
+                <button
+                  onClick={() => setResultCategory('leads')}
+                  className={cn(
+                    'flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all',
+                    resultCategory === 'leads'
+                      ? 'bg-white text-brand-600 shadow-sm'
+                      : 'text-ink-500 hover:text-ink-700',
+                  )}
+                >
+                  已确认客户 {customers.length}
+                </button>
+              </div>
+            )}
             {loading ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <CustomerCardSkeleton key={i} />
                 ))}
               </div>
-            ) : sortedCustomers.length > 0 ? (
+            ) : searchError ? (
+              <SearchFailureState message={searchError} />
+            ) : resultCategory === 'opportunities' && opportunities.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {opportunities.map((opportunity) => (
+                  <OpportunityCard
+                    key={opportunity.id}
+                    opportunity={opportunity}
+                  />
+                ))}
+              </div>
+            ) : resultCategory === 'leads' && sortedCustomers.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {sortedCustomers.map((customer) => (
                   <CustomerCard key={customer.id} customer={customer} onGenerateEmail={handleGenerateEmail} />
                 ))}
               </div>
             ) : (
-              <EmptyState onReset={() => setFilters(DEFAULT_FILTERS)} />
+              <EmptyState
+                category={resultCategory}
+                onReset={() => setFilters(DEFAULT_FILTERS)}
+              />
             )}
           </div>
         </div>
@@ -355,7 +443,7 @@ export function DiscoverPage() {
                 <X className="h-5 w-5 text-ink-500" />
               </button>
             </div>
-            <FilterSidebar filters={filters} onChange={setFilters} resultCount={customers.length} />
+            <FilterSidebar filters={filters} onChange={setFilters} resultCount={opportunities.length + customers.length} />
           </div>
         </div>
       )}
@@ -428,15 +516,41 @@ export function DiscoverPage() {
   )
 }
 
-function EmptyState({ onReset }: { onReset: () => void }) {
+function SearchFailureState({ message }: { message: string }) {
+  return (
+    <div className="card px-6 py-10 text-center">
+      <h3 className="text-base font-semibold text-ink-900">
+        本次搜索未完成
+      </h3>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-ink-500">{message}</p>
+      <p className="mt-3 text-xs text-ink-400">
+        当前结果已清空，历史线索不会被当作本次搜索结果展示。
+      </p>
+    </div>
+  )
+}
+
+function EmptyState({
+  category,
+  onReset,
+}: {
+  category: ResultCategory
+  onReset: () => void
+}) {
   return (
     <div className="card flex flex-col items-center justify-center px-6 py-16 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-ink-100">
         <Search className="h-7 w-7 text-ink-400" />
       </div>
-      <h3 className="mt-4 text-lg font-semibold text-ink-900">未找到匹配客户</h3>
+      <h3 className="mt-4 text-lg font-semibold text-ink-900">
+        {category === 'opportunities'
+          ? '本次未发现可验证的销售机会'
+          : '本次没有通过质量门槛的客户'}
+      </h3>
       <p className="mt-1 max-w-sm text-sm text-ink-500">
-        试试调整搜索关键词或放宽筛选条件，全球雷达会重新扫描潜在客户。
+        {category === 'opportunities'
+          ? '没有真实事件信号时，系统不会生成模拟机会。可以尝试更明确的企业扩张、投资或数字化升级条件。'
+          : '销售机会不会自动成为客户。只有公司身份、域名、证据和产品相关性全部通过后才会显示在这里。'}
       </p>
       <button onClick={onReset} className="btn-secondary mt-5">
         重置筛选条件

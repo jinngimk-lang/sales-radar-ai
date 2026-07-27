@@ -8,70 +8,50 @@ const PLACEHOLDERS = ['工业机器人', '美容仪', 'AI 软件', '机械设备
 const FEATURES = [
   {
     icon: Radar,
-    title: '客户发现',
-    desc: '从全球公开信息中发现潜在买家。覆盖 Reddit、LinkedIn、X、Instagram 等 8 大平台，实时捕捉采购意向。',
+    title: '发现销售机会',
+    desc: '从真实公开来源中识别企业扩张、投资与数字化升级信号，并保留可核验的来源证据。',
     color: 'bg-brand-50 text-brand-600',
   },
   {
     icon: Target,
-    title: '需求分析',
-    desc: 'AI 判断客户购买意向与采购预算，自动评分排序，帮你把精力聚焦在最高价值的线索上。',
+    title: '分析公司与证据',
+    desc: '区分市场机会与已确认客户，解释机会为何相关；没有充分证据时保持待验证，而不是补造信息。',
     color: 'bg-emerald-50 text-emerald-600',
   },
   {
     icon: MessageSquareText,
-    title: '销售辅助',
-    desc: '一键生成英文邮件、WhatsApp 消息、LinkedIn 私信，附带跟进计划与阶梯报价，开发效率提升 10 倍。',
+    title: '转化为销售行动',
+    desc: '围绕真实公司信息和事件证据，研究联系人、推荐切入角度，并为后续触达准备销售策略。',
     color: 'bg-amber-50 text-amber-600',
   },
-]
-
-const STATS = [
-  { value: '8+', label: '数据平台' },
-  { value: '190+', label: '覆盖国家' },
-  { value: '10x', label: '开发效率' },
-  { value: '24/7', label: '实时监控' },
 ]
 
 const FLOW_STEPS = [
   {
     num: '01',
-    title: '输入产品',
-    desc: '输入「工业机器人」「美容仪」等关键词',
+    title: '描述销售目标',
+    desc: '说明你销售的产品、目标行业和地区',
     icon: Search,
   },
   {
     num: '02',
-    title: 'AI 发现客户',
-    desc: '雷达扫描 8 大平台，捕捉采购意向帖子',
+    title: '发现真实机会',
+    desc: '从公开信息中识别投资、扩张与数字化升级事件',
     icon: Radar,
   },
   {
     num: '03',
-    title: '分析意向',
-    desc: 'AI 评分排序，识别高概率采购客户',
+    title: '分析公司',
+    desc: '核验公司、来源证据与产品相关性',
     icon: Target,
   },
   {
     num: '04',
-    title: '联系成交',
-    desc: '一键生成邮件 / WhatsApp / LinkedIn 话术',
+    title: '形成销售行动',
+    desc: '确认客户后研究联系人并准备触达策略',
     icon: MessageSquareText,
   },
 ]
-
-const DEMO_EXAMPLE = {
-  product: '工业机器人',
-  customer: 'Marcus Reyes',
-  platform: 'Reddit',
-  country: '美国',
-  industry: '工业制造',
-  post: "Looking for automation solutions for factory — we're scaling production and need reliable industrial robots. Budget approved for Q3 procurement.",
-  needKeywords: ['工业机器人', '装配线', 'Q3 采购'],
-  score: 92,
-  action: '立即联系',
-  reason: '客户已批准 Q3 采购预算，决策窗口紧迫',
-}
 
 const INDUSTRIES = [
   { name: '工业制造', desc: '机器人、自动化设备、CNC 加工' },
@@ -122,22 +102,22 @@ export function LandingPage() {
         <div className="mx-auto max-w-5xl px-4 pb-20 pt-20 text-center sm:px-6 sm:pt-28 lg:px-8">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 animate-fade-in-up">
             <Sparkles className="h-3.5 w-3.5" />
-            AI 驱动 · 全球客户雷达已上线
+            AI 驱动的 B2B 销售机会情报
           </div>
 
           <h1 className="text-balance text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl lg:text-6xl animate-fade-in-up">
-            AI 驱动的
+            发现值得行动的
             <span className="bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent">
               {' '}
-             全球客户发现{' '}
+              B2B 销售机会
             </span>
-            平台
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-balance text-lg leading-relaxed text-ink-500 animate-fade-in-up">
-            输入你的产品，AI 自动发现全球潜在客户、需求和销售机会。
+            描述你销售的产品与目标市场，系统从真实公开信息中发现企业投资、
+            扩张和数字化升级信号。
             <br className="hidden sm:block" />
-            从 8 大平台实时捕捉采购意向，让获客像雷达一样精准。
+            查看来源证据，分析相关公司，再把机会转化为可靠的销售行动。
           </p>
 
           {/* 中央搜索框 */}
@@ -155,7 +135,7 @@ export function LandingPage() {
               </div>
               <button onClick={() => handleSearch()} className="btn-primary shrink-0 px-5 py-3">
                 <Radar className="h-4 w-4" />
-                开始寻找客户
+                开始发现机会
               </button>
             </div>
 
@@ -174,14 +154,17 @@ export function LandingPage() {
             </div>
           </div>
 
-          {/* 统计 */}
-          <div className="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
-            {STATS.map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-3xl font-bold text-ink-900">{s.value}</div>
-                <div className="mt-1 text-sm text-ink-500">{s.label}</div>
-              </div>
-            ))}
+          <div className="mx-auto mt-16 flex max-w-3xl flex-wrap justify-center gap-3 text-sm text-ink-600">
+            {['真实来源证据', '机会与客户分层', '不确定信息保持待验证'].map(
+              (item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-ink-200 bg-white px-4 py-2"
+                >
+                  {item}
+                </span>
+              ),
+            )}
           </div>
         </div>
       </section>
@@ -191,10 +174,10 @@ export function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
-              四步完成全球获客
+              从市场变化到销售行动
             </h2>
             <p className="mt-4 text-ink-500">
-              从输入产品到联系客户，全流程 AI 自动化，销售新人也能立刻上手
+              先发现真实机会，再核验公司和客户资格；机会不会被自动冒充为客户
             </p>
           </div>
 
@@ -223,86 +206,34 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 真实演示：输入「工业机器人」会看到什么 */}
+      {/* 数据真实性说明 */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
             <Sparkles className="h-3.5 w-3.5" />
-            真实案例演示
+            可信机会原则
           </span>
           <h2 className="mt-4 text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
-            输入「{DEMO_EXAMPLE.product}」，立刻发现采购客户
+            少一些结果，多一些可信证据
           </h2>
           <p className="mt-4 text-ink-500">
-            下面是 AI 在 Reddit 上实时捕捉到的一条高意向线索
+            市场事件可以成为销售机会，但不会因此自动成为已确认客户。
           </p>
         </div>
 
-        <div className="mx-auto mt-12 max-w-2xl">
-          <div className="card overflow-hidden p-6 shadow-card">
-            {/* 客户头 */}
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white">
-                  MR
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-ink-900">{DEMO_EXAMPLE.customer}</h3>
-                    <span className="rounded-md bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold text-orange-600">
-                      {DEMO_EXAMPLE.platform}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-ink-500">
-                    @{DEMO_EXAMPLE.customer.toLowerCase().replace(' ', '_')} · {DEMO_EXAMPLE.country} · {DEMO_EXAMPLE.industry}
-                  </p>
-                </div>
-              </div>
-              <span className="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {DEMO_EXAMPLE.score}
-              </span>
-            </div>
-
-            {/* 原始内容 */}
-            <div className="mt-4 rounded-xl bg-ink-50 px-4 py-3">
-              <p className="text-sm italic leading-relaxed text-ink-700">"{DEMO_EXAMPLE.post}"</p>
-            </div>
-
-            {/* AI 分析 */}
-            <div className="mt-4 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-brand-700">
-                <Sparkles className="h-3.5 w-3.5" />
-                AI 分析结果
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {DEMO_EXAMPLE.needKeywords.map((k) => (
-                  <span key={k} className="chip bg-white text-brand-600 ring-1 ring-brand-100">
-                    {k}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-ink-600">
-                <span className="font-semibold text-ink-800">判断原因：</span>
-                {DEMO_EXAMPLE.reason}
+        <div className="mx-auto mt-12 grid max-w-4xl gap-4 md:grid-cols-3">
+          {[
+            ['销售机会', '企业事件与产品方向相关，并保留真实来源。'],
+            ['待验证公司', '公司身份或域名不足时继续保留证据，不生成客户。'],
+            ['已确认客户', '仅在身份、域名、证据与产品相关性全部通过后进入。'],
+          ].map(([title, description]) => (
+            <div key={title} className="card p-6">
+              <h3 className="font-semibold text-ink-900">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-ink-500">
+                {description}
               </p>
             </div>
-
-            {/* 推荐行动 */}
-            <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-rose-50 px-3 py-2.5 text-xs text-rose-700 ring-1 ring-rose-200">
-              <Sparkles className="h-4 w-4 shrink-0" />
-              <span>
-                <span className="font-semibold">推荐行动 · {DEMO_EXAMPLE.action}</span>
-              </span>
-              <button
-                onClick={() => navigate(`/app/discover?q=${encodeURIComponent(DEMO_EXAMPLE.product)}`)}
-                className="btn-primary ml-auto px-3 py-1.5 text-xs"
-              >
-                查看完整客户列表
-                <ArrowRight className="h-3 w-3" />
-              </button>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
@@ -310,10 +241,10 @@ export function LandingPage() {
       <section id="features" className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
-            从发现到成交，一站式 AI 获客
+            从机会发现到销售准备
           </h2>
           <p className="mt-4 text-ink-500">
-            三个核心能力，覆盖客户发现、意向判断与销售跟进全流程
+            三个核心能力，帮助销售更快找到值得研究和行动的商业信号
           </p>
         </div>
 
@@ -339,10 +270,10 @@ export function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
-              覆盖六大核心行业
+              适用于多类 B2B 销售场景
             </h2>
             <p className="mt-4 text-ink-500">
-              无论你卖什么产品，AI 都能帮你找到正在采购的全球客户
+              从产品与目标市场出发，寻找相关企业变化与可验证客户
             </p>
           </div>
 
@@ -377,17 +308,17 @@ export function LandingPage() {
           />
           <div className="relative">
             <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              现在就开始发现你的全球客户
+              从一个真实销售目标开始
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-brand-100">
-              无需信用卡，输入产品即可体验 AI 客户发现。立即获取你的第一批高意向线索。
+              输入产品、行业和目标地区，发现有证据的市场机会，并逐步核验为可行动客户。
             </p>
             <button
               onClick={() => handleSearch()}
               className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-brand-700 shadow-lg transition-all hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]"
             >
               <Radar className="h-4 w-4" />
-              免费开始寻找客户
+              开始发现销售机会
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>

@@ -17,14 +17,22 @@ const COUNTRY_RULES = [
   { pattern: /\b(uae|united arab emirates)\b|阿联酋/i, country: 'United Arab Emirates', region: 'MiddleEast' },
 ]
 
+const REGION_RULES = [
+  { pattern: /\b(europe|european|eu)\b|欧洲|欧盟/i, region: 'Europe' },
+]
+
 const PRODUCT_RULES = [
+  { pattern: /industrial automation\s+(?:saas|software)|(?:saas|software)\s+for\s+industrial automation/i, product: 'industrial automation SaaS', industry: 'Industrial Manufacturing' },
+  { pattern: /\b(?:crm|customer relationship management)\s+(?:saas|software)\b|\bsaas\s+(?:crm|for customer relationship management)\b/i, product: 'CRM SaaS', industry: 'Business Software' },
+  { pattern: /\bb2b\s+(?:saas|software)\b/i, product: 'B2B software', industry: 'Software' },
   { pattern: /自动化设备|industrial automation(?: equipment)?/i, product: 'industrial automation equipment', industry: 'Industrial Automation' },
   { pattern: /包装机械|packaging machin(?:e|ery)/i, product: 'packaging machinery', industry: 'Packaging Machinery' },
   { pattern: /工业机器人|industrial robots?/i, product: 'industrial robots', industry: 'Industrial Automation' },
   { pattern: /太阳能板|光伏组件|solar panels?|photovoltaic modules?/i, product: 'solar panels', industry: 'Renewable Energy' },
   { pattern: /医疗设备|medical devices?|medical equipment/i, product: 'medical equipment', industry: 'Medical Equipment' },
   { pattern: /电子元件|electronic components?/i, product: 'electronic components', industry: 'Electronics' },
-  { pattern: /saas|software/i, product: 'software solutions', industry: 'Software' },
+  { pattern: /\bsaas\b/i, product: 'SaaS software', industry: 'Software' },
+  { pattern: /\bsoftware\b/i, product: 'software', industry: 'Software' },
 ]
 
 export class RuleBasedSearchIntentProvider implements SearchIntentProvider {
@@ -54,17 +62,46 @@ export class RuleBasedSearchIntentProvider implements SearchIntentProvider {
               : 'buyer'
 
     const countryRule = COUNTRY_RULES.find((rule) => rule.pattern.test(normalized))
+    const regionRule = REGION_RULES.find((rule) => rule.pattern.test(normalized))
     const productRule = PRODUCT_RULES.find((rule) => rule.pattern.test(normalized))
 
     return {
       targetType,
+      customerType: this.customerType(normalized, targetType),
       industry: productRule?.industry ?? UNKNOWN,
       product: productRule?.product ?? this.fallbackProduct(normalized),
-      region: countryRule?.region ?? UNKNOWN,
+      region: countryRule?.region ?? regionRule?.region ?? UNKNOWN,
       country: countryRule?.country ?? UNKNOWN,
       relationship: this.relationship(normalized, targetType),
       language: this.language(normalized),
+      businessProblem: this.businessProblem(normalized),
+      buyingSignals: this.buyingSignals(normalized),
     }
+  }
+
+  private businessProblem(input: string): string {
+    const rules: Array<[RegExp, string]> = [
+      [/\b(downtime|unplanned downtime)\b/i, 'reduce production downtime'],
+      [/\b(manual process|manual workflow)\b/i, 'replace manual workflows'],
+      [/\b(efficiency|productivity|throughput)\b/i, 'improve operational efficiency'],
+      [/\b(integration|legacy system)\b/i, 'integrate legacy systems'],
+      [/\b(cost reduction|reduce costs?|lower costs?)\b/i, 'reduce operating costs'],
+      [/\b(digital transformation|digitization|digitalization)\b/i, 'modernize operations'],
+    ]
+    return rules.find(([pattern]) => pattern.test(input))?.[1] ?? UNKNOWN
+  }
+
+  private buyingSignals(input: string): string[] {
+    const rules: Array<[RegExp, string]> = [
+      [/\b(expansion|expanding|new factory|new plant)\b/i, 'factory expansion'],
+      [/\b(upgrade|modernization|modernisation)\b/i, 'technology upgrade'],
+      [/\b(rfq|request for quotation|tender)\b/i, 'active RFQ or tender'],
+      [/\b(evaluating|evaluation|shortlisting)\b/i, 'solution evaluation'],
+      [/\b(hiring|recruiting)\b/i, 'relevant hiring activity'],
+    ]
+    return rules
+      .filter(([pattern]) => pattern.test(input))
+      .map(([, signal]) => signal)
   }
 
   private relationship(input: string, targetType: SearchTargetType): string {
@@ -79,6 +116,28 @@ export class RuleBasedSearchIntentProvider implements SearchIntentProvider {
       : targetType === 'both'
         ? 'market_development'
         : 'sales_opportunity'
+  }
+
+  private customerType(
+    input: string,
+    targetType: SearchTargetType,
+  ): string {
+    if (targetType === 'channel') return 'Channel partners'
+    if (targetType === 'both') return 'Buyers and channel partners'
+    if (
+      /\b(manufacturing companies|manufacturers?|factory operators?|industrial enterprises?)\b/i.test(
+        input,
+      )
+    ) {
+      return 'Manufacturing companies'
+    }
+    if (/\b(small businesses|small companies|smbs?|smes?)\b/i.test(input)) {
+      return 'Small businesses'
+    }
+    if (/\b(factory|factories|plants?)\b/i.test(input)) {
+      return 'Factory operators'
+    }
+    return 'Buyer companies'
   }
 
   private language(input: string): string {
@@ -98,7 +157,7 @@ export class RuleBasedSearchIntentProvider implements SearchIntentProvider {
         ' ',
       )
       .replace(
-        /德国|美国|中国|法国|意大利|印度|越南|阿联酋|\b(germany|usa|united states|china|france|italy|india|vietnam|uae)\b/gi,
+        /德国|美国|中国|法国|意大利|印度|越南|阿联酋|欧洲|欧盟|\b(germany|usa|united states|china|france|italy|india|vietnam|uae|europe|european|eu)\b/gi,
         ' ',
       )
       .replace(/\s+/g, ' ')

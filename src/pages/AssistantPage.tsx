@@ -15,9 +15,10 @@ import {
   MessageCircle,
   Linkedin,
   Calendar,
+  ShieldCheck,
 } from 'lucide-react'
 import type { ChatMessage, ChatSession } from '@/types'
-import { getChatSessions, getChatMessages, sendChatMessage } from '@/services/api'
+import { getChatSessions, sendChatMessage } from '@/services/api'
 import { Avatar } from '@/components/ui/Avatar'
 import { PlatformIcon } from '@/components/ui/PlatformIcon'
 import { uid } from '@/lib/utils'
@@ -33,19 +34,19 @@ const QUICK_PROMPTS = [
 /** AI 销售助手页面 */
 export function AssistantPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [activeSession, setActiveSession] = useState<string>('default')
+  const [activeSession, setActiveSession] = useState<string>('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [sessionsLoading, setSessionsLoading] = useState(true)
+  const [sessionsError, setSessionsError] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    getChatSessions().then((data) => {
-      setSessions(data)
-      setSessionsLoading(false)
-    })
-    getChatMessages('default').then(setMessages)
+    getChatSessions()
+      .then(setSessions)
+      .catch(() => setSessionsError(true))
+      .finally(() => setSessionsLoading(false))
   }, [])
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export function AssistantPage() {
 
   const handleSend = async (text?: string) => {
     const content = (text ?? input).trim()
-    if (!content || loading) return
+    if (!content || loading || !activeSession) return
 
     const userMsg: ChatMessage = {
       id: uid('msg'),
@@ -79,17 +80,17 @@ export function AssistantPage() {
       {/* 左侧：历史客户 */}
       <aside className="hidden w-72 shrink-0 flex-col border-r border-ink-200 bg-white md:flex">
         <div className="p-3">
-          <button className="btn-primary w-full justify-start">
+          <Link to="/app/discover" className="btn-primary w-full justify-start">
             <Plus className="h-4 w-4" />
-            新建对话
-          </button>
+            选择销售机会
+          </Link>
         </div>
 
         <div className="px-3">
           <div className="flex items-center gap-2 rounded-xl bg-ink-50 px-3 py-2">
             <Search className="h-4 w-4 text-ink-400" />
             <input
-              placeholder="搜索历史客户"
+              placeholder="搜索已验证机会"
               className="w-full bg-transparent text-sm placeholder:text-ink-400 focus:outline-none"
             />
           </div>
@@ -97,7 +98,7 @@ export function AssistantPage() {
 
         <div className="mt-2 flex-1 space-y-1 overflow-y-auto scrollbar-thin px-2 pb-3">
           <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-400">
-            最近会话
+            已验证销售机会
           </p>
           {sessionsLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
@@ -109,11 +110,22 @@ export function AssistantPage() {
                 </div>
               </div>
             ))
+          ) : sessionsError ? (
+            <p className="px-3 py-4 text-xs leading-relaxed text-rose-600">
+              暂时无法加载销售机会，请稍后重试。
+            </p>
+          ) : sessions.length === 0 ? (
+            <p className="px-3 py-4 text-xs leading-relaxed text-ink-500">
+              暂无通过公司、域名、证据与产品相关性验证的销售机会。
+            </p>
           ) : (
             sessions.map((s) => (
               <button
                 key={s.id}
-                onClick={() => setActiveSession(s.id)}
+                onClick={() => {
+                  setActiveSession(s.id)
+                  setMessages([])
+                }}
                 className={`flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors ${
                   activeSession === s.id ? 'bg-brand-50' : 'hover:bg-ink-50'
                 }`}
@@ -142,10 +154,10 @@ export function AssistantPage() {
               <Bot className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-sm font-semibold text-ink-900">Sales Radar AI 助手</h1>
+              <h1 className="text-sm font-semibold text-ink-900">AI Sales Copilot</h1>
               <p className="flex items-center gap-1 text-xs text-ink-500">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                在线 · 可生成开发话术与跟进方案
+                分析销售机会 · 总结证据 · 制定触达与跟进策略
               </p>
             </div>
           </div>
@@ -158,6 +170,35 @@ export function AssistantPage() {
         {/* 消息列表 */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin">
           <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6">
+            {!activeSession && messages.length === 0 && (
+              <div className="mx-auto mt-16 max-w-lg rounded-2xl border border-ink-200 bg-white px-8 py-10 text-center shadow-sm">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <h2 className="mt-4 text-base font-semibold text-ink-900">
+                  选择一个已验证的销售机会
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-ink-500">
+                  Copilot 只分析具备已验证公司、域名、来源证据和产品相关性的客户，不会用历史或测试数据冒充新机会。
+                </p>
+                {sessions.length === 0 && !sessionsLoading && !sessionsError && (
+                  <Link to="/app/discover" className="btn-primary mt-5 inline-flex">
+                    前往客户发现
+                  </Link>
+                )}
+              </div>
+            )}
+            {activeSession && messages.length === 0 && (
+              <div className="mx-auto mt-12 max-w-lg text-center">
+                <Sparkles className="mx-auto h-6 w-6 text-brand-600" />
+                <h2 className="mt-3 text-base font-semibold text-ink-900">
+                  销售机会已选择
+                </h2>
+                <p className="mt-2 text-sm text-ink-500">
+                  可以要求 Copilot 解释匹配原因、总结证据、生成触达内容或建议跟进策略。
+                </p>
+              </div>
+            )}
             {messages.map((msg) => (
               <MessageBubble key={msg.id} message={msg} />
             ))}
@@ -174,7 +215,7 @@ export function AssistantPage() {
         </div>
 
         {/* 快捷提示 */}
-        {messages.length <= 1 && (
+        {activeSession && messages.length <= 1 && (
           <div className="mx-auto w-full max-w-3xl px-4 pb-3 sm:px-6">
             <div className="flex flex-wrap gap-2">
               {QUICK_PROMPTS.map((p) => {
@@ -200,6 +241,7 @@ export function AssistantPage() {
             <div className="flex items-end gap-2 rounded-2xl border border-ink-200 bg-white p-2 shadow-sm transition-all focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-500/10">
               <textarea
                 value={input}
+                disabled={!activeSession}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -207,13 +249,17 @@ export function AssistantPage() {
                     handleSend()
                   }
                 }}
-                placeholder="帮我跟进这个客户，生成销售话术..."
+                placeholder={
+                  activeSession
+                    ? '分析这个销售机会，或生成触达与跟进建议...'
+                    : '请先选择一个已验证的销售机会'
+                }
                 rows={1}
                 className="max-h-32 flex-1 resize-none bg-transparent px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none"
               />
               <button
                 onClick={() => handleSend()}
-                disabled={!input.trim() || loading}
+                disabled={!activeSession || !input.trim() || loading}
                 className="btn-primary shrink-0 p-2.5"
                 aria-label="发送"
               >
@@ -221,7 +267,7 @@ export function AssistantPage() {
               </button>
             </div>
             <p className="mt-2 text-center text-xs text-ink-400">
-              AI 可能出错，重要信息请核实。按 Enter 发送，Shift + Enter 换行
+              Copilot 建议基于现有证据生成，重要信息仍需核实。
             </p>
           </div>
         </div>

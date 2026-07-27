@@ -3,10 +3,14 @@ import type { RequestHandler } from 'express'
 import {
   createSearchTask,
   getSearchTask,
+  getSearchTaskOpportunities,
+  getSearchTaskResults,
   processSearchTask,
 } from '../services/search-task.service.js'
 import { AppError } from '../utils/app-error.js'
 import { globalSearchIntelligence } from '../services/global-search-intelligence.service.js'
+import { providerHealthService } from '../services/provider-health.service.js'
+import type { SearchProductContext } from '../contracts/product-context.contract.js'
 
 function parseEnumArray<T extends string>(
   value: unknown,
@@ -31,7 +35,19 @@ export const createSearchTaskController: RequestHandler = async (
     throw new AppError(400, 'VALIDATION_ERROR', 'keyword is required')
   }
 
-  const strategy = await globalSearchIntelligence.createStrategy(keyword)
+  await providerHealthService.requireAgentReach()
+
+  const requestedProductContext = parseProductContext(
+    request.body?.productContext,
+  )
+  const strategy = await globalSearchIntelligence.createStrategy(
+    keyword,
+    requestedProductContext,
+  )
+  const productContext = effectiveProductContext(
+    requestedProductContext,
+    strategy,
+  )
   const requestedRegions = parseEnumArray(
     request.body?.regions,
     Object.values(Region),
@@ -52,6 +68,7 @@ export const createSearchTaskController: RequestHandler = async (
     ),
     regions:
       requestedRegions.length > 0 ? requestedRegions : inferredRegion,
+    productContext,
   })
 
   setImmediate(() => {
@@ -74,4 +91,96 @@ export const getSearchTaskController: RequestHandler = async (
   }
 
   response.json({ data: task })
+}
+
+export const getSearchTaskResultsController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const results = await getSearchTaskResults(request.params.id)
+  response.json({ data: results, meta: { total: results.length } })
+}
+
+export const getSearchTaskOpportunitiesController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const opportunities = await getSearchTaskOpportunities(request.params.id)
+  response.json({
+    data: opportunities,
+    meta: { total: opportunities.length },
+  })
+}
+
+function parseProductContext(value: unknown) {
+  if (value === undefined) return undefined
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'productContext must be an object',
+    )
+  }
+
+  const source = value as Record<string, unknown>
+  const context = {
+    product: readOptionalString(source.product, 'productContext.product'),
+    industry: readOptionalString(source.industry, 'productContext.industry'),
+    region: readOptionalString(source.region, 'productContext.region'),
+    country: readOptionalString(source.country, 'productContext.country'),
+    customerType: readOptionalString(
+      source.customerType,
+      'productContext.customerType',
+    ),
+    businessProblem: readOptionalString(
+      source.businessProblem,
+      'productContext.businessProblem',
+    ),
+    buyingSignals: readOptionalStringArray(
+      source.buyingSignals,
+      'productContext.buyingSignals',
+    ),
+  }
+
+  return Object.values(context).some(Boolean) ? context : undefined
+}
+
+function readOptionalStringArray(value: unknown, fieldName: string) {
+  if (value === undefined || value === null) return undefined
+  if (
+    !Array.isArray(value) ||
+    value.some((item) => typeof item !== 'string')
+  ) {
+    throw new AppError(400, 'VALIDATION_ERROR', `${fieldName} must be a string array`)
+  }
+  const values = value.map((item) => item.trim()).filter(Boolean)
+  return values.length > 0 ? values : undefined
+}
+
+function effectiveProductContext(
+  requested: SearchProductContext | undefined,
+  strategy: Awaited<
+    ReturnType<typeof globalSearchIntelligence.createStrategy>
+  >,
+): SearchProductContext {
+  const known = (value: string) =>
+    value && value !== 'Unknown' ? value : undefined
+
+  return {
+    product: known(strategy.intent.product),
+    customerType: strategy.intent.customerType,
+    industry: known(strategy.intent.industry),
+    region: known(strategy.intent.region),
+    country: known(strategy.intent.country),
+    businessProblem: known(strategy.intent.businessProblem),
+    buyingSignals: strategy.intent.buyingSignals,
+  }
+}
+
+function readOptionalString(value: unknown, fieldName: string) {
+  if (value === undefined || value === null || value === '') return undefined
+  if (typeof value !== 'string') {
+    throw new AppError(400, 'VALIDATION_ERROR', `${fieldName} must be a string`)
+  }
+  return value.trim() || undefined
 }

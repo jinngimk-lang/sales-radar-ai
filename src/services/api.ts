@@ -42,20 +42,20 @@ import type {
   SearchStrategy,
   ProductUnderstandingResult,
   ProductProfile,
+  SearchExecutionResult,
+  SearchProductContextDraft,
+  SalesOpportunity,
 } from '@/types'
 import {
   DASHBOARD_STATS,
   DISCOVERY_TREND,
   INDUSTRY_DISTRIBUTION,
   PLATFORM_DISTRIBUTION,
-  CHAT_SESSIONS,
-  DEFAULT_CHAT_MESSAGES,
 } from '@/data/dashboard'
 import { delay, scoreToLevel } from '@/lib/utils'
 import * as crmStore from '@/lib/crmStore'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
-const completedSearches = new Set<string>()
 
 interface ApiEnvelope<T> {
   data: T
@@ -108,6 +108,7 @@ interface BackendSearchTask {
   status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
   progress: number
   resultCount: number
+  errorCode: string | null
   errorMessage: string | null
 }
 
@@ -144,6 +145,20 @@ interface ApiErrorBody {
   error?: {
     code?: string
     message?: string
+    provider?: string
+    providerState?: string
+    retryable?: boolean
+  }
+}
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+  ) {
+    super(message)
+    this.name = 'ApiRequestError'
   }
 }
 
@@ -158,7 +173,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as ApiErrorBody
-    throw new Error(body.error?.message || `API request failed (${response.status})`)
+    throw new ApiRequestError(
+      body.error?.message || `API request failed (${response.status})`,
+      response.status,
+      body.error?.code,
+    )
   }
 
   return response.json() as Promise<T>
@@ -262,35 +281,27 @@ function toCustomer(lead: BackendLead): Customer {
   }
 }
 
-function searchKey(filters: SearchFilters): string {
-  return JSON.stringify({
-    keyword: filters.query.trim().toLowerCase(),
-    platforms: [...filters.platforms].sort(),
-    regions: [...filters.regions].sort(),
-  })
-}
-
-async function createSearchTaskAndWait(filters: SearchFilters): Promise<void> {
-  const key = searchKey(filters)
-  if (completedSearches.has(key)) return
-
+async function createSearchTaskAndWait(
+  filters: SearchFilters,
+  productContext?: SearchProductContextDraft,
+): Promise<BackendSearchTask> {
   const created = await request<ApiEnvelope<BackendSearchTask>>('/search-task', {
     method: 'POST',
     body: JSON.stringify({
       keyword: filters.query.trim(),
       platforms: filters.platforms,
       regions: filters.regions,
+      productContext,
     }),
   })
 
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     const result = await request<ApiEnvelope<BackendSearchTask>>(
       `/search-task/${created.data.id}`,
     )
 
     if (result.data.status === 'COMPLETED') {
-      completedSearches.add(key)
-      return
+      return result.data
     }
 
     if (
@@ -381,23 +392,34 @@ export async function analyzeProductProfile(
  * ============================================================ */
 
 /**
- * 有关键词时先创建 SearchTask 并等待 Mock Provider 完成，
- * 然后读取后端 Lead；其余前端筛选保持原有行为。
+ * A current search is created as a SearchTask and reads only that task's
+ * owned results. Historical Leads remain a separate backend collection.
  */
-export async function searchCustomers(filters: SearchFilters): Promise<Customer[]> {
+export async function searchCustomers(
+  filters: SearchFilters,
+  productContext?: SearchProductContextDraft,
+): Promise<SearchExecutionResult> {
   const keyword = filters.query.trim()
 
-  if (keyword) {
-    await createSearchTaskAndWait(filters)
+  if (!keyword) {
+    return {
+      taskId: '',
+      status: 'empty',
+      customers: [],
+      opportunities: [],
+    }
   }
 
-  const params = new URLSearchParams({ sort: 'desc' })
-  if (keyword) params.set('keyword', keyword)
-
-  const response = await request<ApiEnvelope<BackendLead[]>>(
-    `/leads?${params.toString()}`,
-  )
-  let results = response.data.map(toCustomer)
+  const task = await createSearchTaskAndWait(filters, productContext)
+  const [leadResponse, opportunityResponse] = await Promise.all([
+    request<ApiEnvelope<BackendLead[]>>(
+      `/search-task/${task.id}/results`,
+    ),
+    request<ApiEnvelope<SalesOpportunity[]>>(
+      `/search-task/${task.id}/opportunities`,
+    ),
+  ])
+  let results = leadResponse.data.map(toCustomer)
 
   if (filters.platforms.length > 0) {
     results = results.filter((c) => filters.platforms.includes(c.platform))
@@ -433,7 +455,15 @@ export async function searchCustomers(filters: SearchFilters): Promise<Customer[
   // 按意向评分降序
   results.sort((a, b) => b.analysis.intentScore - a.analysis.intentScore)
 
-  return results
+  return {
+    taskId: task.id,
+    status:
+      results.length > 0 || opportunityResponse.data.length > 0
+        ? 'success'
+        : 'empty',
+    customers: results,
+    opportunities: opportunityResponse.data,
+  }
 }
 
 /**
@@ -619,49 +649,32 @@ export async function getPlatformDistribution(): Promise<ChartPoint[]> {
  * ============================================================ */
 
 export async function getChatSessions(): Promise<ChatSession[]> {
-  try {
-    const response = await request<ApiEnvelope<BackendLead[]>>(
-      '/leads?sort=desc',
-    )
-    return response.data.map((lead) => ({
-      id: lead.id,
-      customerName: lead.displayName,
-      initials: lead.initials,
-      platform: lead.platform,
-      lastMessage:
-        lead.analysis?.suggestion ?? '点击客户后可生成 AI 销售建议',
-      updatedAt: formatRelativeTime(lead.updatedAt),
-    }))
-  } catch {
-    return CHAT_SESSIONS
-  }
-}
-
-export async function getChatMessages(_sessionId: string): Promise<ChatMessage[]> {
-  await delay(200)
-  return DEFAULT_CHAT_MESSAGES
+  const response = await request<ApiEnvelope<BackendLead[]>>(
+    '/assistant/leads',
+  )
+  return response.data.map((lead) => ({
+    id: lead.id,
+    customerName: lead.company ?? lead.displayName,
+    initials: lead.initials,
+    platform: lead.platform,
+    lastMessage:
+      lead.analysis?.suggestion ?? '查看证据、匹配原因与销售建议',
+    updatedAt: formatRelativeTime(lead.updatedAt),
+  }))
 }
 
 /**
- * AI 助手复用 Lead Analysis API，不接入真实对话模型。
+ * AI Sales Copilot reuses Lead Analysis and requires an explicitly selected,
+ * production-qualified Lead.
  */
 export async function sendChatMessage(content: string, _sessionId?: string): Promise<ChatMessage> {
-  let leadId = _sessionId
-
-  if (!leadId || leadId === 'default' || leadId.startsWith('sess_')) {
-    const response = await request<ApiEnvelope<BackendLead[]>>(
-      '/leads?sort=desc',
-    )
-    leadId = response.data[0]?.id
-  }
-
+  const leadId = _sessionId?.trim()
   if (!leadId) {
-    return {
-      id: `msg_${Date.now()}`,
-      role: 'assistant',
-      content: '暂时没有可分析的客户，请先在客户发现页面创建搜索任务。',
-      createdAt: new Date().toISOString(),
-    }
+    throw new ApiRequestError(
+      '请先选择一个已验证的销售机会。',
+      400,
+      'ASSISTANT_LEAD_REQUIRED',
+    )
   }
 
   const analysis = await analyzeCustomer(leadId)

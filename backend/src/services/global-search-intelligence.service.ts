@@ -4,6 +4,7 @@ import {
   searchKeywordExpansion,
   type ExpandedKeyword,
 } from './search-keyword-expansion.service.js'
+import type { SearchProductContext } from '../contracts/product-context.contract.js'
 
 export interface SearchStrategy {
   intent: {
@@ -13,6 +14,9 @@ export interface SearchStrategy {
     country: string
     relationship: string
     language: string
+    customerType: string
+    businessProblem: string
+    buyingSignals: string[]
   }
   keywords: ExpandedKeyword[]
   languages: string[]
@@ -21,17 +25,49 @@ export interface SearchStrategy {
 }
 
 export class GlobalSearchIntelligenceService {
-  async createStrategy(input: string): Promise<SearchStrategy> {
+  async createStrategy(
+    input: string,
+    productContext?: SearchProductContext,
+  ): Promise<SearchStrategy> {
     const parsed = await searchIntent.parse(input)
-    const keywords = searchKeywordExpansion.expand(parsed.intent)
+    const intent = {
+      ...parsed.intent,
+      product: preferSpecific(
+        parsed.intent.product,
+        productContext?.product,
+        GENERIC_PRODUCTS,
+      ),
+      industry: preferSpecific(
+        parsed.intent.industry,
+        productContext?.industry,
+        GENERIC_INDUSTRIES,
+      ),
+      region: productContext?.region?.trim() || parsed.intent.region,
+      country: productContext?.country?.trim() || parsed.intent.country,
+      customerType: preferSpecific(
+        parsed.intent.customerType,
+        productContext?.customerType,
+        GENERIC_CUSTOMER_TYPES,
+      ),
+      businessProblem:
+        productContext?.businessProblem?.trim() ||
+        parsed.intent.businessProblem,
+      buyingSignals:
+        productContext?.buyingSignals?.filter(Boolean) ??
+        parsed.intent.buyingSignals,
+    }
+    const keywords = searchKeywordExpansion.expand(intent)
     return {
       intent: {
-        industry: parsed.intent.industry,
-        product: parsed.intent.product,
-        region: parsed.intent.region,
-        country: parsed.intent.country,
-        relationship: parsed.intent.relationship,
-        language: parsed.intent.language,
+        industry: intent.industry,
+        product: intent.product,
+        region: intent.region,
+        country: intent.country,
+        relationship: intent.relationship,
+        language: intent.language,
+        customerType: intent.customerType,
+        businessProblem: intent.businessProblem,
+        buyingSignals: intent.buyingSignals,
       },
       keywords,
       languages: [...new Set(keywords.map((keyword) => keyword.language))],
@@ -59,3 +95,42 @@ export class GlobalSearchIntelligenceService {
 
 export const globalSearchIntelligence =
   new GlobalSearchIntelligenceService()
+
+const GENERIC_PRODUCTS = new Set([
+  'software',
+  'saas',
+  'saas software',
+  'business software',
+])
+
+const GENERIC_INDUSTRIES = new Set([
+  'software',
+  'cross-industry',
+  'unknown',
+])
+
+const GENERIC_CUSTOMER_TYPES = new Set([
+  'buyer',
+  'buyers',
+  'buyer companies',
+  'company',
+  'companies',
+  'customer',
+  'customers',
+])
+
+function preferSpecific(
+  parsedValue: string,
+  suppliedValue: string | undefined,
+  genericValues: Set<string>,
+) {
+  const parsed = parsedValue.trim()
+  const supplied = suppliedValue?.trim()
+  if (!supplied) return parsed
+  if (parsed.toLowerCase() === supplied.toLowerCase()) return parsed
+
+  const parsedIsGeneric = genericValues.has(parsed.toLowerCase())
+  const suppliedIsGeneric = genericValues.has(supplied.toLowerCase())
+  if (!parsedIsGeneric && suppliedIsGeneric) return parsed
+  return supplied
+}

@@ -49,7 +49,7 @@ export function PublicFooter() {
           <div className="col-span-2">
             <Logo />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-500">
-              AI 驱动的全球客户发现平台。输入你的产品，自动发现潜在客户、采购需求与销售机会。
+              AI 驱动的 B2B 销售机会情报平台。从真实公开信息中发现机会、核验证据并形成销售行动。
             </p>
           </div>
 

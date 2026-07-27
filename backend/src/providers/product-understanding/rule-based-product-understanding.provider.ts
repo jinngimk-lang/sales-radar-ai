@@ -222,7 +222,12 @@ export class RuleBasedProductUnderstandingProvider
     const profile = PROFILES.find((candidate) =>
       candidate.patterns.some((pattern) => pattern.test(query)),
     )
-    if (profile) return this.withoutPatterns(profile)
+    if (profile) {
+      return this.preserveSpecificProductMeaning(
+        query,
+        this.withoutPatterns(profile),
+      )
+    }
     return this.fallback(query)
   }
 
@@ -230,6 +235,100 @@ export class RuleBasedProductUnderstandingProvider
     const { patterns: _patterns, ...result } = profile
     void _patterns
     return structuredClone(result)
+  }
+
+  private preserveSpecificProductMeaning(
+    query: string,
+    result: ProductUnderstandingResult,
+  ): ProductUnderstandingResult {
+    if (
+      /industrial automation\s+(?:saas|software)|(?:saas|software)\s+for\s+industrial automation/i.test(
+        query,
+      )
+    ) {
+      result.productUnderstanding.productName = 'Industrial Automation SaaS'
+      result.productUnderstanding.category = 'Industrial Automation Software'
+      result.productUnderstanding.industry = 'Industrial Manufacturing'
+      result.productUnderstanding.applications = [
+        'Factory operations visibility',
+        'Production monitoring',
+        'Downtime reduction',
+        'Manufacturing workflow integration',
+        'Industrial digital transformation',
+      ]
+      result.productUnderstanding.keywords = [
+        'industrial automation SaaS',
+        'factory operations software',
+        'manufacturing operations platform',
+        'production monitoring SaaS',
+      ]
+      result.buyerPersona = [
+        {
+          customerType: 'Manufacturing companies',
+          industry: 'Industrial Manufacturing',
+          companyType: 'Factory operator or industrial enterprise',
+          reason:
+            'Manufacturing teams use operational software to improve production visibility, integration, and uptime.',
+          painPoints: [
+            'Production downtime',
+            'Fragmented operational data',
+            'Manual production reporting',
+            'Legacy system integration',
+          ],
+        },
+      ]
+      result.searchStrategy.buyerKeywords = [
+        'European manufacturing companies factory operations software',
+        'factory operators industrial digital transformation',
+        'manufacturers production monitoring SaaS',
+      ]
+      return result
+    }
+
+    if (
+      /\b(?:crm|customer relationship management)\s+(?:saas|software)\b|\bsaas\s+(?:crm|for customer relationship management)\b/i.test(
+        query,
+      )
+    ) {
+      result.productUnderstanding.productName = 'CRM SaaS'
+      result.productUnderstanding.category = 'Customer Relationship Management Software'
+      result.productUnderstanding.industry = 'Business Software'
+      result.productUnderstanding.applications = [
+        'Sales pipeline management',
+        'Customer relationship management',
+        'Lead follow-up',
+        'Customer data organization',
+        'Sales reporting',
+      ]
+      result.productUnderstanding.keywords = [
+        'CRM SaaS',
+        'small business CRM',
+        'sales pipeline software',
+        'customer relationship management platform',
+      ]
+      result.buyerPersona = [
+        {
+          customerType: 'Small businesses',
+          industry: 'Cross-industry',
+          companyType: 'Small or medium-sized business',
+          reason:
+            'Small businesses use CRM software to organize sales activity and improve customer follow-up.',
+          painPoints: [
+            'Scattered customer information',
+            'Inconsistent lead follow-up',
+            'Limited sales visibility',
+            'Manual reporting',
+          ],
+        },
+      ]
+      result.searchStrategy.buyerKeywords = [
+        'European small businesses evaluating CRM SaaS',
+        'SME sales pipeline software adoption',
+        'small companies customer relationship management needs',
+      ]
+    }
+
+    return result
   }
 
   private fallback(query: string): ProductUnderstandingResult {

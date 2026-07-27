@@ -15,6 +15,7 @@ import type {
 
 /** 平台元数据：用于图标渲染与主题色 */
 export const PLATFORM_META: Record<Platform, PlatformMeta> = {
+  Website: { name: 'Website', label: 'Company Website', color: '#3155D9' },
   Reddit: { name: 'Reddit', label: 'Reddit', color: '#FF4500' },
   X: { name: 'X', label: 'X (Twitter)', color: '#0f1419' },
   Instagram: { name: 'Instagram', label: 'Instagram', color: '#E1306C' },

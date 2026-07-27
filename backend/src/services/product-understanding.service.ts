@@ -70,7 +70,13 @@ export class ProductUnderstandingService {
           latencyMs: Date.now() - startedAt,
         })
         if (!parsed.usedFallback) {
-          return { ...parsed.value, provider: generated.provider }
+          return {
+            ...preserveSpecificUnderstanding(
+              parsed.value,
+              fallbackResponse,
+            ),
+            provider: generated.provider,
+          }
         }
       } catch {
         await this.usageLogs.safeRecord({
@@ -97,7 +103,10 @@ export class ProductUnderstandingService {
       success: true,
       latencyMs: Date.now() - fallbackStartedAt,
     })
-    return { ...safeFallback, provider: fallback.provider }
+    return {
+      ...preserveSpecificUnderstanding(safeFallback, fallbackResponse),
+      provider: fallback.provider,
+    }
   }
 }
 
@@ -137,6 +146,51 @@ function record(value: unknown): Record<string, unknown> {
 
 function stringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+function preserveSpecificUnderstanding(
+  result: ProductUnderstandingResult,
+  ruleBased: ProductUnderstandingResult,
+): ProductUnderstandingResult {
+  const genericProducts = new Set([
+    'software',
+    'saas',
+    'saas software',
+    'business software',
+  ])
+  const resultName = result.productUnderstanding.productName
+    .trim()
+    .toLowerCase()
+  const ruleBasedName = ruleBased.productUnderstanding.productName
+    .trim()
+    .toLowerCase()
+
+  if (
+    !genericProducts.has(resultName) ||
+    genericProducts.has(ruleBasedName)
+  ) {
+    return result
+  }
+
+  return {
+    ...result,
+    productUnderstanding: {
+      ...result.productUnderstanding,
+      productName: ruleBased.productUnderstanding.productName,
+      category: ruleBased.productUnderstanding.category,
+      industry: ruleBased.productUnderstanding.industry,
+      applications: ruleBased.productUnderstanding.applications,
+      keywords: ruleBased.productUnderstanding.keywords,
+    },
+    buyerPersona:
+      ruleBased.buyerPersona.length > 0
+        ? ruleBased.buyerPersona
+        : result.buyerPersona,
+    searchStrategy: {
+      ...result.searchStrategy,
+      buyerKeywords: ruleBased.searchStrategy.buyerKeywords,
+    },
+  }
 }
 
 export const productUnderstanding = new ProductUnderstandingService()

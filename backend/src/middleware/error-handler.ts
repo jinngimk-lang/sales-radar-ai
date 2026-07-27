@@ -12,6 +12,7 @@ export const errorHandler: ErrorRequestHandler = (
       error: {
         code: error.code,
         message: error.message,
+        ...(error.details ?? {}),
       },
     })
     return

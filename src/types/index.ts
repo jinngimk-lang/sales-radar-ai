@@ -5,6 +5,7 @@
 
 /** 社交平台枚举 */
 export type Platform =
+  | 'Website'
   | 'Reddit'
   | 'X'
   | 'Instagram'
@@ -263,6 +264,9 @@ export interface SearchStrategy {
     country: string
     relationship: string
     language: string
+    customerType: string
+    businessProblem: string
+    buyingSignals: string[]
   }
   keywords: Array<{
     language: string
@@ -342,6 +346,56 @@ export interface SearchFilters {
   followUpStatuses?: FollowUpStatus[]
   /** 仅看收藏 */
   favoritesOnly?: boolean
+}
+
+/** Phase 1.1 contract reserved for the future ProductContextSnapshot. */
+export interface SearchProductContextDraft {
+  product?: string
+  industry?: string
+  region?: string
+  country?: string
+  customerType?: string
+  businessProblem?: string
+  buyingSignals?: string[]
+}
+
+export type OpportunityType =
+  | 'COMPANY_EXPANSION'
+  | 'INVESTMENT'
+  | 'DIGITAL_UPGRADE'
+
+export interface SalesOpportunity {
+  id: string
+  type: OpportunityType
+  companyName: string | null
+  title: string
+  summary: string
+  whyItMatters: string
+  recommendedNextStep: string
+  confidence: number
+  productContextSnapshot: SearchProductContextDraft
+  detectionVersion: string
+  createdAt: string
+  evidence: Array<{
+    id: string
+    excerpt: string
+    isPrimary: boolean
+    confidence: number
+    searchEvidence: {
+      id: string
+      rawUrl: string
+      title: string | null
+      provider: string
+      platform: Platform
+    }
+  }>
+}
+
+export interface SearchExecutionResult {
+  taskId: string
+  status: 'success' | 'empty'
+  customers: Customer[]
+  opportunities: SalesOpportunity[]
 }
 
 /** Dashboard 统计卡片 */

@@ -40,6 +40,7 @@ const PLATFORM_DOMAINS: Partial<Record<Platform, string[]>> = {
 }
 
 const PUBLIC_DEFAULT_PLATFORMS = [
+  Platform.Website,
   Platform.Reddit,
   Platform.X,
   Platform.YouTube,
@@ -249,9 +250,9 @@ export class AgentReachProvider implements SearchProvider {
     platforms: Platform[],
     regions: Region[],
   ): string {
-    const domains = platforms.flatMap(
-      (platform) => PLATFORM_DOMAINS[platform] ?? [],
-    )
+    const domains = platforms.includes(Platform.Website)
+      ? []
+      : platforms.flatMap((platform) => PLATFORM_DOMAINS[platform] ?? [])
     const siteClause = domains.map((domain) => `site:${domain}`).join(' OR ')
     const regionClause = regions.map((region) => REGION_COUNTRY[region]).join(' OR ')
 
@@ -465,7 +466,7 @@ function inferPlatform(url: string): Platform | null {
       return platform as Platform
     }
   }
-  return null
+  return Platform.Website
 }
 
 function inferCompany(title: string, url: string): string | null {

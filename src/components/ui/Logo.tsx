@@ -25,7 +25,7 @@ export function Logo({ className, variant = 'default' }: LogoProps) {
         <span className={cn('text-[15px] font-bold tracking-tight', textColor)}>
           Sales Radar <span className="text-brand-500">AI</span>
         </span>
-        <span className={cn('text-[10px] font-medium', subColor)}>全球客户发现平台</span>
+        <span className={cn('text-[10px] font-medium', subColor)}>B2B 销售机会情报</span>
       </div>
     </div>
   )

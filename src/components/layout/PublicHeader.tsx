@@ -46,7 +46,7 @@ export function PublicHeader() {
             登录
           </Link>
           <Link to="/app/discover" className="btn-primary">
-            开始寻找客户
+            开始发现机会
           </Link>
         </div>
 
@@ -77,7 +77,7 @@ export function PublicHeader() {
                 登录
               </Link>
               <Link to="/app/discover" className="btn-primary w-full">
-                开始寻找客户
+                开始发现机会
               </Link>
             </div>
           </nav>
