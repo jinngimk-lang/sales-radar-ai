@@ -78,7 +78,10 @@ describe('AI Provider Platform v1', () => {
       fallback,
     )
     factory.register(deepSeek)
-    assert.equal(factory.resolve(), deepSeek)
+    assert.equal(
+      factory.resolve(AITaskType.PRODUCT_UNDERSTANDING),
+      deepSeek,
+    )
     assert.equal(factory.getConfig().model, 'deepseek-chat')
   })
 

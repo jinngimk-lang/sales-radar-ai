@@ -138,6 +138,19 @@ model PromptTemplate {
   @@index([taskType, updatedAt])
 }
 
+model AIUsageLog {
+  id        String   @id @default(cuid())
+  taskType  String
+  provider  String
+  model     String
+  success   Boolean
+  latencyMs Int
+  createdAt DateTime @default(now())
+
+  @@index([taskType, createdAt])
+  @@index([provider, success, createdAt])
+}
+
 model Lead {
   id                String             @id @default(cuid())
   userId            String
