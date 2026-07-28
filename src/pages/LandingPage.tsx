@@ -9,7 +9,7 @@ const FEATURES = [
   {
     icon: Radar,
     title: '发现销售机会',
-    desc: '从真实公开来源中识别企业扩张、投资与数字化升级信号，并保留可核验的来源证据。',
+    desc: '及时发现企业扩张、投资与数字化升级动向，找到值得跟进的销售方向。',
     color: 'bg-brand-50 text-brand-600',
   },
   {
@@ -36,7 +36,7 @@ const FLOW_STEPS = [
   {
     num: '02',
     title: '发现真实机会',
-    desc: '从公开信息中识别投资、扩张与数字化升级事件',
+    desc: '捕捉企业投资、扩张与数字化升级动向',
     icon: Radar,
   },
   {
@@ -102,22 +102,19 @@ export function LandingPage() {
         <div className="mx-auto max-w-5xl px-4 pb-20 pt-20 text-center sm:px-6 sm:pt-28 lg:px-8">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 animate-fade-in-up">
             <Sparkles className="h-3.5 w-3.5" />
-            AI 驱动的 B2B 销售机会情报
+            帮助你发现值得跟进的销售目标
           </div>
 
           <h1 className="text-balance text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl lg:text-6xl animate-fade-in-up">
-            发现值得行动的
+            发现更多
             <span className="bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent">
               {' '}
-              B2B 销售机会
+              销售机会
             </span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-balance text-lg leading-relaxed text-ink-500 animate-fade-in-up">
-            描述你销售的产品与目标市场，系统从真实公开信息中发现企业投资、
-            扩张和数字化升级信号。
-            <br className="hidden sm:block" />
-            查看来源证据，分析相关公司，再把机会转化为可靠的销售行动。
+            输入你的产品和目标市场，快速发现正在发生变化的企业、行业机会和潜在客户。
           </p>
 
           {/* 中央搜索框 */}
@@ -155,7 +152,7 @@ export function LandingPage() {
           </div>
 
           <div className="mx-auto mt-16 flex max-w-3xl flex-wrap justify-center gap-3 text-sm text-ink-600">
-            {['真实来源证据', '机会与客户分层', '不确定信息保持待验证'].map(
+            {['快速发现销售目标', '捕捉企业变化机会', '基于真实来源判断'].map(
               (item) => (
                 <span
                   key={item}
@@ -211,10 +208,10 @@ export function LandingPage() {
         <div className="mx-auto max-w-2xl text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
             <Sparkles className="h-3.5 w-3.5" />
-            可信机会原则
+            从发现到行动
           </span>
           <h2 className="mt-4 text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
-            少一些结果，多一些可信证据
+            消息更广，机会更多
           </h2>
           <p className="mt-4 text-ink-500">
             市场事件可以成为销售机会，但不会因此自动成为已确认客户。
@@ -270,7 +267,7 @@ export function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
-              适用于多类 B2B 销售场景
+              适用于多类企业销售场景
             </h2>
             <p className="mt-4 text-ink-500">
               从产品与目标市场出发，寻找相关企业变化与可验证客户
@@ -308,10 +305,10 @@ export function LandingPage() {
           />
           <div className="relative">
             <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              从一个真实销售目标开始
+              快速找到你的销售目标
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-brand-100">
-              输入产品、行业和目标地区，发现有证据的市场机会，并逐步核验为可行动客户。
+              输入产品、行业和目标地区，发现有真实来源的市场机会，并逐步确认值得跟进的客户。
             </p>
             <button
               onClick={() => handleSearch()}

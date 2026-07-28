@@ -107,7 +107,13 @@ export class RuleBasedSearchIntentProvider implements SearchIntentProvider {
   private relationship(input: string, targetType: SearchTargetType): string {
     if (/系统集成商|\bsystem integrators?\b/i.test(input)) return 'system_integration'
     if (/代理商|经销商|\b(distributor|reseller)\b/i.test(input)) return 'distribution'
-    if (/合作伙伴|\b(channel partner|partner)\b/i.test(input)) return 'partnership'
+    if (
+      /合作伙伴|\b(?:(?:strategic|technology|business|channel)\s+)?partners?\b/i.test(
+        input,
+      )
+    ) {
+      return 'partnership'
+    }
     if (/贸易公司|\btrading company\b/i.test(input)) return 'trade_cooperation'
     if (/采购商|采购方|\b(procurement|purchaser)\b/i.test(input)) return 'procurement'
     if (/进口商|\bimporter\b/i.test(input)) return 'import'

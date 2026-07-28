@@ -5,14 +5,13 @@ import type {
   Customer,
   SearchFilters,
   OutreachChannel,
-  ProductUnderstandingResult,
   ProductProfile,
+  ProductContextSnapshot,
   SearchProductContextDraft,
   SearchStrategy,
   SalesOpportunity,
 } from '@/types'
 import {
-  analyzeSearchIntent,
   searchCustomers,
   generateOutreach,
   understandProduct,
@@ -60,8 +59,8 @@ export function DiscoverPage() {
   const [sortBy, setSortBy] = useState<SortKey>('intent')
   const [searchStrategy, setSearchStrategy] =
     useState<SearchStrategy | null>(null)
-  const [productInsight, setProductInsight] =
-    useState<ProductUnderstandingResult | null>(null)
+  const [productContext, setProductContext] =
+    useState<ProductContextSnapshot | null>(null)
   const [productProfiles, setProductProfiles] = useState<ProductProfile[]>([])
   const [selectedProductId, setSelectedProductId] = useState('')
   const [emailModal, setEmailModal] = useState<{
@@ -81,68 +80,77 @@ export function DiscoverPage() {
     setSearchError(null)
     setCustomers([])
     setOpportunities([])
+    setSearchStrategy(null)
+    setProductContext(null)
     try {
-      let productContext: SearchProductContextDraft | undefined
+      let productContextDraft: SearchProductContextDraft | undefined
       if (currentFilters.query.trim()) {
-        const [intentResult, productResult] = await Promise.allSettled([
-          analyzeSearchIntent(currentFilters.query.trim()),
-          understandProduct(currentFilters.query.trim()),
-        ])
-        setSearchStrategy(
-          intentResult.status === 'fulfilled' ? intentResult.value : null,
-        )
-        setProductInsight(
-          productResult.status === 'fulfilled' ? productResult.value : null,
-        )
-        productContext = {
-          product:
-            productResult.status === 'fulfilled'
-              ? productResult.value.productUnderstanding.productName
+        const productResult = selectedProductId
+          ? null
+          : await understandProduct(currentFilters.query.trim()).catch(
+              () => null,
+            )
+        productContextDraft = {
+          product: selectedProductId
+            ? undefined
+            : productResult
+              ? productResult.productUnderstanding.productName
               : currentFilters.query.trim(),
-          industry:
-            productResult.status === 'fulfilled'
-              ? productResult.value.productUnderstanding.industry
-              : undefined,
-          region:
-            currentFilters.regions[0] ??
-            (intentResult.status === 'fulfilled' &&
-            intentResult.value.intent.region !== 'Unknown'
-              ? intentResult.value.intent.region
-              : undefined),
-          customerType:
-            intentResult.status === 'fulfilled'
-              ? intentResult.value.targetType
-              : undefined,
+          category: selectedProductId
+            ? undefined
+            : productResult?.productUnderstanding.category,
+          industry: selectedProductId
+            ? undefined
+            : productResult?.productUnderstanding.industry,
+          applications: selectedProductId
+            ? undefined
+            : productResult?.productUnderstanding.applications,
+          region: currentFilters.regions[0],
           businessProblem:
-            productResult.status === 'fulfilled'
-              ? productResult.value.salesPreparation.customerPainPoints
+            !selectedProductId && productResult
+              ? productResult.salesPreparation.customerPainPoints
                   .slice(0, 2)
                   .join('; ')
               : undefined,
           buyingSignals:
-            productResult.status === 'fulfilled'
-              ? productResult.value.salesPreparation.buyingSignals
+            !selectedProductId && productResult
+              ? productResult.salesPreparation.buyingSignals
+              : undefined,
+          buyerKeywords:
+            !selectedProductId && productResult
+              ? productResult.searchStrategy.buyerKeywords
+              : undefined,
+          channelKeywords:
+            !selectedProductId && productResult
+              ? productResult.searchStrategy.channelKeywords
               : undefined,
         }
       } else {
         setSearchStrategy(null)
-        setProductInsight(null)
+        setProductContext(null)
       }
-      const result = await searchCustomers(currentFilters, productContext)
+      const result = await searchCustomers(
+        currentFilters,
+        productContextDraft,
+        selectedProductId || undefined,
+        (preparation) => {
+          setSearchStrategy(preparation.strategy)
+          setProductContext(preparation.productContext)
+        },
+      )
+      setSearchStrategy(result.strategy)
+      setProductContext(result.productContext)
       setCustomers(result.customers)
       setOpportunities(result.opportunities)
     } catch (error) {
+      console.error('[DiscoverPage] Search failed', error)
       setCustomers([])
       setOpportunities([])
-      setSearchError(
-        error instanceof Error
-          ? error.message
-          : 'Search could not be completed.',
-      )
+      setSearchError('SEARCH_UNAVAILABLE')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedProductId])
 
   useEffect(() => {
     const searchTimer = window.setTimeout(() => {
@@ -268,50 +276,11 @@ export function DiscoverPage() {
               )}
             </div>
           )}
-          {searchStrategy && filters.query.trim() && (
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-brand-50/60 px-3 py-2 text-xs text-ink-600 ring-1 ring-brand-100">
-              <span className="font-semibold text-brand-700">AI 理解</span>
-              <span>
-                目标：
-                <strong className="ml-1 uppercase text-ink-800">
-                  {searchStrategy.targetType}
-                </strong>
-              </span>
-              <span>
-                行业：
-                <strong className="ml-1 text-ink-800">
-                  {searchStrategy.intent.industry}
-                </strong>
-              </span>
-              <span>
-                地区：
-                <strong className="ml-1 text-ink-800">
-                  {searchStrategy.intent.country === 'Unknown'
-                    ? searchStrategy.intent.region
-                    : searchStrategy.intent.country}
-                </strong>
-              </span>
-              {productInsight && (
-                <>
-                  <span>
-                    产品：
-                    <strong className="ml-1 text-ink-800">
-                      {productInsight.productUnderstanding.productName}
-                    </strong>
-                  </span>
-                  <span>
-                    推荐寻找：
-                    <strong className="ml-1 text-ink-800">
-                      {searchStrategy.targetType === 'both'
-                        ? 'Buyer + Channel'
-                        : searchStrategy.targetType === 'channel'
-                          ? 'Channel'
-                          : 'Buyer'}
-                    </strong>
-                  </span>
-                </>
-              )}
-            </div>
+          {searchStrategy && productContext && filters.query.trim() && (
+            <ProductContextPanel
+              snapshot={productContext}
+              strategy={searchStrategy}
+            />
           )}
         </div>
       </div>
@@ -327,7 +296,7 @@ export function DiscoverPage() {
               </span>
             ) : (
               <>
-                发现 <span className="font-semibold text-brand-600">{opportunities.length + customers.length}</span> 项销售情报
+                发现 <span className="font-semibold text-brand-600">{opportunities.length + customers.length}</span> 个销售机会
                 {filters.query && (
                   <>
                     {' '}
@@ -406,7 +375,9 @@ export function DiscoverPage() {
                 ))}
               </div>
             ) : searchError ? (
-              <SearchFailureState message={searchError} />
+              <SearchFailureState
+                onRetry={() => void runSearch(filters)}
+              />
             ) : resultCategory === 'opportunities' && opportunities.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {opportunities.map((opportunity) => (
@@ -516,18 +487,90 @@ export function DiscoverPage() {
   )
 }
 
-function SearchFailureState({ message }: { message: string }) {
+function SearchFailureState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="card px-6 py-10 text-center">
       <h3 className="text-base font-semibold text-ink-900">
-        本次搜索未完成
+        暂时无法完成本次搜索
       </h3>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-ink-500">{message}</p>
-      <p className="mt-3 text-xs text-ink-400">
-        当前结果已清空，历史线索不会被当作本次搜索结果展示。
+      <p className="mx-auto mt-2 max-w-xl text-sm text-ink-500">
+        系统暂时无法获取新的市场信息，请稍后重试。
       </p>
+      <button onClick={onRetry} className="btn-primary mt-5">
+        <Radar className="h-4 w-4" />
+        重新搜索
+      </button>
     </div>
   )
+}
+
+function ProductContextPanel({
+  snapshot,
+  strategy,
+}: {
+  snapshot: ProductContextSnapshot
+  strategy: SearchStrategy
+}) {
+  const context = snapshot.context
+  const signals = context.buyingSignals?.slice(0, 3) ?? []
+  const directions = strategy.searchDirections.slice(0, 3)
+  const salesIntentLabel = {
+    customer: '寻找潜在客户',
+    channel: '寻找销售渠道',
+    partnership: '寻找合作机会',
+  }[strategy.salesIntent]
+
+  return (
+    <div className="mt-3 rounded-2xl border border-brand-100 bg-brand-50/60 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-700">
+          <Radar className="h-3.5 w-3.5" />
+          产品理解
+        </span>
+        <span className="text-sm font-semibold text-ink-900">
+          {context.product ?? strategy.intent.product}
+        </span>
+        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-brand-100">
+          {salesIntentLabel}
+        </span>
+      </div>
+
+      <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <dt className="text-ink-400">产品类别</dt>
+          <dd className="mt-1 font-medium text-ink-800">
+            {knownValue(context.category, strategy.intent.category)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-ink-400">目标客户类型</dt>
+          <dd className="mt-1 font-medium text-ink-800">
+            {knownValue(context.customerType, strategy.intent.customerType)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-ink-400">关注信号</dt>
+          <dd className="mt-1 font-medium text-ink-800">
+            {signals.length > 0 ? signals.join('、') : '根据真实来源识别'}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-ink-400">搜索方向</dt>
+          <dd className="mt-1 font-medium text-ink-800">
+            {directions.length > 0 ? directions.join('、') : '待确认'}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
+
+function knownValue(
+  primary: string | undefined,
+  fallback: string | undefined,
+) {
+  const value = primary || fallback
+  return value && value !== 'Unknown' ? value : '待确认'
 }
 
 function EmptyState({
@@ -544,14 +587,32 @@ function EmptyState({
       </div>
       <h3 className="mt-4 text-lg font-semibold text-ink-900">
         {category === 'opportunities'
-          ? '本次未发现可验证的销售机会'
-          : '本次没有通过质量门槛的客户'}
+          ? '暂时没有发现匹配机会'
+          : '暂时没有已确认客户'}
       </h3>
-      <p className="mt-1 max-w-sm text-sm text-ink-500">
-        {category === 'opportunities'
-          ? '没有真实事件信号时，系统不会生成模拟机会。可以尝试更明确的企业扩张、投资或数字化升级条件。'
-          : '销售机会不会自动成为客户。只有公司身份、域名、证据和产品相关性全部通过后才会显示在这里。'}
-      </p>
+      {category === 'opportunities' ? (
+        <div className="mt-3 max-w-sm text-left text-sm text-ink-500">
+          <p className="mb-2 text-center">换一种搜索方式，可能更容易发现机会：</p>
+          <ul className="space-y-1.5">
+            <li className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+              尝试更具体的产品
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+              添加目标地区
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+              添加企业变化关键词
+            </li>
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-2 max-w-sm text-sm text-ink-500">
+          只有企业身份、官网、真实来源和产品匹配度都确认后，才会显示在这里。
+        </p>
+      )}
       <button onClick={onReset} className="btn-secondary mt-5">
         重置筛选条件
       </button>

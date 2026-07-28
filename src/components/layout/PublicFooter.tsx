@@ -5,9 +5,9 @@ const FOOTER_LINKS = [
   {
     title: '产品',
     links: [
-      { label: '客户发现', href: '/app/discover' },
+      { label: '销售机会', href: '/app/discover' },
       { label: 'AI 销售助手', href: '/app/assistant' },
-      { label: '数据看板', href: '/app/dashboard' },
+      { label: '市场机会中心', href: '/app/dashboard' },
       { label: '客户详情', href: '/app/customer/cus_001' },
     ],
   },
@@ -15,7 +15,7 @@ const FOOTER_LINKS = [
     title: '解决方案',
     links: [
       { label: '外贸销售', href: '/#solutions' },
-      { label: 'B2B 销售', href: '/#solutions' },
+      { label: '销售团队', href: '/#solutions' },
       { label: '企业销售', href: '/#solutions' },
       { label: '营销获客', href: '/#solutions' },
     ],
@@ -49,7 +49,7 @@ export function PublicFooter() {
           <div className="col-span-2">
             <Logo />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-500">
-              AI 驱动的 B2B 销售机会情报平台。从真实公开信息中发现机会、核验证据并形成销售行动。
+              销售机会发现平台。帮助销售发现企业动向、市场机会和值得跟进的潜在客户。
             </p>
           </div>
 

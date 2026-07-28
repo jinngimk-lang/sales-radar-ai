@@ -13,9 +13,9 @@ import { Avatar } from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { to: '/app/discover', label: '客户发现', icon: Search, desc: '搜索全球潜在客户' },
+  { to: '/app/discover', label: '销售机会', icon: Search, desc: '发现市场机会与潜在客户' },
   { to: '/app/assistant', label: 'AI 销售助手', icon: Bot, desc: '生成开发话术与跟进方案' },
-  { to: '/app/dashboard', label: '数据看板', icon: BarChart3, desc: '销售数据总览' },
+  { to: '/app/dashboard', label: '市场机会中心', icon: BarChart3, desc: '查看企业动向与市场机会' },
   { to: '/app/account', label: '个人中心', icon: User, desc: '账号与 API 设置' },
 ]
 
@@ -36,7 +36,7 @@ export function AppLayout() {
         <div className="px-3 py-2">
           <Link to="/app/discover" className="btn-primary w-full justify-start">
             <Radar className="h-4 w-4" />
-            开始寻找客户
+            开始发现机会
           </Link>
         </div>
 

@@ -13,6 +13,10 @@ describe('Global Search Intelligence v1', () => {
     assert.equal(intent.product, 'industrial robots')
     assert.equal(intent.country, 'United States')
     assert.equal(intent.relationship, 'procurement')
+    const strategy = await intelligence.createStrategy(
+      '寻找美国工业机器人采购商',
+    )
+    assert.equal(strategy.salesIntent, 'customer')
   })
 
   it('understands a Chinese channel search', async () => {
@@ -22,12 +26,64 @@ describe('Global Search Intelligence v1', () => {
     assert.equal(strategy.targetType, 'channel')
     assert.equal(strategy.intent.country, 'Germany')
     assert.equal(strategy.intent.relationship, 'distribution')
+    assert.equal(strategy.salesIntent, 'channel')
     assert.ok(
       strategy.keywords.some(
         (keyword) =>
           keyword.language === 'de' &&
           /Industrieautomatisierung Händler Deutschland/.test(keyword.query),
       ),
+    )
+  })
+
+  it('distinguishes partnership intent from channel discovery', async () => {
+    const strategy = await intelligence.createStrategy(
+      '寻找德国工业自动化技术合作伙伴',
+      {
+        product: 'industrial automation SaaS',
+        category: 'Industrial SaaS',
+        industry: 'Industrial Manufacturing',
+        channelKeywords: ['industrial software technology partner'],
+      },
+    )
+
+    assert.equal(strategy.salesIntent, 'partnership')
+    assert.equal(strategy.targetType, 'channel')
+    assert.deepEqual(strategy.searchDirections, [
+      'industrial software technology partner',
+    ])
+    assert.match(strategy.keywords[0]?.query ?? '', /business partnership/i)
+
+    const english = await intelligence.createStrategy(
+      'Find industrial automation channel partners in Germany',
+    )
+    assert.equal(english.salesIntent, 'partnership')
+    assert.equal(english.intent.relationship, 'partnership')
+  })
+
+  it('uses Product Context keywords to expand a customer search', async () => {
+    const strategy = await intelligence.createStrategy(
+      'find European manufacturers',
+      {
+        product: 'industrial automation SaaS',
+        category: 'Industrial SaaS',
+        industry: 'Industrial Manufacturing',
+        customerType: 'Manufacturing companies',
+        region: 'Europe',
+        applications: ['production monitoring'],
+        buyerKeywords: ['factory digital transformation'],
+      },
+    )
+
+    assert.equal(strategy.intent.category, 'Industrial SaaS')
+    assert.equal(strategy.salesIntent, 'customer')
+    assert.deepEqual(strategy.searchDirections, [
+      'factory digital transformation',
+    ])
+    assert.match(strategy.keywords[0]?.query ?? '', /production monitoring/i)
+    assert.match(
+      strategy.keywords[0]?.query ?? '',
+      /factory digital transformation/i,
     )
   })
 

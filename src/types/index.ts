@@ -260,6 +260,7 @@ export interface SearchStrategy {
   intent: {
     industry: string
     product: string
+    category: string
     region: string
     country: string
     relationship: string
@@ -274,8 +275,12 @@ export interface SearchStrategy {
   }>
   languages: string[]
   targetType: 'buyer' | 'channel' | 'both'
+  salesIntent: SalesIntent
+  searchDirections: string[]
   reason: string
 }
+
+export type SalesIntent = 'customer' | 'channel' | 'partnership'
 
 export interface ProductUnderstandingResult {
   provider: string
@@ -351,18 +356,63 @@ export interface SearchFilters {
 /** Phase 1.1 contract reserved for the future ProductContextSnapshot. */
 export interface SearchProductContextDraft {
   product?: string
+  category?: string
   industry?: string
   region?: string
   country?: string
   customerType?: string
   businessProblem?: string
+  applications?: string[]
   buyingSignals?: string[]
+  buyerKeywords?: string[]
+  channelKeywords?: string[]
+}
+
+export interface ProductContextSnapshot {
+  version: string
+  capturedAt: string
+  source: 'inferred' | 'request' | 'product_profile' | 'combined'
+  productProfile: {
+    id: string
+    productName: string
+    updatedAt: string
+  } | null
+  context: SearchProductContextDraft
+}
+
+export interface SearchIntentSnapshot {
+  version: string
+  capturedAt: string
+  salesIntent: SalesIntent
+  targetType: SearchStrategy['targetType']
+  relationship: string
+  reason: string
+  keywords: SearchStrategy['keywords']
+  languages: string[]
+  searchDirections: string[]
+}
+
+export interface SearchPreparation {
+  strategy: SearchStrategy
+  productContext: ProductContextSnapshot
+  searchIntent: SearchIntentSnapshot
 }
 
 export type OpportunityType =
   | 'COMPANY_EXPANSION'
   | 'INVESTMENT'
   | 'DIGITAL_UPGRADE'
+
+export type CompanyResearchStatus =
+  | 'NOT_STARTED'
+  | 'DRAFT'
+  | 'READY'
+  | 'NEEDS_REVIEW'
+  | 'FAILED'
+
+export type OpportunityProductContext =
+  | SearchProductContextDraft
+  | ProductContextSnapshot
 
 export interface SalesOpportunity {
   id: string
@@ -373,7 +423,7 @@ export interface SalesOpportunity {
   whyItMatters: string
   recommendedNextStep: string
   confidence: number
-  productContextSnapshot: SearchProductContextDraft
+  productContextSnapshot: OpportunityProductContext
   detectionVersion: string
   createdAt: string
   evidence: Array<{
@@ -387,8 +437,205 @@ export interface SalesOpportunity {
       title: string | null
       provider: string
       platform: Platform
+      createdAt?: string
+    }
+    createdAt?: string
+  }>
+}
+
+export interface OpportunityCompanyProfileSummary {
+  id: string
+  companyName: string
+  normalizedDomain: string | null
+  officialWebsite: string | null
+  country: string | null
+  region: string | null
+  industry: string | null
+  companyType: string
+  identityStatus: string
+  identityConfidence: number
+  analysisStatus: Exclude<CompanyResearchStatus, 'NOT_STARTED'>
+  analysisVersion: string
+  currentVersion: number
+  updatedAt: string
+  relationshipType: string
+  currentSnapshot: {
+    id: string
+    analysisStatus: Exclude<CompanyResearchStatus, 'NOT_STARTED'>
+    confidence: number
+    analysisVersion: string
+    createdAt: string
+  } | null
+}
+
+export interface OpportunityDetail extends SalesOpportunity {
+  searchTaskId: string
+  updatedAt: string
+  companyResearchStatus: CompanyResearchStatus
+  companies: OpportunityCompanyProfileSummary[]
+}
+
+export interface OpportunityCompanyIntelligenceResult {
+  companyProfile: {
+    id: string
+    companyName: string
+    normalizedDomain: string | null
+    officialWebsite: string | null
+    country: string | null
+    region: string | null
+    industry: string | null
+    companyType: string
+    identityStatus: string
+    identityConfidence: number
+    description: string | null
+    products: string[]
+    industries: string[]
+    businessModel: string | null
+    analysisStatus: Exclude<CompanyResearchStatus, 'NOT_STARTED'>
+    analysisVersion: string
+    currentVersion: number
+    updatedAt: string
+  }
+  snapshot: {
+    id: string
+    status: Exclude<CompanyResearchStatus, 'NOT_STARTED'>
+    confidence: number
+    analysisVersion: string
+    provider: string | null
+    createdAt: string
+    created: boolean
+  }
+  sources: Array<{
+    id: string
+    searchEvidenceId: string | null
+    url: string
+    title: string
+    sourceType: string
+    excerpt: string | null
+    capturedAt: string
+    confidence: number
+    createdAt: string
+  }>
+  researchResult: {
+    identity: Record<string, unknown>
+    understanding: Record<string, unknown>
+    relevance: Record<string, unknown>
+    researchHints: Record<string, unknown>
+  }
+}
+
+export interface CompanyResearchWorkspace {
+  opportunity: {
+    id: string
+    searchTaskId: string
+    type: OpportunityType
+    companyName: string | null
+    title: string
+    summary: string
+    whyItMatters: string
+    recommendedNextStep: string
+    confidence: number
+    detectionVersion: string
+    createdAt: string
+    updatedAt: string
+  }
+  productContextSnapshot: OpportunityProductContext
+  searchEvidence: Array<{
+    id: string
+    excerpt: string
+    isPrimary: boolean
+    confidence: number
+    createdAt: string
+    searchEvidence: {
+      id: string
+      provider: string
+      platform: Platform
+      sourceUrl: string
+      title: string | null
+      extractionStatus: string
+      identityStatus: string
+      evidenceStatus: string
+      createdAt: string
     }
   }>
+  companyProfile: {
+    id: string
+    companyName: string
+    normalizedDomain: string | null
+    officialWebsite: string | null
+    country: string | null
+    region: string | null
+    industry: string | null
+    companyType: string
+    identityStatus: string
+    identityConfidence: number
+    description: string | null
+    products: string[]
+    industries: string[]
+    businessModel: string | null
+    analysisStatus: Exclude<CompanyResearchStatus, 'NOT_STARTED'>
+    analysisVersion: string
+    currentVersion: number
+    updatedAt: string
+    relationshipType: string
+  } | null
+  companySources: Array<{
+    id: string
+    searchEvidenceId: string | null
+    url: string
+    title: string
+    sourceType: string
+    excerpt: string | null
+    capturedAt: string
+    confidence: number
+    createdAt: string
+  }>
+  research: {
+    status: CompanyResearchStatus
+    currentSnapshot: {
+      id: string
+      analysisStatus: Exclude<CompanyResearchStatus, 'NOT_STARTED'>
+      confidence: number
+      analysisVersion: string
+      identitySnapshot: Record<string, unknown>
+      understandingSnapshot: Record<string, unknown>
+      relevanceAssessment: Record<string, unknown>
+      researchHints: Record<string, unknown>
+      createdAt: string
+    } | null
+    lastUpdatedAt: string | null
+  }
+  permissions: {
+    canResearch: boolean
+    canRefresh: boolean
+    reason: 'NO_LINKED_EVIDENCE' | 'NO_ELIGIBLE_SOURCE' | null
+    eligibleSearchEvidenceId: string | null
+  }
+}
+
+export type MarketSignalType =
+  | 'FACTORY_EXPANSION'
+  | 'INVESTMENT'
+  | 'DIGITAL_TRANSFORMATION'
+  | 'HIRING_SIGNAL'
+  | 'POLICY_CHANGE'
+  | 'INDUSTRY_TREND'
+
+export interface MarketSignal {
+  id: string
+  sourceType: string
+  sourceUrl: string
+  title: string
+  summary: string
+  content: string | null
+  companyName: string | null
+  country: string | null
+  region: string | null
+  signalType: MarketSignalType
+  confidence: number
+  detectedAt: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface SearchExecutionResult {
@@ -396,6 +643,9 @@ export interface SearchExecutionResult {
   status: 'success' | 'empty'
   customers: Customer[]
   opportunities: SalesOpportunity[]
+  strategy: SearchStrategy | null
+  productContext: ProductContextSnapshot | null
+  searchIntent: SearchIntentSnapshot | null
 }
 
 /** Dashboard 统计卡片 */

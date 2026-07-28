@@ -18,33 +18,46 @@ import {
   sanitizeProviderString,
   toSafeJson,
 } from './safe-json.service.js'
-import type { SearchProductContext } from '../contracts/product-context.contract.js'
+import type {
+  ProductContextSnapshot,
+  SearchProductContext,
+} from '../contracts/product-context.contract.js'
+import type { SearchIntentSnapshot } from '../contracts/search-intent-snapshot.contract.js'
 import { CURRENT_QUALIFICATION_VERSION } from '../contracts/qualification-version.contract.js'
 import { opportunityDetection } from './opportunity-detection.service.js'
 import { opportunityPersistence } from './opportunity-persistence.service.js'
+import { captureMarketSignalsSafely } from './market-intelligence/market-intelligence.service.js'
 
 export type { SearchProductContext } from '../contracts/product-context.contract.js'
 
 export interface CreateSearchTaskInput {
+  userId?: string
+  productProfileId?: string
   keyword: string
   platforms: Platform[]
   regions: Region[]
-  productContext?: SearchProductContext
+  productContextSnapshot?: ProductContextSnapshot
+  searchIntentSnapshot?: SearchIntentSnapshot
 }
 
 export async function createSearchTask(input: CreateSearchTaskInput) {
-  const user = await ensureDemoUser()
+  const userId = input.userId ?? (await ensureDemoUser()).id
 
   return prisma.searchTask.create({
     data: {
-      userId: user.id,
+      userId,
+      productProfileId: input.productProfileId,
       keyword: input.keyword,
       platforms: input.platforms,
       regions: input.regions,
       provider: 'agent-reach',
       status: 'PENDING',
-      parameters: input.productContext
-        ? toSafeJson({ productContext: input.productContext })
+      parameters: input.productContextSnapshot || input.searchIntentSnapshot
+        ? toSafeJson({
+            productContext: input.productContextSnapshot?.context,
+            productContextSnapshot: input.productContextSnapshot,
+            searchIntentSnapshot: input.searchIntentSnapshot,
+          })
         : undefined,
     },
   })
@@ -72,6 +85,7 @@ export async function processSearchTask(taskId: string): Promise<void> {
     const productContext = readProductContext(task.parameters)
     let qualifiedCount = 0
     let opportunityCount = 0
+    let marketSignalCount = 0
 
     for (const result of providerResults) {
       const title =
@@ -123,6 +137,13 @@ export async function processSearchTask(taskId: string): Promise<void> {
           leadId: null,
         },
       })
+
+      const marketSignals = await captureMarketSignalsSafely({
+        userId: task.userId,
+        provider: provider.name,
+        result,
+      })
+      marketSignalCount += marketSignals.length
 
       try {
         const evaluation = searchEvidencePipeline.evaluate(
@@ -308,7 +329,7 @@ export async function processSearchTask(taskId: string): Promise<void> {
     }
 
     console.info(
-      `[SearchTaskService] ${provider.name} results: raw=${providerResults.length}, evidence=${providerResults.length}, opportunities=${opportunityCount}, qualified=${qualifiedCount}`,
+      `[SearchTaskService] ${provider.name} results: raw=${providerResults.length}, evidence=${providerResults.length}, marketSignals=${marketSignalCount}, opportunities=${opportunityCount}, qualified=${qualifiedCount}`,
     )
     await prisma.searchTask.update({
       where: { id: task.id },
@@ -343,7 +364,13 @@ function readProductContext(value: unknown): SearchProductContext | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined
   }
-  const productContext = (value as Record<string, unknown>).productContext
+  const parameters = value as Record<string, unknown>
+  const snapshot = parameters.productContextSnapshot
+  const snapshotContext =
+    snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)
+      ? (snapshot as Record<string, unknown>).context
+      : undefined
+  const productContext = snapshotContext ?? parameters.productContext
   if (
     !productContext ||
     typeof productContext !== 'object' ||
@@ -355,6 +382,7 @@ function readProductContext(value: unknown): SearchProductContext | undefined {
   const context: SearchProductContext = {}
   for (const key of [
     'product',
+    'category',
     'industry',
     'region',
     'country',
@@ -366,14 +394,19 @@ function readProductContext(value: unknown): SearchProductContext | undefined {
       context[key] = field.trim()
     }
   }
-  const buyingSignals = source.buyingSignals
-  if (
-    Array.isArray(buyingSignals) &&
-    buyingSignals.every((signal) => typeof signal === 'string')
-  ) {
-    context.buyingSignals = buyingSignals
-      .map((signal) => signal.trim())
-      .filter(Boolean)
+  for (const key of [
+    'applications',
+    'buyingSignals',
+    'buyerKeywords',
+    'channelKeywords',
+  ] as const) {
+    const values = source[key]
+    if (
+      Array.isArray(values) &&
+      values.every((value) => typeof value === 'string')
+    ) {
+      context[key] = values.map((value) => value.trim()).filter(Boolean)
+    }
   }
   return Object.values(context).some(Boolean) ? context : undefined
 }

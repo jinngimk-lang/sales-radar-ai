@@ -2,7 +2,14 @@ import {
   LeadIdentityStatus,
   Platform,
 } from '@prisma/client'
-import type { SearchResult } from '../providers/search/search-provider.interface.js'
+
+export interface CompanyIdentityEvidence {
+  platform: Platform
+  sourceUrl: string
+  company: string | null
+  rawContent: string
+  metadata: Record<string, unknown>
+}
 
 export interface CompanyIdentityResult {
   companyName: string | null
@@ -71,7 +78,7 @@ const LEGAL_SUFFIX =
  * official-site content. Titles and hostname prefixes are never company names.
  */
 export class CompanyIdentityExtractionService {
-  extract(result: SearchResult): CompanyIdentityResult {
+  extract(result: CompanyIdentityEvidence): CompanyIdentityResult {
     const reasons: string[] = []
     const confidenceReasoning: string[] = []
     const sourceDomain = this.domainFromUrl(result.sourceUrl)
@@ -281,7 +288,7 @@ export class CompanyIdentityExtractionService {
   }
 
   private corroboratedOfficialBrand(
-    result: SearchResult,
+    result: CompanyIdentityEvidence,
     domain: string | null,
   ) {
     if (!domain) return null

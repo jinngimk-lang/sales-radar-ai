@@ -230,7 +230,7 @@ export function CustomerCard({ customer, onGenerateEmail }: CustomerCardProps) {
               <p><span className="font-semibold text-ink-800">判断原因：</span>{research.qualityReason}</p>
               <p><span className="font-semibold text-ink-800">下一步：</span>{research.salesRecommendation}</p>
               <p>
-                <span className="font-semibold text-ink-800">销售情报：</span>
+                <span className="font-semibold text-ink-800">销售建议：</span>
                 客户类型 {research.companyProfile.companyType}
                 {' · '}优先级 {research.priority}
               </p>

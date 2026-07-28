@@ -90,7 +90,7 @@ export function AssistantPage() {
           <div className="flex items-center gap-2 rounded-xl bg-ink-50 px-3 py-2">
             <Search className="h-4 w-4 text-ink-400" />
             <input
-              placeholder="搜索已验证机会"
+              placeholder="搜索已确认客户"
               className="w-full bg-transparent text-sm placeholder:text-ink-400 focus:outline-none"
             />
           </div>
@@ -98,7 +98,7 @@ export function AssistantPage() {
 
         <div className="mt-2 flex-1 space-y-1 overflow-y-auto scrollbar-thin px-2 pb-3">
           <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-400">
-            已验证销售机会
+            已确认客户
           </p>
           {sessionsLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
@@ -116,7 +116,7 @@ export function AssistantPage() {
             </p>
           ) : sessions.length === 0 ? (
             <p className="px-3 py-4 text-xs leading-relaxed text-ink-500">
-              暂无通过公司、域名、证据与产品相关性验证的销售机会。
+              暂无已确认客户。只有企业身份、官网、真实来源和产品匹配度都确认后，才会显示在这里。
             </p>
           ) : (
             sessions.map((s) => (
@@ -154,16 +154,16 @@ export function AssistantPage() {
               <Bot className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-sm font-semibold text-ink-900">AI Sales Copilot</h1>
+              <h1 className="text-sm font-semibold text-ink-900">销售助手</h1>
               <p className="flex items-center gap-1 text-xs text-ink-500">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                分析销售机会 · 总结证据 · 制定触达与跟进策略
+                分析潜在客户 · 总结真实来源 · 制定触达与跟进策略
               </p>
             </div>
           </div>
           <Link to="/app/discover" className="btn-ghost text-xs">
             <MessageSquare className="h-3.5 w-3.5" />
-            去发现客户
+            去发现机会
           </Link>
         </header>
 
@@ -176,14 +176,14 @@ export function AssistantPage() {
                   <ShieldCheck className="h-5 w-5" />
                 </div>
                 <h2 className="mt-4 text-base font-semibold text-ink-900">
-                  选择一个已验证的销售机会
+                  选择一个已确认客户
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-ink-500">
-                  Copilot 只分析具备已验证公司、域名、来源证据和产品相关性的客户，不会用历史或测试数据冒充新机会。
+                  销售助手只分析企业身份、官网、真实来源和产品匹配度都已确认的客户。
                 </p>
                 {sessions.length === 0 && !sessionsLoading && !sessionsError && (
                   <Link to="/app/discover" className="btn-primary mt-5 inline-flex">
-                    前往客户发现
+                    前往销售机会
                   </Link>
                 )}
               </div>
@@ -195,7 +195,7 @@ export function AssistantPage() {
                   销售机会已选择
                 </h2>
                 <p className="mt-2 text-sm text-ink-500">
-                  可以要求 Copilot 解释匹配原因、总结证据、生成触达内容或建议跟进策略。
+                  可以要求销售助手解释匹配原因、总结真实来源、生成触达内容或建议跟进策略。
                 </p>
               </div>
             )}

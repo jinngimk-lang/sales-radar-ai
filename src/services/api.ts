@@ -43,8 +43,15 @@ import type {
   ProductUnderstandingResult,
   ProductProfile,
   SearchExecutionResult,
+  SearchPreparation,
   SearchProductContextDraft,
+  ProductContextSnapshot,
+  SearchIntentSnapshot,
   SalesOpportunity,
+  OpportunityDetail,
+  OpportunityCompanyIntelligenceResult,
+  CompanyResearchWorkspace,
+  MarketSignal,
 } from '@/types'
 import {
   DASHBOARD_STATS,
@@ -110,6 +117,13 @@ interface BackendSearchTask {
   resultCount: number
   errorCode: string | null
   errorMessage: string | null
+}
+
+interface CreateSearchTaskResponse {
+  data: BackendSearchTask
+  strategy: SearchStrategy
+  productContext: ProductContextSnapshot
+  searchIntent: SearchIntentSnapshot
 }
 
 interface BackendOutreachGeneration {
@@ -284,16 +298,28 @@ function toCustomer(lead: BackendLead): Customer {
 async function createSearchTaskAndWait(
   filters: SearchFilters,
   productContext?: SearchProductContextDraft,
-): Promise<BackendSearchTask> {
-  const created = await request<ApiEnvelope<BackendSearchTask>>('/search-task', {
+  productProfileId?: string,
+  onPrepared?: (preparation: SearchPreparation) => void,
+): Promise<{
+  task: BackendSearchTask
+  preparation: SearchPreparation
+}> {
+  const created = await request<CreateSearchTaskResponse>('/search-task', {
     method: 'POST',
     body: JSON.stringify({
       keyword: filters.query.trim(),
       platforms: filters.platforms,
       regions: filters.regions,
       productContext,
+      productProfileId: productProfileId || undefined,
     }),
   })
+  const preparation = {
+    strategy: created.strategy,
+    productContext: created.productContext,
+    searchIntent: created.searchIntent,
+  }
+  onPrepared?.(preparation)
 
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const result = await request<ApiEnvelope<BackendSearchTask>>(
@@ -301,7 +327,7 @@ async function createSearchTaskAndWait(
     )
 
     if (result.data.status === 'COMPLETED') {
-      return result.data
+      return { task: result.data, preparation }
     }
 
     if (
@@ -398,6 +424,8 @@ export async function analyzeProductProfile(
 export async function searchCustomers(
   filters: SearchFilters,
   productContext?: SearchProductContextDraft,
+  productProfileId?: string,
+  onPrepared?: (preparation: SearchPreparation) => void,
 ): Promise<SearchExecutionResult> {
   const keyword = filters.query.trim()
 
@@ -407,10 +435,18 @@ export async function searchCustomers(
       status: 'empty',
       customers: [],
       opportunities: [],
+      strategy: null,
+      productContext: null,
+      searchIntent: null,
     }
   }
 
-  const task = await createSearchTaskAndWait(filters, productContext)
+  const { task, preparation } = await createSearchTaskAndWait(
+    filters,
+    productContext,
+    productProfileId,
+    onPrepared,
+  )
   const [leadResponse, opportunityResponse] = await Promise.all([
     request<ApiEnvelope<BackendLead[]>>(
       `/search-task/${task.id}/results`,
@@ -463,7 +499,49 @@ export async function searchCustomers(
         : 'empty',
     customers: results,
     opportunities: opportunityResponse.data,
+    strategy: preparation.strategy,
+    productContext: preparation.productContext,
+    searchIntent: preparation.searchIntent,
   }
+}
+
+export async function getOpportunityById(
+  id: string,
+): Promise<OpportunityDetail> {
+  const response = await request<ApiEnvelope<OpportunityDetail>>(
+    `/opportunities/${encodeURIComponent(id)}`,
+  )
+  return response.data
+}
+
+export async function researchOpportunityCompany(
+  opportunityId: string,
+  searchEvidenceId: string,
+): Promise<OpportunityCompanyIntelligenceResult> {
+  const response =
+    await request<ApiEnvelope<OpportunityCompanyIntelligenceResult>>(
+      `/opportunities/${encodeURIComponent(opportunityId)}/company-intelligence`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ searchEvidenceId }),
+      },
+    )
+  return response.data
+}
+
+export async function getCompanyResearchWorkspace(
+  opportunityId: string,
+): Promise<CompanyResearchWorkspace> {
+  const response = await request<ApiEnvelope<CompanyResearchWorkspace>>(
+    `/opportunities/${encodeURIComponent(opportunityId)}/company-intelligence/workspace`,
+  )
+  return response.data
+}
+
+export async function getMarketSignals(): Promise<MarketSignal[]> {
+  const response =
+    await request<ApiEnvelope<MarketSignal[]>>('/market-signals')
+  return response.data
 }
 
 /**

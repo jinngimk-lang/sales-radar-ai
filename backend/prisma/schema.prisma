@@ -125,48 +125,90 @@ enum OpportunityType {
   DIGITAL_UPGRADE
 }
 
+enum MarketSignalType {
+  FACTORY_EXPANSION
+  INVESTMENT
+  DIGITAL_TRANSFORMATION
+  HIRING_SIGNAL
+  POLICY_CHANGE
+  INDUSTRY_TREND
+}
+
+enum CompanyType {
+  MANUFACTURER
+  INTEGRATOR
+  DISTRIBUTOR
+  SOFTWARE_COMPANY
+  UNKNOWN
+}
+
+enum CompanyIdentityStatus {
+  UNKNOWN
+  PARTIAL
+  VERIFIED
+  REJECTED
+}
+
+enum CompanyAnalysisStatus {
+  DRAFT
+  READY
+  NEEDS_REVIEW
+  FAILED
+}
+
+enum CompanySourceType {
+  OFFICIAL_WEBSITE
+  SEARCH_EVIDENCE
+  NEWS
+  COMPANY_ANNOUNCEMENT
+  OTHER
+}
+
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  passwordHash String
-  name         String?
-  avatarUrl    String?
-  role         UserRole     @default(user)
-  leads        Lead[]
-  searchTasks  SearchTask[]
-  productProfiles ProductProfile[]
+  id                    String                 @id @default(cuid())
+  email                 String                 @unique
+  passwordHash          String
+  name                  String?
+  avatarUrl             String?
+  role                  UserRole               @default(user)
+  leads                 Lead[]
+  searchTasks           SearchTask[]
+  productProfiles       ProductProfile[]
   leadResearchFeedbacks LeadResearchFeedback[]
-  leadOutcomes LeadOutcome[]
-  opportunities Opportunity[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  leadOutcomes          LeadOutcome[]
+  opportunities         Opportunity[]
+  marketSignals         MarketSignal[]
+  companyProfiles       CompanyProfile[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   @@index([createdAt])
 }
 
 model ProductProfile {
-  id                   String   @id @default(cuid())
-  userId               String
-  productName          String
-  category             String
-  industry             String
-  applications         String[] @default([])
-  keywords             String[] @default([])
-  relatedProducts      String[] @default([])
-  buyerPersona         Json
-  decisionMakerRoles   Json
-  buyerKeywords        String[] @default([])
-  channelKeywords      String[] @default([])
-  targetCountries      String[] @default([])
-  targetLanguages      String[] @default([])
-  recommendedPlatforms String[] @default([])
-  buyingSignals        String[] @default([])
-  painPoints           String[] @default([])
-  valueAngles          String[] @default([])
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  leadResearches       LeadResearch[]
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                           String                        @id @default(cuid())
+  userId                       String
+  productName                  String
+  category                     String
+  industry                     String
+  applications                 String[]                      @default([])
+  keywords                     String[]                      @default([])
+  relatedProducts              String[]                      @default([])
+  buyerPersona                 Json
+  decisionMakerRoles           Json
+  buyerKeywords                String[]                      @default([])
+  channelKeywords              String[]                      @default([])
+  targetCountries              String[]                      @default([])
+  targetLanguages              String[]                      @default([])
+  recommendedPlatforms         String[]                      @default([])
+  buyingSignals                String[]                      @default([])
+  painPoints                   String[]                      @default([])
+  valueAngles                  String[]                      @default([])
+  user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadResearches               LeadResearch[]
+  searchTasks                  SearchTask[]
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
 
   @@unique([userId, productName])
   @@index([userId, updatedAt])
@@ -199,54 +241,55 @@ model AIUsageLog {
 }
 
 model Lead {
-  id                String             @id @default(cuid())
-  userId            String
-  searchTaskId      String?
-  provider          String             @default("mock")
-  externalId        String
-  sourceMetadata    Json?
-  username          String
-  displayName       String
-  avatarUrl         String?
-  initials          String
-  platform          Platform
-  customerType      CustomerType
-  postContent       String             @db.Text
-  postedAt          DateTime?
-  country           String
-  region            Region
-  industry          Industry
-  jobTitle          String?
-  company           String?
-  normalizedDomain  String?
-  identityStatus    LeadIdentityStatus      @default(UNVERIFIED)
-  evidenceStatus    LeadEvidenceStatus      @default(UNKNOWN)
-  productRelevancePassed Boolean            @default(false)
-  qualificationStatus LeadQualificationStatus @default(UNQUALIFIED)
-  qualificationVersion String               @default("v1")
-  sourceUrl         String
-  profileUrl        String
-  interestTags      String[]           @default([])
-  intentScore       Int                @default(0)
-  contactStatus     FollowUpStatus     @default(new)
-  recommendedAction RecommendedAction?
-  isFavorited       Boolean            @default(false)
-  customTags        String[]           @default([])
-  note              String?            @db.Text
-  lastContactedAt   DateTime?
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  searchTask        SearchTask?        @relation(fields: [searchTaskId], references: [id], onDelete: SetNull)
-  analyses          AIAnalysis[]
-  research          LeadResearch?
-  outreachMessages  OutreachMessage[]
-  contacts          ContactProfile[]
-  channelProfile    ChannelProfile?
-  outcome           LeadOutcome?
-  searchTaskLinks   SearchTaskLead[]
-  searchEvidence    SearchEvidence[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                     String                  @id @default(cuid())
+  userId                 String
+  searchTaskId           String?
+  provider               String                  @default("mock")
+  externalId             String
+  sourceMetadata         Json?
+  username               String
+  displayName            String
+  avatarUrl              String?
+  initials               String
+  platform               Platform
+  customerType           CustomerType
+  postContent            String                  @db.Text
+  postedAt               DateTime?
+  country                String
+  region                 Region
+  industry               Industry
+  jobTitle               String?
+  company                String?
+  normalizedDomain       String?
+  identityStatus         LeadIdentityStatus      @default(UNVERIFIED)
+  evidenceStatus         LeadEvidenceStatus      @default(UNKNOWN)
+  productRelevancePassed Boolean                 @default(false)
+  qualificationStatus    LeadQualificationStatus @default(UNQUALIFIED)
+  qualificationVersion   String                  @default("v1")
+  sourceUrl              String
+  profileUrl             String
+  interestTags           String[]                @default([])
+  intentScore            Int                     @default(0)
+  contactStatus          FollowUpStatus          @default(new)
+  recommendedAction      RecommendedAction?
+  isFavorited            Boolean                 @default(false)
+  customTags             String[]                @default([])
+  note                   String?                 @db.Text
+  lastContactedAt        DateTime?
+  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  searchTask             SearchTask?             @relation(fields: [searchTaskId], references: [id], onDelete: SetNull)
+  analyses               AIAnalysis[]
+  research               LeadResearch?
+  outreachMessages       OutreachMessage[]
+  contacts               ContactProfile[]
+  channelProfile         ChannelProfile?
+  outcome                LeadOutcome?
+  searchTaskLinks        SearchTaskLead[]
+  searchEvidence         SearchEvidence[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
+  @@unique([userId, provider, externalId])
   @@index([userId, createdAt])
   @@index([userId, intentScore])
   @@index([userId, contactStatus])
@@ -256,28 +299,27 @@ model Lead {
   @@index([normalizedDomain])
   @@index([platform, profileUrl])
   @@index([sourceUrl])
-  @@unique([userId, provider, externalId])
 }
 
 model ContactProfile {
-  id          String   @id @default(cuid())
-  leadId      String
-  name        String   @default("Unknown")
-  jobTitle    String   @default("Unknown")
-  company     String   @default("Unknown")
-  source      String
-  profileUrl  String   @default("Unknown")
-  email       String   @default("Unknown")
-  phone       String   @default("Unknown")
-  contactRole String   @default("unknown")
-  confidence  Int      @default(0)
-  evidence    Json
-  contactScore Int?
-  priorityRank Int?
-  recommendationReason String? @db.Text
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  leadId               String
+  name                 String   @default("Unknown")
+  jobTitle             String   @default("Unknown")
+  company              String   @default("Unknown")
+  source               String
+  profileUrl           String   @default("Unknown")
+  email                String   @default("Unknown")
+  phone                String   @default("Unknown")
+  contactRole          String   @default("unknown")
+  confidence           Int      @default(0)
+  evidence             Json
+  contactScore         Int?
+  priorityRank         Int?
+  recommendationReason String?  @db.Text
+  lead                 Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@unique([leadId, name, jobTitle, profileUrl])
   @@index([leadId, confidence])
@@ -298,64 +340,64 @@ model OutreachMessage {
 }
 
 model ChannelProfile {
-  id                     String   @id @default(cuid())
-  leadId                 String   @unique
-  channelType            String   @default("unknown")
-  companyName            String   @default("Unknown")
-  industry               String   @default("Unknown")
-  region                 String   @default("Unknown")
-  website                String   @default("Unknown")
-  evidence               Json
-  channelScore           Int      @default(0)
-  confidence             Int      @default(0)
-  recommendationReason   String   @db.Text
-  cooperationStrategy    String   @db.Text
-  lead                   Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  leadId               String   @unique
+  channelType          String   @default("unknown")
+  companyName          String   @default("Unknown")
+  industry             String   @default("Unknown")
+  region               String   @default("Unknown")
+  website              String   @default("Unknown")
+  evidence             Json
+  channelScore         Int      @default(0)
+  confidence           Int      @default(0)
+  recommendationReason String   @db.Text
+  cooperationStrategy  String   @db.Text
+  lead                 Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([channelType, channelScore])
 }
 
 model LeadResearch {
-  id                  String   @id @default(cuid())
-  leadId              String   @unique
-  companySummary      String   @db.Text
+  id                  String                 @id @default(cuid())
+  leadId              String                 @unique
+  companySummary      String                 @db.Text
   industry            String
   companyType         String
-  customerPersona     String   @db.Text
+  customerPersona     String                 @db.Text
   painPoints          Json
   buyingSignals       Json
-  communicationStyle  String   @db.Text
-  recommendedApproach String   @db.Text
+  communicationStyle  String                 @db.Text
+  recommendedApproach String                 @db.Text
   confidenceScore     Int
-  leadQuality         String   @default("low")
-  leadCategory        String   @default("content")
-  salesRecommendation String   @default("ignore")
-  qualityReason       String   @default("Unknown") @db.Text
+  leadQuality         String                 @default("low")
+  leadCategory        String                 @default("content")
+  salesRecommendation String                 @default("ignore")
+  qualityReason       String                 @default("Unknown") @db.Text
   companyProfile      Json?
   buyingSignalDetails Json?
   salesAngle          Json?
   outreachPlan        Json?
-  priority            String   @default("C")
-  intelligenceVersion Int      @default(1)
+  priority            String                 @default("C")
+  intelligenceVersion Int                    @default(1)
   productProfileId    String?
   matchScore          Int?
   purchaseLikelihood  String?
-  industryFit         String?  @db.Text
-  businessFit         String?  @db.Text
-  recommendedAngle    String?  @db.Text
-  contactReason       String?  @db.Text
+  industryFit         String?                @db.Text
+  businessFit         String?                @db.Text
+  recommendedAngle    String?                @db.Text
+  contactReason       String?                @db.Text
   riskFactors         Json?
   evidence            Json?
   provider            String?
   model               String?
   generatedAt         DateTime?
-  lead                Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  productProfile      ProductProfile? @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
+  lead                Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  productProfile      ProductProfile?        @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
   feedbacks           LeadResearchFeedback[]
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
 
   @@index([createdAt])
   @@index([productProfileId])
@@ -394,30 +436,33 @@ model LeadOutcome {
 }
 
 model SearchTask {
-  id           String           @id @default(cuid())
-  userId       String
-  keyword      String
-  platforms    Platform[]       @default([])
-  regions      Region[]         @default([])
-  provider     String           @default("mock")
-  status       SearchTaskStatus @default(PENDING)
-  progress     Int              @default(0)
-  resultCount  Int              @default(0)
-  retryCount   Int              @default(0)
-  parameters   Json?
-  errorCode    String?
-  errorMessage String?          @db.Text
-  startedAt    DateTime?
-  completedAt  DateTime?
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  leads        Lead[]
-  resultLinks  SearchTaskLead[]
-  searchEvidence SearchEvidence[]
-  opportunities Opportunity[]
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  userId           String
+  productProfileId String?
+  keyword          String
+  platforms        Platform[]       @default([])
+  regions          Region[]         @default([])
+  provider         String           @default("mock")
+  status           SearchTaskStatus @default(PENDING)
+  progress         Int              @default(0)
+  resultCount      Int              @default(0)
+  retryCount       Int              @default(0)
+  parameters       Json?
+  errorCode        String?
+  errorMessage     String?          @db.Text
+  startedAt        DateTime?
+  completedAt      DateTime?
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productProfile   ProductProfile?  @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
+  leads            Lead[]
+  resultLinks      SearchTaskLead[]
+  searchEvidence   SearchEvidence[]
+  opportunities    Opportunity[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([userId, createdAt])
+  @@index([productProfileId, createdAt])
   @@index([status, createdAt])
 }
 
@@ -448,6 +493,7 @@ model SearchEvidence {
   searchTask             SearchTask                     @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
   lead                   Lead?                          @relation(fields: [leadId], references: [id], onDelete: SetNull)
   opportunityEvidence    OpportunityEvidence[]
+  companySources         CompanySource[]
   createdAt              DateTime                       @default(now())
   updatedAt              DateTime                       @updatedAt
 
@@ -458,25 +504,50 @@ model SearchEvidence {
   @@index([qualificationVersion, qualificationStatus, createdAt])
 }
 
+model MarketSignal {
+  id          String           @id @default(cuid())
+  userId      String
+  sourceType  String
+  sourceUrl   String
+  title       String
+  summary     String           @db.Text
+  content     String?          @db.Text
+  companyName String?
+  country     String?
+  region      String?
+  signalType  MarketSignalType
+  confidence  Int
+  detectedAt  DateTime         @default(now())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([userId, sourceUrl, signalType])
+  @@index([userId, detectedAt])
+  @@index([userId, signalType, detectedAt])
+}
+
 model Opportunity {
-  id                     String                @id @default(cuid())
-  userId                 String
-  searchTaskId           String
-  type                   OpportunityType
-  dedupeKey              String
-  companyName            String?
-  title                  String
-  summary                String                @db.Text
-  whyItMatters           String                @db.Text
-  recommendedNextStep    String                @db.Text
-  confidence             Int
-  productContextSnapshot Json
-  detectionVersion       String                @default("v1")
-  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  searchTask             SearchTask            @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
-  evidence               OpportunityEvidence[]
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  id                           String                        @id @default(cuid())
+  userId                       String
+  searchTaskId                 String
+  type                         OpportunityType
+  dedupeKey                    String
+  companyName                  String?
+  title                        String
+  summary                      String                        @db.Text
+  whyItMatters                 String                        @db.Text
+  recommendedNextStep          String                        @db.Text
+  confidence                   Int
+  productContextSnapshot       Json
+  detectionVersion             String                        @default("v1")
+  user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  searchTask                   SearchTask                    @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
+  evidence                     OpportunityEvidence[]
+  companySources               CompanySource[]
+  companyProfiles              CompanyOpportunity[]
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
 
   @@unique([searchTaskId, dedupeKey])
   @@index([userId, createdAt])
@@ -497,6 +568,107 @@ model OpportunityEvidence {
 
   @@unique([opportunityId, searchEvidenceId])
   @@index([searchEvidenceId])
+}
+
+model CompanyProfile {
+  id                 String                        @id @default(cuid())
+  userId             String
+  identityKey        String
+  companyName        String
+  normalizedDomain   String?
+  officialWebsite    String?
+  country            String?
+  region             String?
+  industry           String?
+  companyType        CompanyType                   @default(UNKNOWN)
+  identityStatus     CompanyIdentityStatus         @default(UNKNOWN)
+  identityConfidence Int                           @default(0)
+  description        String?                       @db.Text
+  products           String[]                      @default([])
+  industries         String[]                      @default([])
+  businessModel      String?
+  analysisStatus     CompanyAnalysisStatus         @default(DRAFT)
+  analysisVersion    String                        @default("v1")
+  provider           String?
+  model              String?
+  currentVersion     Int                           @default(0)
+  currentSnapshotId  String?                       @unique
+  user               User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentSnapshot    CompanyIntelligenceSnapshot?  @relation("CurrentCompanySnapshot", fields: [currentSnapshotId], references: [id], onDelete: SetNull)
+  snapshots          CompanyIntelligenceSnapshot[] @relation("CompanySnapshotHistory")
+  sources            CompanySource[]
+  opportunities      CompanyOpportunity[]
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  @@unique([userId, identityKey])
+  @@index([userId, normalizedDomain])
+  @@index([userId, analysisStatus, updatedAt])
+}
+
+model CompanySource {
+  id               String            @id @default(cuid())
+  companyProfileId String
+  searchEvidenceId String?
+  opportunityId    String?
+  url              String
+  title            String
+  sourceType       CompanySourceType
+  excerpt          String?           @db.Text
+  capturedAt       DateTime
+  sourceHash       String
+  confidence       Int               @default(0)
+  companyProfile   CompanyProfile    @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+  searchEvidence   SearchEvidence?   @relation(fields: [searchEvidenceId], references: [id], onDelete: SetNull)
+  opportunity      Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  createdAt        DateTime          @default(now())
+
+  @@unique([companyProfileId, sourceHash])
+  @@index([companyProfileId, capturedAt])
+  @@index([searchEvidenceId])
+  @@index([opportunityId])
+}
+
+model CompanyIntelligenceSnapshot {
+  id                     String                @id @default(cuid())
+  companyProfileId       String
+  opportunityId          String?
+  productProfileId       String?
+  productContextSnapshot Json
+  identitySnapshot       Json
+  understandingSnapshot  Json
+  relevanceAssessment    Json
+  researchHints          Json
+  sourceIds              String[]              @default([])
+  analysisVersion        String                @default("v1")
+  provider               String?
+  model                  String?
+  analysisStatus         CompanyAnalysisStatus @default(DRAFT)
+  confidence             Int                   @default(0)
+  analysisKey            String
+  companyProfile         CompanyProfile        @relation("CompanySnapshotHistory", fields: [companyProfileId], references: [id], onDelete: Cascade)
+  currentFor             CompanyProfile?       @relation("CurrentCompanySnapshot")
+  createdAt              DateTime              @default(now())
+
+  @@unique([companyProfileId, analysisKey])
+  @@index([companyProfileId, createdAt])
+  @@index([opportunityId])
+  @@index([productProfileId])
+  @@index([analysisStatus, createdAt])
+}
+
+model CompanyOpportunity {
+  id               String         @id @default(cuid())
+  companyProfileId String
+  opportunityId    String
+  relationshipType String
+  companyProfile   CompanyProfile @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+  opportunity      Opportunity    @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+
+  @@unique([companyProfileId, opportunityId, relationshipType])
+  @@index([companyProfileId, createdAt])
+  @@index([opportunityId, relationshipType])
 }
 
 model SearchTaskLead {

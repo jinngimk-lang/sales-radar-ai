@@ -1,4 +1,6 @@
 import type { SearchIntent } from '../providers/search-intent/search-intent-provider.interface.js'
+import type { SearchProductContext } from '../contracts/product-context.contract.js'
+import type { SalesIntent } from '../contracts/search-intent-snapshot.contract.js'
 
 export interface ExpandedKeyword {
   language: string
@@ -6,7 +8,11 @@ export interface ExpandedKeyword {
 }
 
 export class SearchKeywordExpansionService {
-  expand(intent: SearchIntent): ExpandedKeyword[] {
+  expand(
+    intent: SearchIntent,
+    productContext?: SearchProductContext,
+    salesIntent: SalesIntent = 'customer',
+  ): ExpandedKeyword[] {
     const product =
       intent.product === 'Unknown' ? intent.industry : intent.product
     if (product === 'Unknown') return []
@@ -19,7 +25,13 @@ export class SearchKeywordExpansionService {
     if (intent.targetType === 'buyer' || intent.targetType === 'both') {
       keywords.push({
         language: 'en',
-        query: this.buyerQuery(intent, product, suffix),
+        query: this.buyerQuery(
+          intent,
+          product,
+          suffix,
+          productContext?.buyerKeywords,
+          productContext?.applications,
+        ),
       })
     }
     if (intent.targetType === 'channel' || intent.targetType === 'both') {
@@ -28,7 +40,9 @@ export class SearchKeywordExpansionService {
         query: [
           product,
           intent.industry === 'Unknown' ? '' : intent.industry,
+          ...this.contextTerms(productContext?.channelKeywords),
           this.englishChannelTerm(intent.relationship),
+          salesIntent === 'partnership' ? 'business partnership' : '',
           'official company website',
           suffix,
         ]
@@ -72,6 +86,8 @@ export class SearchKeywordExpansionService {
     intent: SearchIntent,
     product: string,
     locationSuffix: string,
+    buyerKeywords: string[] | undefined,
+    applications: string[] | undefined,
   ): string {
     const customerType = this.customerTypeTerm(intent)
     const industry =
@@ -85,6 +101,8 @@ export class SearchKeywordExpansionService {
       industry,
       `end-user ${customerType}`,
       productRelevance,
+      ...this.contextTerms(buyerKeywords),
+      ...this.contextTerms(applications),
       businessProblem,
       buyingSignals,
       'official company website',
@@ -100,6 +118,13 @@ export class SearchKeywordExpansionService {
       .join(' ')
       .replace(/\s+/g, ' ')
       .trim()
+  }
+
+  private contextTerms(values: string[] | undefined): string[] {
+    return (values ?? [])
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .slice(0, 2)
   }
 
   private productRelevanceTerm(product: string): string {

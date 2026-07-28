@@ -11,6 +11,8 @@ import { AppError } from '../utils/app-error.js'
 import { globalSearchIntelligence } from '../services/global-search-intelligence.service.js'
 import { providerHealthService } from '../services/provider-health.service.js'
 import type { SearchProductContext } from '../contracts/product-context.contract.js'
+import { productContextSnapshotBuilder } from '../services/product-context-snapshot.service.js'
+import { searchIntentSnapshotBuilder } from '../services/search-intent-snapshot.service.js'
 
 function parseEnumArray<T extends string>(
   value: unknown,
@@ -40,14 +42,23 @@ export const createSearchTaskController: RequestHandler = async (
   const requestedProductContext = parseProductContext(
     request.body?.productContext,
   )
+  const productProfileId = readOptionalString(
+    request.body?.productProfileId,
+    'productProfileId',
+  )
+  const preparedContext = await productContextSnapshotBuilder.prepare({
+    productProfileId,
+    requestedContext: requestedProductContext,
+  })
   const strategy = await globalSearchIntelligence.createStrategy(
     keyword,
-    requestedProductContext,
+    preparedContext.context,
   )
-  const productContext = effectiveProductContext(
-    requestedProductContext,
-    strategy,
+  const productContextSnapshot = productContextSnapshotBuilder.build(
+    preparedContext,
+    strategyProductContext(strategy),
   )
+  const searchIntentSnapshot = searchIntentSnapshotBuilder.build(strategy)
   const requestedRegions = parseEnumArray(
     request.body?.regions,
     Object.values(Region),
@@ -60,6 +71,8 @@ export const createSearchTaskController: RequestHandler = async (
     : []
 
   const task = await createSearchTask({
+    userId: preparedContext.userId,
+    productProfileId: productContextSnapshot.productProfile?.id,
     keyword: globalSearchIntelligence.optimizedKeyword(strategy, keyword),
     platforms: parseEnumArray(
       request.body?.platforms,
@@ -68,7 +81,8 @@ export const createSearchTaskController: RequestHandler = async (
     ),
     regions:
       requestedRegions.length > 0 ? requestedRegions : inferredRegion,
-    productContext,
+    productContextSnapshot,
+    searchIntentSnapshot,
   })
 
   setImmediate(() => {
@@ -77,7 +91,12 @@ export const createSearchTaskController: RequestHandler = async (
     })
   })
 
-  response.status(202).json({ data: task, strategy })
+  response.status(202).json({
+    data: task,
+    strategy,
+    productContext: productContextSnapshot,
+    searchIntent: searchIntentSnapshot,
+  })
 }
 
 export const getSearchTaskController: RequestHandler = async (
@@ -125,6 +144,10 @@ function parseProductContext(value: unknown) {
   const source = value as Record<string, unknown>
   const context = {
     product: readOptionalString(source.product, 'productContext.product'),
+    category: readOptionalString(
+      source.category,
+      'productContext.category',
+    ),
     industry: readOptionalString(source.industry, 'productContext.industry'),
     region: readOptionalString(source.region, 'productContext.region'),
     country: readOptionalString(source.country, 'productContext.country'),
@@ -136,9 +159,21 @@ function parseProductContext(value: unknown) {
       source.businessProblem,
       'productContext.businessProblem',
     ),
+    applications: readOptionalStringArray(
+      source.applications,
+      'productContext.applications',
+    ),
     buyingSignals: readOptionalStringArray(
       source.buyingSignals,
       'productContext.buyingSignals',
+    ),
+    buyerKeywords: readOptionalStringArray(
+      source.buyerKeywords,
+      'productContext.buyerKeywords',
+    ),
+    channelKeywords: readOptionalStringArray(
+      source.channelKeywords,
+      'productContext.channelKeywords',
     ),
   }
 
@@ -157,8 +192,7 @@ function readOptionalStringArray(value: unknown, fieldName: string) {
   return values.length > 0 ? values : undefined
 }
 
-function effectiveProductContext(
-  requested: SearchProductContext | undefined,
+function strategyProductContext(
   strategy: Awaited<
     ReturnType<typeof globalSearchIntelligence.createStrategy>
   >,
@@ -168,6 +202,7 @@ function effectiveProductContext(
 
   return {
     product: known(strategy.intent.product),
+    category: known(strategy.intent.category),
     customerType: strategy.intent.customerType,
     industry: known(strategy.intent.industry),
     region: known(strategy.intent.region),

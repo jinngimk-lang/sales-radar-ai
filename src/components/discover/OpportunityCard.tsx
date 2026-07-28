@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   ArrowUpRight,
   Building2,
   CircleGauge,
@@ -6,6 +7,7 @@ import {
   Landmark,
   RefreshCw,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import type {
   OpportunityType,
   SalesOpportunity,
@@ -16,7 +18,7 @@ const TYPE_META: Record<
   { label: string; icon: typeof Factory }
 > = {
   COMPANY_EXPANSION: { label: '企业扩张', icon: Factory },
-  INVESTMENT: { label: '投资动态', icon: Landmark },
+  INVESTMENT: { label: '企业投资', icon: Landmark },
   DIGITAL_UPGRADE: { label: '数字化升级', icon: RefreshCw },
 }
 
@@ -47,7 +49,7 @@ export function OpportunityCard({
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink-50 px-2.5 py-1 text-xs font-medium text-ink-600">
           <CircleGauge className="h-3.5 w-3.5" />
-          {opportunity.confidence}%
+          匹配度 {opportunity.confidence}%
         </span>
       </div>
 
@@ -70,17 +72,26 @@ export function OpportunityCard({
         <span>{opportunity.recommendedNextStep}</span>
       </div>
 
-      {source && (
-        <a
-          href={source.rawUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-semibold text-brand-600 hover:text-brand-700"
+      <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+        <Link
+          to={`/app/opportunities/${opportunity.id}`}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
         >
-          查看真实来源
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        </a>
-      )}
+          查看机会
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+        {source && (
+          <a
+            href={source.rawUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-700"
+          >
+            真实来源
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </a>
+        )}
+      </div>
     </article>
   )
 }

@@ -9,6 +9,8 @@ import { productRouter } from './routes/product.routes.js'
 import { productsRouter } from './routes/products.routes.js'
 import { learningRouter } from './routes/learning.routes.js'
 import { assistantRouter } from './routes/assistant.routes.js'
+import { marketSignalRouter } from './routes/market-signal.routes.js'
+import { opportunityRouter } from './routes/opportunity.routes.js'
 
 export const app = express()
 
@@ -23,6 +25,8 @@ app.use('/api/products', productsRouter)
 app.use('/api/leads', leadRouter)
 app.use('/api/assistant', assistantRouter)
 app.use('/api/learning', learningRouter)
+app.use('/api/market-signals', marketSignalRouter)
+app.use('/api/opportunities', opportunityRouter)
 
 app.use(notFound)
 app.use(errorHandler)

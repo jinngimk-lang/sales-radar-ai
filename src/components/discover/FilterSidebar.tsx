@@ -239,7 +239,7 @@ export function FilterSidebar({ filters, onChange, resultCount }: FilterSidebarP
 
       <div className="border-t border-ink-100 px-5 py-3">
         <p className="text-xs text-ink-500">
-          已为你筛选出 <span className="font-semibold text-brand-600">{resultCount}</span> 个潜在客户
+          已为你筛选出 <span className="font-semibold text-brand-600">{resultCount}</span> 个销售机会
         </p>
         {filters.platforms.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
