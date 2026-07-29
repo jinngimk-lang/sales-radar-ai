@@ -62,6 +62,7 @@ Skills:
 
 - `sales-radar-product-owner`
 - `source-management`
+- `data-ingestion-governance`
 - `agent-orchestration`
 - `agent-evaluation`
 - `sales-data-quality`
@@ -74,6 +75,7 @@ Responsibilities:
 - Route tasks using least privilege.
 - Evaluate changes and regressions.
 - Protect data quality and CRM promotion boundaries.
+- Guard Raw Data from being promoted without Evidence Validation.
 
 Forbidden:
 
@@ -116,6 +118,7 @@ Skills:
 - `evidence-validation`
 - `source-grounding`
 - `market-data-ingestion`
+- `data-ingestion-governance`
 - `market-signal-evaluation`
 
 Responsibilities:
@@ -244,7 +247,8 @@ Forbidden:
 |---|---|---|---|---|
 | `sales-radar-product-owner` | Product direction, requested change | Scope and boundary decision | All layers for governance | Create customer truth |
 | `source-management` | Source definition, ownership, health | Registry lifecycle decision | `market-data-ingestion` | Fetch content or generate Signal |
-| `market-data-ingestion` | Registered Source | Raw capture and Evidence candidate | `evidence-validation` | Create Signal, Opportunity, Lead |
+| `market-data-ingestion` | Registered Source | Raw capture | `data-ingestion-governance` | Create Signal, Opportunity, Lead |
+| `data-ingestion-governance` | DataSource, IngestionRun, RawSourceDocument | Duplicate/revision and Evidence-eligibility decision | `evidence-validation` | Create Evidence, Signal, Opportunity, or CRM data |
 | `product-intelligence` | User product description | Product Context | Search/Market Intelligence | Generate companies or market facts |
 | `evidence-validation` | Raw page or Evidence candidate | Validation status | `source-grounding`, `market-signal-evaluation` | Fill missing facts |
 | `source-grounding` | Claim and explicit sources | Grounding result | Intelligence and Trace layers | Link by similarity |
