@@ -9,6 +9,7 @@ import {
 import { AppError } from '../utils/app-error.js'
 import { ProviderError } from '../providers/errors/provider-error.js'
 import { searchProviderFactory } from '../providers/search/provider.factory.js'
+import type { SearchResult } from '../providers/search/search-provider.interface.js'
 import { prisma } from '../prisma/client.js'
 import { ensureDemoUser } from './demo-user.service.js'
 import { leadNormalizer } from './lead-normalizer.service.js'
@@ -92,6 +93,13 @@ export async function processSearchTask(taskId: string): Promise<void> {
         typeof result.metadata.title === 'string'
           ? result.metadata.title.trim()
           : null
+      const evidenceMetadata = toSafeJson({
+        ...result.metadata,
+        customerName: result.customerName,
+        country: result.country,
+        region: result.region,
+        industry: result.industry,
+      })
       const evidence = await prisma.searchEvidence.upsert({
         where: {
           searchTaskId_provider_externalId: {
@@ -109,13 +117,7 @@ export async function processSearchTask(taskId: string): Promise<void> {
           profileUrl: sanitizeProviderString(result.profileUrl),
           title: title ? sanitizeProviderString(title) : null,
           content: sanitizeProviderString(result.rawContent),
-          rawMetadata: toSafeJson({
-            ...result.metadata,
-            customerName: result.customerName,
-            country: result.country,
-            region: result.region,
-            industry: result.industry,
-          }),
+          rawMetadata: evidenceMetadata,
           extractionStatus: SearchEvidenceExtractionStatus.PENDING,
           qualificationVersion: CURRENT_QUALIFICATION_VERSION,
         },
@@ -125,13 +127,7 @@ export async function processSearchTask(taskId: string): Promise<void> {
           profileUrl: sanitizeProviderString(result.profileUrl),
           title: title ? sanitizeProviderString(title) : null,
           content: sanitizeProviderString(result.rawContent),
-          rawMetadata: toSafeJson({
-            ...result.metadata,
-            customerName: result.customerName,
-            country: result.country,
-            region: result.region,
-            industry: result.industry,
-          }),
+          rawMetadata: evidenceMetadata,
           extractionStatus: SearchEvidenceExtractionStatus.PENDING,
           qualificationVersion: CURRENT_QUALIFICATION_VERSION,
           leadId: null,
@@ -145,6 +141,27 @@ export async function processSearchTask(taskId: string): Promise<void> {
       })
       marketSignalCount += marketSignals.length
 
+      if (productContext) {
+        try {
+          const created = await detectAndPersistSearchOpportunity({
+            userId: task.userId,
+            searchTaskId: task.id,
+            searchEvidenceId: evidence.id,
+            providerName: provider.name,
+            result,
+            title,
+            rawMetadata: evidenceMetadata,
+            productContext,
+          })
+          if (created) opportunityCount += 1
+        } catch (error) {
+          console.error(
+            `[SearchTaskService] Opportunity detection failed for evidence ${evidence.id}:`,
+            error,
+          )
+        }
+      }
+
       try {
         const evaluation = searchEvidencePipeline.evaluate(
           result,
@@ -154,36 +171,6 @@ export async function processSearchTask(taskId: string): Promise<void> {
           result,
           evaluation,
         )
-
-        if (productContext) {
-          try {
-            const opportunity = opportunityDetection.detect({
-              provider: provider.name,
-              sourceUrl: result.sourceUrl,
-              title,
-              content: result.rawContent,
-              rawMetadata: toSafeJson(result.metadata),
-              explicitCompanyName:
-                evaluation.identity.companyName ?? result.company,
-              productContext,
-            })
-            if (opportunity) {
-              await opportunityPersistence.persist({
-                userId: task.userId,
-                searchTaskId: task.id,
-                searchEvidenceId: evidence.id,
-                productContext,
-                detection: opportunity,
-              })
-              opportunityCount += 1
-            }
-          } catch (error) {
-            console.error(
-              `[SearchTaskService] Opportunity detection failed for evidence ${evidence.id}:`,
-              error,
-            )
-          }
-        }
 
         if (!qualifiedResult) {
           await prisma.searchEvidence.update({
@@ -324,7 +311,10 @@ export async function processSearchTask(taskId: string): Promise<void> {
             ]),
           },
         })
-        throw error
+        console.error(
+          `[SearchTaskService] Evidence processing failed for ${evidence.id}; continuing task:`,
+          error,
+        )
       }
     }
 
@@ -358,6 +348,52 @@ export async function processSearchTask(taskId: string): Promise<void> {
 
     throw error
   }
+}
+
+interface DetectSearchOpportunityInput {
+  userId: string
+  searchTaskId: string
+  searchEvidenceId: string
+  providerName: string
+  result: SearchResult
+  title: string | null
+  rawMetadata: unknown
+  productContext: SearchProductContext
+}
+
+interface SearchOpportunityDependencies {
+  detect: (
+    input: Parameters<typeof opportunityDetection.detect>[0],
+  ) => ReturnType<typeof opportunityDetection.detect>
+  persist: typeof opportunityPersistence.persist
+}
+
+export async function detectAndPersistSearchOpportunity(
+  input: DetectSearchOpportunityInput,
+  dependencies: SearchOpportunityDependencies = {
+    detect: (candidate) => opportunityDetection.detect(candidate),
+    persist: (candidate) => opportunityPersistence.persist(candidate),
+  },
+): Promise<boolean> {
+  const detection = dependencies.detect({
+    provider: input.providerName,
+    sourceUrl: input.result.sourceUrl,
+    title: input.title,
+    content: input.result.rawContent,
+    rawMetadata: input.rawMetadata,
+    explicitCompanyName: input.result.company,
+    productContext: input.productContext,
+  })
+  if (!detection) return false
+
+  await dependencies.persist({
+    userId: input.userId,
+    searchTaskId: input.searchTaskId,
+    searchEvidenceId: input.searchEvidenceId,
+    productContext: input.productContext,
+    detection,
+  })
+  return true
 }
 
 function readProductContext(value: unknown): SearchProductContext | undefined {

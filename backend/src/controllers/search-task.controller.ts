@@ -103,6 +103,7 @@ export const getSearchTaskController: RequestHandler = async (
   request,
   response,
 ) => {
+  response.set('Cache-Control', 'no-store')
   const task = await getSearchTask(request.params.id)
 
   if (!task) {
@@ -116,6 +117,7 @@ export const getSearchTaskResultsController: RequestHandler = async (
   request,
   response,
 ) => {
+  response.set('Cache-Control', 'no-store')
   const results = await getSearchTaskResults(request.params.id)
   response.json({ data: results, meta: { total: results.length } })
 }
@@ -124,6 +126,7 @@ export const getSearchTaskOpportunitiesController: RequestHandler = async (
   request,
   response,
 ) => {
+  response.set('Cache-Control', 'no-store')
   const opportunities = await getSearchTaskOpportunities(request.params.id)
   response.json({
     data: opportunities,

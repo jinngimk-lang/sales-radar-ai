@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Search, Radar, SlidersHorizontal, X, Loader2, Mail, MessageCircle, Linkedin } from 'lucide-react'
 import type {
@@ -63,6 +63,7 @@ export function DiscoverPage() {
     useState<ProductContextSnapshot | null>(null)
   const [productProfiles, setProductProfiles] = useState<ProductProfile[]>([])
   const [selectedProductId, setSelectedProductId] = useState('')
+  const searchRequestIdRef = useRef(0)
   const [emailModal, setEmailModal] = useState<{
     customer: Customer
     channel: OutreachChannel
@@ -76,6 +77,8 @@ export function DiscoverPage() {
 
   // 搜索
   const runSearch = useCallback(async (currentFilters: SearchFilters) => {
+    const searchRequestId = searchRequestIdRef.current + 1
+    searchRequestIdRef.current = searchRequestId
     setLoading(true)
     setSearchError(null)
     setCustomers([])
@@ -134,21 +137,27 @@ export function DiscoverPage() {
         productContextDraft,
         selectedProductId || undefined,
         (preparation) => {
+          if (searchRequestIdRef.current !== searchRequestId) return
           setSearchStrategy(preparation.strategy)
           setProductContext(preparation.productContext)
         },
       )
+      if (searchRequestIdRef.current !== searchRequestId) return
       setSearchStrategy(result.strategy)
       setProductContext(result.productContext)
       setCustomers(result.customers)
       setOpportunities(result.opportunities)
+      setResultCategory('opportunities')
     } catch (error) {
+      if (searchRequestIdRef.current !== searchRequestId) return
       console.error('[DiscoverPage] Search failed', error)
       setCustomers([])
       setOpportunities([])
       setSearchError('SEARCH_UNAVAILABLE')
     } finally {
-      setLoading(false)
+      if (searchRequestIdRef.current === searchRequestId) {
+        setLoading(false)
+      }
     }
   }, [selectedProductId])
 
@@ -240,7 +249,10 @@ export function DiscoverPage() {
                 </button>
               )}
             </div>
-            <button className="btn-primary hidden sm:inline-flex">
+            <button
+              className="btn-primary hidden sm:inline-flex"
+              onClick={() => void runSearch(filters)}
+            >
               <Radar className="h-4 w-4" />
               雷达扫描
             </button>
@@ -396,7 +408,7 @@ export function DiscoverPage() {
             ) : (
               <EmptyState
                 category={resultCategory}
-                onReset={() => setFilters(DEFAULT_FILTERS)}
+                onRetry={() => void runSearch(filters)}
               />
             )}
           </div>
@@ -575,10 +587,10 @@ function knownValue(
 
 function EmptyState({
   category,
-  onReset,
+  onRetry,
 }: {
   category: ResultCategory
-  onReset: () => void
+  onRetry: () => void
 }) {
   return (
     <div className="card flex flex-col items-center justify-center px-6 py-16 text-center">
@@ -613,8 +625,8 @@ function EmptyState({
           只有企业身份、官网、真实来源和产品匹配度都确认后，才会显示在这里。
         </p>
       )}
-      <button onClick={onReset} className="btn-secondary mt-5">
-        重置筛选条件
+      <button onClick={onRetry} className="btn-secondary mt-5">
+        重新搜索
       </button>
     </div>
   )

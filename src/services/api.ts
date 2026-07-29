@@ -65,6 +65,8 @@ import { delay, scoreToLevel } from '@/lib/utils'
 import * as crmStore from '@/lib/crmStore'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const SEARCH_TASK_POLL_INTERVAL_MS = 500
+const SEARCH_TASK_MAX_POLL_ATTEMPTS = 240
 
 interface ApiEnvelope<T> {
   data: T
@@ -323,9 +325,14 @@ async function createSearchTaskAndWait(
   }
   onPrepared?.(preparation)
 
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+  for (
+    let attempt = 0;
+    attempt < SEARCH_TASK_MAX_POLL_ATTEMPTS;
+    attempt += 1
+  ) {
     const result = await request<ApiEnvelope<BackendSearchTask>>(
       `/search-task/${created.data.id}`,
+      { cache: 'no-store' },
     )
 
     if (result.data.status === 'COMPLETED') {
@@ -339,7 +346,7 @@ async function createSearchTaskAndWait(
       throw new Error(result.data.errorMessage || '搜索任务执行失败')
     }
 
-    await delay(250)
+    await delay(SEARCH_TASK_POLL_INTERVAL_MS)
   }
 
   throw new Error('搜索任务等待超时')
@@ -452,9 +459,11 @@ export async function searchCustomers(
   const [leadResponse, opportunityResponse] = await Promise.all([
     request<ApiEnvelope<BackendLead[]>>(
       `/search-task/${task.id}/results`,
+      { cache: 'no-store' },
     ),
     request<ApiEnvelope<SalesOpportunity[]>>(
       `/search-task/${task.id}/opportunities`,
+      { cache: 'no-store' },
     ),
   ])
   let results = leadResponse.data.map(toCustomer)

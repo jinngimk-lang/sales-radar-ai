@@ -6,6 +6,7 @@
   "description": "AI-powered global customer discovery platform - Sales Radar AI",
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc -b --pretty false",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint ."
