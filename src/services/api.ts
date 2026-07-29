@@ -51,6 +51,8 @@ import type {
   OpportunityDetail,
   OpportunityCompanyIntelligenceResult,
   CompanyResearchWorkspace,
+  ResearchTrace,
+  ResearchTraceDetails,
   MarketSignal,
 } from '@/types'
 import {
@@ -534,6 +536,24 @@ export async function getCompanyResearchWorkspace(
 ): Promise<CompanyResearchWorkspace> {
   const response = await request<ApiEnvelope<CompanyResearchWorkspace>>(
     `/opportunities/${encodeURIComponent(opportunityId)}/company-intelligence/workspace`,
+  )
+  return response.data
+}
+
+export async function getResearchTrace(
+  opportunityId: string,
+): Promise<ResearchTrace> {
+  const response = await request<ApiEnvelope<ResearchTrace>>(
+    `/opportunities/${encodeURIComponent(opportunityId)}/research-trace`,
+  )
+  return response.data
+}
+
+export async function getResearchTraceDetails(
+  opportunityId: string,
+): Promise<ResearchTraceDetails> {
+  const response = await request<ApiEnvelope<ResearchTraceDetails>>(
+    `/opportunities/${encodeURIComponent(opportunityId)}/research-trace/details`,
   )
   return response.data
 }

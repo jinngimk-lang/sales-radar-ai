@@ -3,6 +3,8 @@ import { ensureDemoUser } from '../services/demo-user.service.js'
 import { companyIntelligenceWorkspace } from '../services/company-intelligence-workspace.service.js'
 import { opportunityCompanyIntelligence } from '../services/opportunity-company-intelligence.service.js'
 import { opportunityService } from '../services/opportunity.service.js'
+import { researchTraceDetails } from '../services/research-trace-details.service.js'
+import { researchTrace } from '../services/research-trace.service.js'
 import { AppError } from '../utils/app-error.js'
 
 interface OpportunityDetailReader {
@@ -18,6 +20,14 @@ interface OpportunityCompanyResearcher {
 }
 
 interface CompanyIntelligenceWorkspaceReader {
+  getForUser(opportunityId: string, userId: string): Promise<unknown>
+}
+
+interface ResearchTraceReader {
+  getForUser(opportunityId: string, userId: string): Promise<unknown>
+}
+
+interface ResearchTraceDetailsReader {
   getForUser(opportunityId: string, userId: string): Promise<unknown>
 }
 
@@ -132,3 +142,51 @@ export function createGetCompanyIntelligenceWorkspaceController(
 
 export const getCompanyIntelligenceWorkspaceController =
   createGetCompanyIntelligenceWorkspaceController()
+
+export function createGetResearchTraceController(
+  service: ResearchTraceReader = researchTrace,
+  demoUserResolver = ensureDemoUser,
+): RequestHandler {
+  return async (request, response) => {
+    const authenticatedUserId = readAuthenticatedUserId(request)
+    if (!authenticatedUserId && process.env.NODE_ENV === 'production') {
+      throw new AppError(
+        401,
+        'AUTHENTICATION_REQUIRED',
+        'Authentication is required to access research trace',
+      )
+    }
+
+    const userId =
+      authenticatedUserId ?? (await demoUserResolver()).id
+    const trace = await service.getForUser(request.params.id, userId)
+    response.json({ data: trace })
+  }
+}
+
+export const getResearchTraceController =
+  createGetResearchTraceController()
+
+export function createGetResearchTraceDetailsController(
+  service: ResearchTraceDetailsReader = researchTraceDetails,
+  demoUserResolver = ensureDemoUser,
+): RequestHandler {
+  return async (request, response) => {
+    const authenticatedUserId = readAuthenticatedUserId(request)
+    if (!authenticatedUserId && process.env.NODE_ENV === 'production') {
+      throw new AppError(
+        401,
+        'AUTHENTICATION_REQUIRED',
+        'Authentication is required to access research trace details',
+      )
+    }
+
+    const userId =
+      authenticatedUserId ?? (await demoUserResolver()).id
+    const trace = await service.getForUser(request.params.id, userId)
+    response.json({ data: trace })
+  }
+}
+
+export const getResearchTraceDetailsController =
+  createGetResearchTraceDetailsController()

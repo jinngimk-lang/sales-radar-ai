@@ -1,6 +1,10 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { AppError } from '../utils/app-error.js'
+import {
+  buildAgentReachProcessEnv,
+  resolveAgentReachCommand,
+} from '../utils/agent-reach-runtime.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -25,13 +29,6 @@ export type ProviderHealthCommand = (
   args: string[],
 ) => Promise<ProviderHealthCommandResult>
 
-function runtimeCommand(): string {
-  return (
-    process.env.AGENT_REACH_MCPORTER_PATH?.trim() ||
-    (process.platform === 'win32' ? 'mcporter.cmd' : 'mcporter')
-  )
-}
-
 async function runHealthCommand(
   executable: string,
   args: string[],
@@ -41,6 +38,7 @@ async function runHealthCommand(
     timeout: 5_000,
     windowsHide: true,
     shell: process.platform === 'win32',
+    env: buildAgentReachProcessEnv(),
     maxBuffer: 512 * 1024,
   })
   return { stdout: result.stdout, stderr: result.stderr }
@@ -49,7 +47,7 @@ async function runHealthCommand(
 export class ProviderHealthService {
   constructor(
     private readonly command: ProviderHealthCommand = runHealthCommand,
-    private readonly executable = runtimeCommand(),
+    private readonly executable = resolveAgentReachCommand(),
   ) {}
 
   async checkAgentReach(): Promise<ProviderHealth> {

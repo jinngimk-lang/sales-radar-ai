@@ -3,6 +3,10 @@ import { createHash } from 'node:crypto'
 import { promisify } from 'node:util'
 import { Industry, Platform, Region } from '@prisma/client'
 import { ProviderError } from '../errors/provider-error.js'
+import {
+  buildAgentReachProcessEnv,
+  resolveAgentReachCommand,
+} from '../../utils/agent-reach-runtime.js'
 import type {
   SearchProvider,
   SearchProviderInput,
@@ -57,9 +61,7 @@ const REGION_COUNTRY: Record<Region, string> = {
 export class AgentReachProvider implements SearchProvider {
   readonly name = 'agent-reach' as const
 
-  private readonly command =
-    process.env.AGENT_REACH_MCPORTER_PATH?.trim() ||
-    (process.platform === 'win32' ? 'mcporter.cmd' : 'mcporter')
+  private readonly command = resolveAgentReachCommand()
   private readonly timeoutMs = this.readPositiveInteger(
     process.env.AGENT_REACH_TIMEOUT_MS,
     15_000,
@@ -122,6 +124,7 @@ export class AgentReachProvider implements SearchProvider {
           timeout: this.timeoutMs,
           windowsHide: true,
           shell: process.platform === 'win32',
+          env: buildAgentReachProcessEnv(),
           maxBuffer: 2 * 1024 * 1024,
         },
       )

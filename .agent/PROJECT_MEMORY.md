@@ -225,6 +225,39 @@ Sales Copilot。
 
 建立可编排、可评估、可追踪的销售机会 Agent 系统。
 
+## Current Agent OS Layers
+
+1. Product Intelligence
+2. Market Intelligence
+3. Evidence Validation
+4. Opportunity Analysis
+5. Company Intelligence
+6. Research Trace
+7. Contact Intelligence
+8. Sales Action Planning
+
+## Core Boundary
+
+AI assists research.
+
+AI does not create customer truth.
+
+## Truth Hierarchy
+
+```text
+Source
+  ↓
+Evidence
+  ↓
+Fact
+  ↓
+Assessment
+  ↓
+Recommendation
+```
+
+CRM entities require human confirmation and quality gates.
+
 所有 Agent 共同遵守：
 
 - Evidence First

@@ -613,6 +613,137 @@ export interface CompanyResearchWorkspace {
   }
 }
 
+export type ResearchTraceStage =
+  | 'PRODUCT_CONTEXT'
+  | 'EVIDENCE_VALIDATION'
+  | 'OPPORTUNITY_ASSESSMENT'
+  | 'COMPANY_IDENTITY'
+  | 'COMPANY_RESEARCH'
+  | 'SALES_PREPARATION'
+
+export type ResearchTraceStatus =
+  | 'COMPLETED'
+  | 'PARTIAL'
+  | 'NEEDS_REVIEW'
+  | 'FAILED'
+
+export type ResearchInformationType =
+  | 'FACT'
+  | 'ASSESSMENT'
+  | 'RECOMMENDATION'
+
+export interface ResearchTraceReference {
+  type: string
+  id: string
+}
+
+export interface ResearchTraceSourceReference {
+  type: 'PRODUCT_CONTEXT' | 'SEARCH_EVIDENCE' | 'COMPANY_SOURCE'
+  id: string
+  title: string | null
+  url: string | null
+  capturedAt: string | null
+  supports: string[]
+}
+
+export interface ResearchTraceStep {
+  id: string
+  stage: ResearchTraceStage
+  status: ResearchTraceStatus
+  informationType: ResearchInformationType
+  title: string
+  summary: string
+  reasons: string[]
+  sourceReferences: ResearchTraceSourceReference[]
+  inputReferences: ResearchTraceReference[]
+  outputReferences: ResearchTraceReference[]
+  version: string | null
+  confidence: number | null
+  timestamp: string
+  pendingVerifications: string[]
+}
+
+export type ResearchTraceVerificationStatus =
+  | 'VERIFIED'
+  | 'PARTIALLY_VERIFIED'
+  | 'NEEDS_REVIEW'
+  | 'CONFLICTING'
+  | 'NOT_APPLICABLE'
+
+export type ResearchTraceClaimVerificationStatus =
+  | 'CONFIRMED'
+  | 'PARTIALLY_CONFIRMED'
+  | 'NEEDS_REVIEW'
+  | 'CONFLICTING'
+  | 'NOT_APPLICABLE'
+
+export interface ResearchTraceSupportingSource {
+  id: string
+  referenceType:
+    | 'SEARCH_EVIDENCE'
+    | 'COMPANY_SOURCE'
+    | 'PRODUCT_CONTEXT'
+  referenceId: string
+  title: string
+  url: string | null
+  excerpt: string | null
+  capturedAt: string | null
+  role: 'PRIMARY' | 'CORROBORATING' | 'CONTEXT'
+  verificationStatus:
+    | 'VERIFIED'
+    | 'PARTIALLY_VERIFIED'
+    | 'NEEDS_REVIEW'
+    | 'CONFLICTING'
+}
+
+export interface ResearchTraceSupportedClaim {
+  id: string
+  claimType: ResearchInformationType
+  text: string
+  verificationStatus: ResearchTraceClaimVerificationStatus
+  supportingSourceIds: string[]
+  reasons: string[]
+  verificationQuestions: string[]
+}
+
+export interface ResearchTraceReasoningLink {
+  fromType: 'SOURCE' | 'CLAIM'
+  fromId: string
+  toClaimId: string
+  relationship: 'SUPPORTS' | 'INFORMS' | 'MOTIVATES' | 'CONTRADICTS'
+  explanation: string
+}
+
+export interface ResearchTraceStepV2 extends ResearchTraceStep {
+  supportingSources: ResearchTraceSupportingSource[]
+  supportedClaims: ResearchTraceSupportedClaim[]
+  reasoningLinks: ResearchTraceReasoningLink[]
+  verificationStatus: ResearchTraceVerificationStatus
+}
+
+export interface ResearchTrace {
+  opportunityId: string
+  generatedAt: string
+  steps: ResearchTraceStep[]
+  summary: {
+    completed: number
+    needsReview: number
+    failed: number
+  }
+}
+
+export interface ResearchTraceDetails
+  extends Omit<ResearchTrace, 'steps'> {
+  traceVersion: 'v2'
+  steps: ResearchTraceStepV2[]
+  detailsSummary: {
+    confirmedFacts: number
+    assessments: number
+    recommendations: number
+    needsReview: number
+  }
+}
+
 export type MarketSignalType =
   | 'FACTORY_EXPANSION'
   | 'INVESTMENT'
