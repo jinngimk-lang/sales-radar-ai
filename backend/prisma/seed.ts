@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from '@prisma/client'
+import { OpportunityType, Prisma, PrismaClient } from '@prisma/client'
 import { DEMO_USER } from '../src/config/demo-user.js'
 import { mockAIAnalyzer } from '../src/providers/ai/mock-ai-analyzer.js'
 import { searchProviderFactory } from '../src/providers/search/provider.factory.js'
@@ -33,6 +33,86 @@ async function main(): Promise<void> {
       completedAt: new Date(),
     },
   })
+
+  const opportunityFixtures = [
+    {
+      id: 'seed-opportunity-expansion',
+      type: OpportunityType.COMPANY_EXPANSION,
+      dedupeKey: 'seed-fixture-company-expansion',
+      title: '制造企业产能扩张场景（测试数据）',
+      summary:
+        'Seed fixture：用于验证企业扩张类销售机会的页面展示，不代表真实企业事件。',
+      whyItMatters:
+        '产能扩张通常值得销售人员进一步研究自动化、软件和供应链相关需求。',
+      recommendedNextStep:
+        '核验真实来源、项目阶段和相关业务部门后，再判断是否值得跟进。',
+      confidence: 60,
+    },
+    {
+      id: 'seed-opportunity-investment',
+      type: OpportunityType.INVESTMENT,
+      dedupeKey: 'seed-fixture-investment',
+      title: '制造业投资动态场景（测试数据）',
+      summary:
+        'Seed fixture：用于验证企业投资类销售机会的页面展示，不代表真实投资公告。',
+      whyItMatters:
+        '新增投资可能带来产线、运营系统或数字化能力建设方向，仍需来源验证。',
+      recommendedNextStep:
+        '查找企业公告或投资者关系材料，确认投资范围与实施时间。',
+      confidence: 55,
+    },
+    {
+      id: 'seed-opportunity-digital-upgrade',
+      type: OpportunityType.DIGITAL_UPGRADE,
+      dedupeKey: 'seed-fixture-digital-upgrade',
+      title: '工厂数字化升级场景（测试数据）',
+      summary:
+        'Seed fixture：用于验证数字化升级类销售机会的页面展示，不代表真实采购需求。',
+      whyItMatters:
+        '数字化升级方向可能与工业软件和自动化产品相关，但不能视为采购事实。',
+      recommendedNextStep:
+        '确认企业是否存在公开升级计划，并研究运营、工程或数字化相关部门。',
+      confidence: 50,
+    },
+  ] as const
+
+  for (const fixture of opportunityFixtures) {
+    const productContextSnapshot: Prisma.InputJsonValue = {
+      version: 'seed-v1',
+      isSeedFixture: true,
+      product: 'industrial automation',
+      industry: 'Industrial Manufacturing',
+      region: 'Europe',
+      customerType: 'Manufacturing companies',
+      source: 'prisma-seed',
+    }
+
+    await prisma.opportunity.upsert({
+      where: { id: fixture.id },
+      update: {
+        userId: user.id,
+        searchTaskId: searchTask.id,
+        type: fixture.type,
+        dedupeKey: fixture.dedupeKey,
+        companyName: null,
+        title: fixture.title,
+        summary: fixture.summary,
+        whyItMatters: fixture.whyItMatters,
+        recommendedNextStep: fixture.recommendedNextStep,
+        confidence: fixture.confidence,
+        productContextSnapshot,
+        detectionVersion: 'seed-v1',
+      },
+      create: {
+        ...fixture,
+        userId: user.id,
+        searchTaskId: searchTask.id,
+        companyName: null,
+        productContextSnapshot,
+        detectionVersion: 'seed-v1',
+      },
+    })
+  }
 
   const provider = searchProviderFactory.create('mock')
   const mockLeads = leadNormalizer.normalizeMany(
@@ -93,7 +173,13 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log('Seeded demo user, search task, leads, and AI analysis')
+  const opportunityCount = await prisma.opportunity.count({
+    where: { userId: user.id },
+  })
+
+  console.log(
+    `Seeded demo user, search task, leads, AI analysis, and ${opportunityCount} opportunities`,
+  )
 }
 
 main()
