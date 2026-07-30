@@ -51,4 +51,4 @@ USER node
 
 EXPOSE 8787
 
-CMD ["sh", "-c", "prisma migrate deploy && npm run start"]
+CMD ["node", "dist/server.js"]
