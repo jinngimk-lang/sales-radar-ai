@@ -32,6 +32,14 @@ interface AgentReachRawResult {
   metadata?: Record<string, unknown>
 }
 
+export interface AgentReachOutputDiagnostics {
+  format: 'empty' | 'json' | 'text'
+  byteLength: number
+  containerKeys: string[]
+  textBlockCount: number
+  urlMarkerCount: number
+}
+
 const PLATFORM_DOMAINS: Partial<Record<Platform, string[]>> = {
   [Platform.Reddit]: ['reddit.com'],
   [Platform.X]: ['x.com', 'twitter.com'],
@@ -79,18 +87,42 @@ export class AgentReachProvider implements SearchProvider {
     const query = this.buildQuery(input.keyword, platforms, input.regions)
     const rawOutput = await this.executeSearch(query)
     const rawResults = parseAgentReachOutput(rawOutput)
+    const outputDiagnostics = inspectAgentReachOutput(rawOutput)
 
-    console.info(`[AgentReachProvider] raw result count: ${rawResults.length}`)
+    console.info(
+      '[AgentReachProvider] mcporter response diagnostics:',
+      JSON.stringify({
+        ...outputDiagnostics,
+        parsedResultCount: rawResults.length,
+      }),
+    )
     if (rawResults[0]) {
       console.info(
-        '[AgentReachProvider] first raw result:',
+        '[AgentReachProvider] first parsed result shape:',
         JSON.stringify(
           {
-            ...rawResults[0],
-            text: rawResults[0].text.slice(0, 1_000),
+            fieldsPresent: [
+              'title',
+              'url',
+              'text',
+              'author',
+              'profileUrl',
+              'publishedAt',
+              'company',
+              'companyDomain',
+              'companyWebsite',
+              'jobTitle',
+              'country',
+              'location',
+              'buyingNeed',
+            ].filter((field) => {
+              const value = rawResults[0]?.[field as keyof AgentReachRawResult]
+              return value !== undefined && value !== null && value !== ''
+            }),
+            titleLength: rawResults[0].title.length,
+            contentLength: rawResults[0].text.length,
+            hasValidHttpUrl: /^https?:\/\//i.test(rawResults[0].url),
           },
-          null,
-          2,
         ),
       )
     }
@@ -103,10 +135,31 @@ export class AgentReachProvider implements SearchProvider {
       )
     }
 
-    return rawResults
-      .slice(0, this.maxResults)
+    const consideredResults = rawResults.slice(0, this.maxResults)
+    const invalidUrlCount = consideredResults.filter(
+      (result) => inferPlatform(result.url) === null,
+    ).length
+    const platformFilteredCount = consideredResults.filter((result) => {
+      const platform = inferPlatform(result.url)
+      return platform !== null && !platforms.includes(platform)
+    }).length
+    const adaptedResults = consideredResults
       .map((result) => this.toSearchResult(result, input, platforms))
       .filter((result): result is SearchResult => result !== null)
+
+    console.info(
+      '[AgentReachProvider] adapter diagnostics:',
+      JSON.stringify({
+        parsedResultCount: rawResults.length,
+        consideredResultCount: consideredResults.length,
+        adaptedResultCount: adaptedResults.length,
+        invalidUrlCount,
+        platformFilteredCount,
+        requestedPlatforms: platforms,
+      }),
+    )
+
+    return adaptedResults
   }
 
   private async executeSearch(query: string): Promise<string> {
@@ -319,6 +372,44 @@ export function parseAgentReachOutput(output: string): AgentReachRawResult[] {
   }
 
   return parseTextResults(trimmed)
+}
+
+export function inspectAgentReachOutput(
+  output: string,
+): AgentReachOutputDiagnostics {
+  const trimmed = output.trim()
+  if (!trimmed) {
+    return {
+      format: 'empty',
+      byteLength: 0,
+      containerKeys: [],
+      textBlockCount: 0,
+      urlMarkerCount: 0,
+    }
+  }
+
+  let format: AgentReachOutputDiagnostics['format'] = 'text'
+  let containerKeys: string[] = []
+  try {
+    const parsed = JSON.parse(trimmed) as unknown
+    format = 'json'
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>
+      containerKeys = ['results', 'items', 'data', 'content', 'output'].filter(
+        (key) => record[key] !== undefined,
+      )
+    }
+  } catch {
+    // The default mcporter output can be human-readable MCP text.
+  }
+
+  return {
+    format,
+    byteLength: Buffer.byteLength(trimmed, 'utf8'),
+    containerKeys,
+    textBlockCount: trimmed.split(/\n\s*\n/).filter(Boolean).length,
+    urlMarkerCount: (trimmed.match(/https?:\/\//gi) ?? []).length,
+  }
 }
 
 function collectStructuredResults(value: unknown): AgentReachRawResult[] {

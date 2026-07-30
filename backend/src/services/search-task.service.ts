@@ -138,6 +138,9 @@ export async function processSearchTask(
       platforms: task.platforms,
       regions: task.regions,
     })
+    console.info(
+      `[SearchTaskService] Provider execution completed: task=${task.id}, provider=${provider.name}, adapterResults=${providerResults.length}.`,
+    )
     const productContext = readProductContext(task.parameters)
     let qualifiedCount = 0
     let opportunityCount = 0
@@ -374,7 +377,7 @@ export async function processSearchTask(
     }
 
     console.info(
-      `[SearchTaskService] ${provider.name} results: raw=${providerResults.length}, evidence=${providerResults.length}, marketSignals=${marketSignalCount}, opportunities=${opportunityCount}, qualified=${qualifiedCount}`,
+      `[SearchTaskService] ${provider.name} task outcome: adapterResults=${providerResults.length}, evidence=${providerResults.length}, marketSignals=${marketSignalCount}, opportunities=${opportunityCount}, resultCountQualifiedLeads=${qualifiedCount}.`,
     )
     await prisma.searchTask.update({
       where: { id: task.id },
