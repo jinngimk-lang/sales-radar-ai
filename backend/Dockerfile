@@ -44,7 +44,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY config ./config
 
-RUN mcporter list --json
+RUN mcporter config get exa --json
 
 USER node
 
