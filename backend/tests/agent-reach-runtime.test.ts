@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
-import { delimiter, dirname } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { describe, it } from 'node:test'
 import {
   buildAgentReachProcessEnv,
   findAgentReachExecutable,
+  getExaCredentialStatus,
+  getExaMcpRuntimeStatus,
 } from '../src/utils/agent-reach-runtime.js'
 
 describe('Agent Reach runtime environment', () => {
@@ -48,6 +50,47 @@ describe('Agent Reach runtime environment', () => {
 
   it('resolves an explicitly configured executable path', () => {
     assert.equal(findAgentReachExecutable(process.execPath), process.execPath)
+  })
+
+  it('injects a normalized EXA_API_KEY into the MCP child process', () => {
+    const environment = buildAgentReachProcessEnv(
+      {
+        PATH: process.env.PATH,
+        exa_api_key: '  runtime-credential-probe  ',
+      },
+      process.execPath,
+    )
+
+    assert.equal(environment.EXA_API_KEY, 'runtime-credential-probe')
+    assert.equal(environment.exa_api_key, undefined)
+    assert.deepEqual(getExaCredentialStatus(environment), {
+      configured: true,
+    })
+  })
+
+  it('reports credential availability without returning credential data', () => {
+    assert.deepEqual(
+      getExaCredentialStatus({ EXA_API_KEY: '  configured  ' }),
+      { configured: true },
+    )
+    assert.deepEqual(getExaCredentialStatus({ EXA_API_KEY: '   ' }), {
+      configured: false,
+    })
+  })
+
+  it('reports the configured local Exa MCP transport without reading secrets', () => {
+    const configPath = join(process.cwd(), 'config', 'mcporter.json')
+
+    assert.deepEqual(
+      getExaMcpRuntimeStatus({
+        MCPORTER_CONFIG: configPath,
+        EXA_API_KEY: 'must-not-be-returned',
+      }),
+      {
+        configPath,
+        transport: 'local-stdio',
+      },
+    )
   })
 
   it('reports a missing command without exposing environment values', () => {

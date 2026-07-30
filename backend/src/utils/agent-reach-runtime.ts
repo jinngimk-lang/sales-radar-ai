@@ -1,5 +1,14 @@
-import { accessSync, constants } from 'node:fs'
+import { accessSync, constants, readFileSync } from 'node:fs'
 import { delimiter, dirname, isAbsolute, join } from 'node:path'
+
+export interface ExaCredentialStatus {
+  configured: boolean
+}
+
+export interface ExaMcpRuntimeStatus {
+  configPath: string | null
+  transport: 'local-stdio' | 'remote-http' | 'unknown'
+}
 
 export function resolveAgentReachCommand(): string {
   return (
@@ -28,6 +37,17 @@ export function buildAgentReachProcessEnv(
     if (key.toLowerCase() === 'path') delete environment[key]
   }
 
+  const exaApiKey = readEnvironmentValue(baseEnv, 'EXA_API_KEY')?.trim()
+  for (const key of Object.keys(environment)) {
+    if (key.toLowerCase() === 'exa_api_key') delete environment[key]
+  }
+  if (exaApiKey) {
+    // Exa's local MCP runtime reads this exact environment variable and sends
+    // it to the Exa API as an x-api-key header. Keep the secret out of argv,
+    // config output, and logs.
+    environment.EXA_API_KEY = exaApiKey
+  }
+
   environment.PATH = (
     includesNodeDirectory
       ? pathEntries
@@ -35,6 +55,50 @@ export function buildAgentReachProcessEnv(
   ).join(delimiter)
 
   return environment
+}
+
+export function getExaCredentialStatus(
+  environment: NodeJS.ProcessEnv = process.env,
+): ExaCredentialStatus {
+  return {
+    configured: Boolean(
+      readEnvironmentValue(environment, 'EXA_API_KEY')?.trim(),
+    ),
+  }
+}
+
+export function getExaMcpRuntimeStatus(
+  environment: NodeJS.ProcessEnv = process.env,
+): ExaMcpRuntimeStatus {
+  const configPath =
+    readEnvironmentValue(environment, 'MCPORTER_CONFIG')?.trim() || null
+  if (!configPath) return { configPath: null, transport: 'unknown' }
+
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
+      mcpServers?: {
+        exa?: {
+          command?: unknown
+          baseUrl?: unknown
+          url?: unknown
+        }
+      }
+    }
+    const exa = config.mcpServers?.exa
+    if (exa?.command === 'exa-mcp-server') {
+      return { configPath, transport: 'local-stdio' }
+    }
+    if (
+      typeof exa?.baseUrl === 'string' ||
+      typeof exa?.url === 'string'
+    ) {
+      return { configPath, transport: 'remote-http' }
+    }
+  } catch {
+    // Startup diagnostics must never interrupt the backend process.
+  }
+
+  return { configPath, transport: 'unknown' }
 }
 
 export function findAgentReachExecutable(
@@ -74,4 +138,13 @@ function canExecute(path: string): boolean {
   } catch {
     return false
   }
+}
+
+function readEnvironmentValue(
+  environment: NodeJS.ProcessEnv,
+  name: string,
+): string | undefined {
+  return Object.entries(environment).find(
+    ([key]) => key.toLowerCase() === name.toLowerCase(),
+  )?.[1]
 }
