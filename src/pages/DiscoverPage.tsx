@@ -1003,12 +1003,15 @@ function SearchFailureState({
 }) {
   const authenticationRequired = errorCode === 'AUTHENTICATION_REQUIRED'
   const systemError = errorCode === 'RADAR_SYSTEM_ERROR'
+  const providerBusy = errorCode === 'PROVIDER_RATE_LIMIT'
 
   return (
     <div className="card px-6 py-10 text-center">
       <h3 className="text-base font-semibold text-ink-900">
         {authenticationRequired
           ? '登录状态已失效'
+          : providerBusy
+            ? '市场信息服务当前繁忙'
           : systemError
             ? '暂时无法读取判断结果'
             : '暂时无法完成本次搜索'}
@@ -1016,13 +1019,17 @@ function SearchFailureState({
       <p className="mx-auto mt-2 max-w-xl text-sm text-ink-500">
         {authenticationRequired
           ? '请重新登录后查看本次市场扫描结果。'
+          : providerBusy
+            ? '真实来源服务当前达到访问限制，系统已经自动重试。请稍后再次搜索。'
           : systemError
             ? '市场信息已经完成处理，但判断结果暂时无法读取，请稍后重试。'
             : '系统暂时无法获取新的市场信息，请稍后重试。'}
       </p>
       <button onClick={onRetry} className="btn-primary mt-5">
         <Radar className="h-4 w-4" />
-        {authenticationRequired || systemError ? '重新尝试' : '重新搜索'}
+        {authenticationRequired || systemError || providerBusy
+          ? '重新尝试'
+          : '重新搜索'}
       </button>
     </div>
   )
@@ -1030,6 +1037,9 @@ function SearchFailureState({
 
 function searchFailureCode(error: unknown) {
   if (error instanceof ApiRequestError) {
+    if (error.status === 429 || error.code === 'RATE_LIMIT') {
+      return 'PROVIDER_RATE_LIMIT'
+    }
     if (
       error.status === 401 ||
       error.status === 403 ||

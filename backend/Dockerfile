@@ -30,10 +30,12 @@ ENV PATH=/usr/local/bin:${PATH}
 
 WORKDIR /app
 
-RUN npm install --global mcporter@0.12.3 \
+RUN npm install --global mcporter@0.12.3 prisma@6.7.0 \
     && node --version \
     && command -v mcporter \
-    && mcporter --version
+    && mcporter --version \
+    && command -v prisma \
+    && prisma --version
 
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
@@ -50,4 +52,4 @@ USER node
 
 EXPOSE 8787
 
-CMD ["npm", "run", "start"]
+CMD ["sh", "-c", "prisma migrate deploy && npm run start"]

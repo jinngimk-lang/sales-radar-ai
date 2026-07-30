@@ -11,6 +11,7 @@ import {
   type SearchTaskExecutionDependencies,
 } from '../src/services/search-task.service.js'
 import type { ProviderHealth } from '../src/services/provider-health.service.js'
+import { ProviderError } from '../src/providers/errors/provider-error.js'
 
 const suffix = randomUUID()
 let userId = ''
@@ -194,6 +195,47 @@ describe('SearchTask provider health execution boundary', () => {
     assert.equal(stored.errorCode, null)
     assert.equal(parameters?.providerExecution?.health?.state, 'AVAILABLE')
     assert.equal(parameters?.providerExecution?.health?.code, 'OK')
+  })
+
+  it('retries a transient provider rate limit before completing', async () => {
+    const task = await createSearchTask({
+      userId,
+      keyword: `provider-rate-limit-retry-${suffix}`,
+      platforms: [],
+      regions: [],
+    })
+    taskIds.push(task.id)
+    let providerCalls = 0
+    const retryDelays: number[] = []
+    const dependencies: SearchTaskExecutionDependencies = {
+      checkProviderHealth: async () => providerHealth('AVAILABLE', 'OK'),
+      resolveProvider: () => ({
+        name: 'agent-reach',
+        search: async () => {
+          providerCalls += 1
+          if (providerCalls === 1) {
+            throw new ProviderError(
+              'RATE_LIMIT',
+              'transient test rate limit',
+              'agent-reach',
+            )
+          }
+          return []
+        },
+      }),
+      waitForProviderRetry: async (delayMs) => {
+        retryDelays.push(delayMs)
+      },
+    }
+
+    await processSearchTask(task.id, dependencies)
+
+    const stored = await prisma.searchTask.findUniqueOrThrow({
+      where: { id: task.id },
+    })
+    assert.equal(stored.status, 'COMPLETED')
+    assert.equal(providerCalls, 2)
+    assert.deepEqual(retryDelays, [2_000])
   })
 
   it('persists one idempotent RadarAssessment for each SearchEvidence before completing', async () => {

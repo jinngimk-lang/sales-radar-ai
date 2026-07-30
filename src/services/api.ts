@@ -354,7 +354,11 @@ async function createSearchTaskAndWait(
       result.data.status === 'FAILED' ||
       result.data.status === 'CANCELLED'
     ) {
-      throw new Error(result.data.errorMessage || '搜索任务执行失败')
+      throw new ApiRequestError(
+        result.data.errorMessage || '搜索任务执行失败',
+        result.data.errorCode === 'RATE_LIMIT' ? 429 : 503,
+        result.data.errorCode || undefined,
+      )
     }
 
     await delay(SEARCH_TASK_POLL_INTERVAL_MS)

@@ -39,6 +39,7 @@ export type { SearchProductContext } from '../contracts/product-context.contract
 
 const SEARCH_PROVIDER_UNAVAILABLE_MESSAGE =
   'The search service is temporarily unavailable. Please try again later.'
+const PROVIDER_RATE_LIMIT_RETRY_DELAYS_MS = [2_000, 5_000] as const
 
 export interface CreateSearchTaskInput {
   userId?: string
@@ -82,6 +83,7 @@ export interface SearchTaskExecutionDependencies {
     userId: string
     searchEvidenceId: string
   }) => Promise<unknown>
+  waitForProviderRetry?: (delayMs: number) => Promise<void>
 }
 
 const defaultExecutionDependencies: SearchTaskExecutionDependencies = {
@@ -140,11 +142,15 @@ export async function processSearchTask(
     }
 
     const provider = dependencies.resolveProvider(task.provider)
-    const providerResults = await provider.search({
-      keyword: task.keyword,
-      platforms: task.platforms,
-      regions: task.regions,
-    })
+    const providerResults = await searchProviderWithRetry(
+      provider,
+      {
+        keyword: task.keyword,
+        platforms: task.platforms,
+        regions: task.regions,
+      },
+      dependencies.waitForProviderRetry,
+    )
     console.info(
       `[SearchTaskService] Provider execution completed: task=${task.id}, provider=${provider.name}, adapterResults=${providerResults.length}.`,
     )
@@ -436,6 +442,48 @@ export async function processSearchTask(
     )
     throw error
   }
+}
+
+async function searchProviderWithRetry(
+  provider: SearchProvider,
+  input: Parameters<SearchProvider['search']>[0],
+  waitForRetry: (delayMs: number) => Promise<void> = wait,
+) {
+  for (
+    let attempt = 0;
+    attempt <= PROVIDER_RATE_LIMIT_RETRY_DELAYS_MS.length;
+    attempt += 1
+  ) {
+    try {
+      return await provider.search(input)
+    } catch (error) {
+      const retryDelay = PROVIDER_RATE_LIMIT_RETRY_DELAYS_MS[attempt]
+      if (
+        !(error instanceof ProviderError) ||
+        error.code !== 'RATE_LIMIT' ||
+        retryDelay === undefined
+      ) {
+        throw error
+      }
+
+      console.warn(
+        `[SearchTaskService] ${provider.name} rate limited; retrying after ${retryDelay}ms (attempt ${attempt + 2}/${PROVIDER_RATE_LIMIT_RETRY_DELAYS_MS.length + 1}).`,
+      )
+      await waitForRetry(retryDelay)
+    }
+  }
+
+  throw new ProviderError(
+    'RATE_LIMIT',
+    'Search provider remained rate limited after retry attempts',
+    provider.name,
+  )
+}
+
+function wait(delayMs: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, delayMs)
+  })
 }
 
 interface ProviderExecutionRecord {
