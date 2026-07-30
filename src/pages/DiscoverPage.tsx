@@ -31,6 +31,7 @@ import type {
   SearchProductContextDraft,
   SearchStrategy,
   SalesOpportunity,
+  RadarAssessment,
 } from '@/types'
 import {
   searchCustomers,
@@ -41,6 +42,7 @@ import {
 import { FilterSidebar } from '@/components/discover/FilterSidebar'
 import { CustomerCard } from '@/components/discover/CustomerCard'
 import { OpportunityCard } from '@/components/discover/OpportunityCard'
+import { RadarWorkspace } from '@/components/discover/RadarWorkspace'
 import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
 import {
@@ -60,7 +62,8 @@ const DEFAULT_FILTERS: SearchFilters = {
 }
 
 type SortKey = 'intent' | 'time'
-type ResultCategory = 'opportunities' | 'leads'
+type OpportunitySortKey = 'recommended' | 'confidence' | 'latest'
+type ResultCategory = 'radar' | 'opportunities' | 'leads'
 
 const CHANNELS: { key: OutreachChannel; label: string; icon: typeof Mail }[] = [
   { key: 'email', label: '开发信', icon: Mail },
@@ -77,12 +80,17 @@ export function DiscoverPage() {
   })
   const [customers, setCustomers] = useState<Customer[]>([])
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([])
+  const [radarAssessments, setRadarAssessments] = useState<
+    RadarAssessment[]
+  >([])
   const [resultCategory, setResultCategory] =
-    useState<ResultCategory>('opportunities')
+    useState<ResultCategory>('radar')
   const [loading, setLoading] = useState(true)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [showMobileFilter, setShowMobileFilter] = useState(false)
   const [sortBy, setSortBy] = useState<SortKey>('intent')
+  const [opportunitySort, setOpportunitySort] =
+    useState<OpportunitySortKey>('recommended')
   const [searchStrategy, setSearchStrategy] =
     useState<SearchStrategy | null>(null)
   const [productContext, setProductContext] =
@@ -115,6 +123,7 @@ export function DiscoverPage() {
     setSearchError(null)
     setCustomers([])
     setOpportunities([])
+    setRadarAssessments([])
     setSearchStrategy(null)
     setProductContext(null)
     try {
@@ -182,12 +191,14 @@ export function DiscoverPage() {
       setProductContext(result.productContext)
       setCustomers(result.customers)
       setOpportunities(result.opportunities)
-      setResultCategory('opportunities')
+      setRadarAssessments(result.radarAssessments)
+      setResultCategory('radar')
     } catch (error) {
       if (searchRequestIdRef.current !== searchRequestId) return
       console.error('[DiscoverPage] Search failed', error)
       setCustomers([])
       setOpportunities([])
+      setRadarAssessments([])
       setSearchError('SEARCH_UNAVAILABLE')
     } finally {
       if (searchRequestIdRef.current === searchRequestId) {
@@ -276,16 +287,30 @@ export function DiscoverPage() {
     return 0 // 时间排序暂用原顺序
   })
 
-  const highConfidenceOpportunities = opportunities.filter(
-    (opportunity) => opportunity.confidence >= 75,
+  const highMatchAssessments = radarAssessments.filter(
+    (assessment) => assessment.decision === 'OPPORTUNITY_CREATED',
   )
-  const recommendedOpportunity = [...opportunities].sort(
-    (a, b) => b.confidence - a.confidence,
-  )[0]
+  // Radar API already returns the service-defined order. Keep that order as
+  // the default recommendation instead of adding another frontend model.
+  const recommendedAssessment = radarAssessments[0]
+  const sortedOpportunities = [...opportunities].sort((a, b) => {
+    if (opportunitySort === 'confidence') {
+      return b.confidence - a.confidence
+    }
+    if (opportunitySort === 'latest') {
+      return (
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
+      )
+    }
+    return 0
+  })
   const currentResultCount =
-    resultCategory === 'opportunities'
-      ? opportunities.length
-      : customers.length
+    resultCategory === 'radar'
+      ? radarAssessments.length
+      : resultCategory === 'opportunities'
+        ? opportunities.length
+        : customers.length
 
   return (
     <div className="h-full overflow-y-auto bg-ink-50 scrollbar-thin">
@@ -492,33 +517,40 @@ export function DiscoverPage() {
                 <div className="grid gap-3 sm:grid-cols-3">
                   <DiscoveryMetric
                     icon={Target}
-                    label="本次发现"
-                    value={`${opportunities.length} 个机会`}
-                    detail="来自当前搜索任务"
+                    label="本次评估"
+                    value={`${radarAssessments.length} 条信息`}
+                    detail="基于当前搜索任务的真实来源"
                   />
                   <DiscoveryMetric
                     icon={CircleGauge}
-                    label="高可信判断"
-                    value={`${highConfidenceOpportunities.length} 个`}
-                    detail="判断可信度 75% 以上"
+                    label="高匹配机会"
+                    value={`${highMatchAssessments.length} 个`}
+                    detail="建议关注，仍需销售进一步验证"
                   />
                   <DiscoveryMetric
                     icon={Sparkles}
                     label="建议优先关注"
                     value={
-                      recommendedOpportunity?.companyName ||
-                      recommendedOpportunity?.title ||
+                      recommendedAssessment?.evidence.companyName ||
+                      recommendedAssessment?.evidence.title ||
                       '待发现'
                     }
                     detail={
-                      recommendedOpportunity
-                        ? `${recommendedOpportunity.confidence}% 判断可信度`
-                        : '等待真实搜索结果'
+                      recommendedAssessment
+                        ? `${recommendedAssessment.matchScore}% 匹配度 · ${recommendedAssessment.confidenceScore}% 可信程度`
+                        : '等待真实评估结果'
                     }
                   />
                 </div>
 
                 <div className="mt-6 flex gap-3 overflow-x-auto pb-1">
+                  <ResultCategoryButton
+                    active={resultCategory === 'radar'}
+                    icon={Radar}
+                    title={`Radar 判断 ${radarAssessments.length}`}
+                    description="解释真实信息与当前销售目标的关系"
+                    onClick={() => setResultCategory('radar')}
+                  />
                   <ResultCategoryButton
                     active={resultCategory === 'opportunities'}
                     icon={Target}
@@ -543,7 +575,28 @@ export function DiscoverPage() {
                     </span>{' '}
                     项
                   </p>
-                  {resultCategory === 'leads' && (
+                  {resultCategory === 'opportunities' ? (
+                    <label className="flex items-center gap-2 text-xs text-ink-500">
+                      <span className="hidden sm:inline">排序</span>
+                      <span className="relative">
+                        <select
+                          value={opportunitySort}
+                          onChange={(event) =>
+                            setOpportunitySort(
+                              event.target.value as OpportunitySortKey,
+                            )
+                          }
+                          aria-label="销售机会排序"
+                          className="appearance-none rounded-xl border border-ink-200 bg-white py-2 pl-3 pr-8 font-medium text-ink-700 outline-none transition hover:border-ink-300 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10"
+                        >
+                          <option value="recommended">推荐关注</option>
+                          <option value="confidence">可信程度 ↓</option>
+                          <option value="latest">最新发现 ↓</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-400" />
+                      </span>
+                    </label>
+                  ) : resultCategory === 'leads' ? (
                     <div className="flex items-center gap-1 text-xs">
                       <span className="hidden text-ink-400 sm:inline">
                         排序
@@ -571,51 +624,61 @@ export function DiscoverPage() {
                         最新发布
                       </button>
                     </div>
+                  ) : (
+                    <span className="text-xs text-ink-500">
+                      可按评估分类、匹配度、可信程度和风险排序
+                    </span>
                   )}
                 </div>
 
-                <div className="mt-5 flex gap-6">
-                  <aside className="hidden w-60 shrink-0 lg:block">
-                    <div className="sticky top-6">
-                      <FilterSidebar
-                        filters={filters}
-                        onChange={setFilters}
-                        resultCount={currentResultCount}
-                        mode={resultCategory}
-                      />
-                    </div>
-                  </aside>
-
-                  <div className="min-w-0 flex-1">
-                    {resultCategory === 'opportunities' &&
-                    opportunities.length > 0 ? (
-                      <div className="grid gap-4 xl:grid-cols-2">
-                        {opportunities.map((opportunity) => (
-                          <OpportunityCard
-                            key={opportunity.id}
-                            opportunity={opportunity}
-                          />
-                        ))}
-                      </div>
-                    ) : resultCategory === 'leads' &&
-                      sortedCustomers.length > 0 ? (
-                      <div className="grid gap-4 xl:grid-cols-2">
-                        {sortedCustomers.map((customer) => (
-                          <CustomerCard
-                            key={customer.id}
-                            customer={customer}
-                            onGenerateEmail={handleGenerateEmail}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <EmptyState
-                        category={resultCategory}
-                        onRetry={() => void runSearch(filters)}
-                      />
-                    )}
+                {resultCategory === 'radar' ? (
+                  <div className="mt-5">
+                    <RadarWorkspace assessments={radarAssessments} />
                   </div>
-                </div>
+                ) : (
+                  <div className="mt-5 flex gap-6">
+                    <aside className="hidden w-60 shrink-0 lg:block">
+                      <div className="sticky top-6">
+                        <FilterSidebar
+                          filters={filters}
+                          onChange={setFilters}
+                          resultCount={currentResultCount}
+                          mode={resultCategory}
+                        />
+                      </div>
+                    </aside>
+
+                    <div className="min-w-0 flex-1">
+                      {resultCategory === 'opportunities' &&
+                      opportunities.length > 0 ? (
+                        <div className="grid gap-4 xl:grid-cols-2">
+                          {sortedOpportunities.map((opportunity) => (
+                            <OpportunityCard
+                              key={opportunity.id}
+                              opportunity={opportunity}
+                            />
+                          ))}
+                        </div>
+                      ) : resultCategory === 'leads' &&
+                        sortedCustomers.length > 0 ? (
+                        <div className="grid gap-4 xl:grid-cols-2">
+                          {sortedCustomers.map((customer) => (
+                            <CustomerCard
+                              key={customer.id}
+                              customer={customer}
+                              onGenerateEmail={handleGenerateEmail}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <EmptyState
+                          category={resultCategory}
+                          onRetry={() => void runSearch(filters)}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </section>

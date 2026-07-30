@@ -15,7 +15,7 @@ interface FilterSidebarProps {
   filters: SearchFilters
   onChange: (filters: SearchFilters) => void
   resultCount: number
-  mode?: 'opportunities' | 'leads'
+  mode?: 'radar' | 'opportunities' | 'leads'
 }
 
 /** 多选勾选项 */
@@ -269,7 +269,12 @@ export function FilterSidebar({
         <p className="text-xs text-ink-500">
           当前显示{' '}
           <span className="font-semibold text-brand-600">{resultCount}</span>{' '}
-          个{mode === 'opportunities' ? '销售机会' : '已确认客户'}
+          个
+          {mode === 'radar'
+            ? '评估信息'
+            : mode === 'opportunities'
+              ? '销售机会'
+              : '已确认客户'}
         </p>
         {filters.platforms.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">

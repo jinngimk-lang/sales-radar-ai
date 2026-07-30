@@ -54,6 +54,7 @@ import type {
   ResearchTrace,
   ResearchTraceDetails,
   MarketSignal,
+  RadarAssessment,
 } from '@/types'
 import {
   DASHBOARD_STATS,
@@ -454,6 +455,7 @@ export async function searchCustomers(
       status: 'empty',
       customers: [],
       opportunities: [],
+      radarAssessments: [],
       strategy: null,
       productContext: null,
       searchIntent: null,
@@ -466,7 +468,7 @@ export async function searchCustomers(
     productProfileId,
     onPrepared,
   )
-  const [leadResponse, opportunityResponse] = await Promise.all([
+  const [leadResponse, opportunityResponse, radarResponse] = await Promise.all([
     request<ApiEnvelope<BackendLead[]>>(
       `/search-task/${task.id}/results`,
       { cache: 'no-store' },
@@ -475,6 +477,13 @@ export async function searchCustomers(
       `/search-task/${task.id}/opportunities`,
       { cache: 'no-store' },
     ),
+    request<ApiEnvelope<RadarAssessment[]>>(
+      `/radar/assessments?searchTaskId=${encodeURIComponent(task.id)}&includeBlocked=true`,
+      { cache: 'no-store' },
+    ).catch((error) => {
+      console.error('[API] Radar assessments unavailable', error)
+      return { data: [] as RadarAssessment[] }
+    }),
   ])
   let results = leadResponse.data.map(toCustomer)
 
@@ -515,11 +524,14 @@ export async function searchCustomers(
   return {
     taskId: task.id,
     status:
-      results.length > 0 || opportunityResponse.data.length > 0
+      results.length > 0 ||
+      opportunityResponse.data.length > 0 ||
+      radarResponse.data.length > 0
         ? 'success'
         : 'empty',
     customers: results,
     opportunities: opportunityResponse.data,
+    radarAssessments: radarResponse.data,
     strategy: preparation.strategy,
     productContext: preparation.productContext,
     searchIntent: preparation.searchIntent,

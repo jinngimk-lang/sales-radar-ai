@@ -443,6 +443,77 @@ export interface SalesOpportunity {
   }>
 }
 
+export type RadarEntityRole =
+  | 'END_CUSTOMER'
+  | 'SUPPLIER'
+  | 'PARTNER'
+  | 'DISTRIBUTOR'
+  | 'COMPETITOR'
+  | 'UNKNOWN'
+
+export type RadarAssessmentDecision =
+  | 'OPPORTUNITY_CREATED'
+  | 'POTENTIAL_OPPORTUNITY'
+  | 'MARKET_SIGNAL_ONLY'
+  | 'NEEDS_REVIEW'
+  | 'BLOCKED'
+
+export type RadarRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH'
+
+export type RadarRecommendedAction =
+  | 'CONTACT_RESEARCH'
+  | 'VERIFY_ENTITY'
+  | 'VERIFY_ROLE'
+  | 'CHECK_PARTNERSHIP'
+  | 'MONITOR_SIGNAL'
+  | 'REVIEW_SOURCE'
+  | 'NO_ACTION'
+
+export interface RadarScoreBreakdown {
+  confidence: {
+    evidenceQuality: number
+    eventSignal: number
+    identityConfidence: number
+    total: number
+  }
+  match: {
+    productRelevance: number
+    entityRoleFit: number
+    userIntentFit: number
+    eventRelevance: number
+    total: number
+  }
+}
+
+export interface RadarAssessment {
+  id: string
+  searchTaskId: string
+  searchEvidenceId: string
+  assessmentVersion: string
+  detectionVersion: string
+  userIntentSnapshot: Record<string, unknown>
+  entityRole: RadarEntityRole
+  customerGoal: string
+  decision: RadarAssessmentDecision
+  recommendedAction: RadarRecommendedAction
+  confidenceScore: number
+  matchScore: number
+  riskLevel: RadarRiskLevel
+  reasonCodes: string[]
+  scoreBreakdown: RadarScoreBreakdown
+  createdAt: string
+  evidence: {
+    id: string
+    companyName: string | null
+    rawUrl: string
+    title: string | null
+    provider: string
+    platform: Platform
+    publishedAt?: string | null
+    createdAt: string
+  }
+}
+
 export interface OpportunityCompanyProfileSummary {
   id: string
   companyName: string
@@ -774,6 +845,7 @@ export interface SearchExecutionResult {
   status: 'success' | 'empty'
   customers: Customer[]
   opportunities: SalesOpportunity[]
+  radarAssessments: RadarAssessment[]
   strategy: SearchStrategy | null
   productContext: ProductContextSnapshot | null
   searchIntent: SearchIntentSnapshot | null
