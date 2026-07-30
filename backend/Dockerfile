@@ -2,6 +2,10 @@
 
 FROM node:20-bookworm-slim AS builder
 
+RUN apt-get update \
+    && apt-get install -y openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -15,6 +19,10 @@ COPY src ./src
 RUN npm run build
 
 FROM node:20-bookworm-slim AS runtime
+
+RUN apt-get update \
+    && apt-get install -y openssl \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV MCPORTER_CONFIG=/app/config/mcporter.json
