@@ -51,12 +51,7 @@ const PLATFORM_DOMAINS: Partial<Record<Platform, string[]>> = {
   [Platform.YouTube]: ['youtube.com', 'youtu.be'],
 }
 
-const PUBLIC_DEFAULT_PLATFORMS = [
-  Platform.Website,
-  Platform.Reddit,
-  Platform.X,
-  Platform.YouTube,
-] as const
+const PUBLIC_DEFAULT_PLATFORMS = Object.values(Platform)
 
 const REGION_COUNTRY: Record<Region, string> = {
   [Region.USA]: 'United States',
@@ -75,8 +70,8 @@ export class AgentReachProvider implements SearchProvider {
     15_000,
   )
   private readonly maxResults = Math.min(
-    this.readPositiveInteger(process.env.AGENT_REACH_MAX_RESULTS, 5),
-    5,
+    this.readPositiveInteger(process.env.AGENT_REACH_MAX_RESULTS, 10),
+    10,
   )
 
   async search(input: SearchProviderInput): Promise<SearchResult[]> {
@@ -135,7 +130,10 @@ export class AgentReachProvider implements SearchProvider {
       )
     }
 
-    const consideredResults = rawResults.slice(0, this.maxResults)
+    // Exa already applies maxResults to the upstream request. Preserve every
+    // real result it returns so RadarAssessment can explain and score it,
+    // including adjacent supplier, partner, social, and review-only signals.
+    const consideredResults = rawResults
     const invalidUrlCount = consideredResults.filter(
       (result) => inferPlatform(result.url) === null,
     ).length

@@ -1,7 +1,10 @@
 {
   "mcpServers": {
     "exa": {
-      "command": "exa-mcp-server"
+      "baseUrl": "https://mcp.exa.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer ${EXA_API_KEY}"
+      }
     }
   }
 }

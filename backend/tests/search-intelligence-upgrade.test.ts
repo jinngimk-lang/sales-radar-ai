@@ -69,7 +69,7 @@ describe('Search Intelligence Upgrade v1', () => {
     assert.match(query, /industrial automation SaaS/i)
     assert.match(query, /manufacturing companies/i)
     assert.match(query, /Europe/i)
-    assert.match(query, /-reseller.*-distributor/i)
+    assert.doesNotMatch(query, /-(?:vendor|supplier|reseller|distributor)/i)
   })
 
   it('preserves CRM SaaS, small-business buyers, and Europe', async () => {
@@ -93,7 +93,7 @@ describe('Search Intelligence Upgrade v1', () => {
     assert.match(query, /CRM SaaS/i)
     assert.match(query, /small businesses/i)
     assert.match(query, /Europe/i)
-    assert.match(query, /-reseller.*-distributor/i)
+    assert.doesNotMatch(query, /-(?:vendor|supplier|reseller|distributor)/i)
   })
 
   it('generates a company-oriented query from full ProductContext', async () => {
@@ -128,6 +128,26 @@ describe('Search Intelligence Upgrade v1', () => {
       'factory expansion',
       'technology upgrade',
     ])
+  })
+
+  it('keeps adjacent real business roles in the Radar search scope', async () => {
+    const intelligence = new GlobalSearchIntelligenceService()
+    const strategy = await intelligence.createStrategy(
+      'Find European packaging automation buyers',
+      {
+        product: 'Packaging Automation',
+        industry: 'Food Manufacturing',
+        region: 'Europe',
+        customerType: 'Buyer companies',
+      },
+    )
+    const query = intelligence.optimizedKeyword(strategy, '')
+
+    assert.match(query, /Packaging Automation/i)
+    assert.match(query, /Food Manufacturing/i)
+    assert.match(query, /Europe/i)
+    assert.match(query, /company news industry applications/i)
+    assert.doesNotMatch(query, /-(?:vendor|supplier|reseller|distributor)/i)
   })
 
   it('rejects category phrases as company identities', () => {

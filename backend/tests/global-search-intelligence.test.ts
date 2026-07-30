@@ -96,6 +96,30 @@ describe('Global Search Intelligence v1', () => {
     assert.equal(intent.relationship, 'system_integration')
   })
 
+  it('preserves the same product direction in Chinese and English searches', async () => {
+    const chinese = await intelligence.createStrategy(
+      '我销售工业机器人，寻找欧洲制造企业',
+    )
+    const english = await intelligence.createStrategy(
+      'I sell industrial robots, find European manufacturing companies',
+    )
+
+    assert.equal(chinese.intent.product, 'industrial robots')
+    assert.equal(english.intent.product, 'industrial robots')
+    assert.equal(chinese.intent.region, 'Europe')
+    assert.equal(english.intent.region, 'Europe')
+    assert.equal(chinese.targetType, 'buyer')
+    assert.equal(english.targetType, 'buyer')
+    assert.match(
+      intelligence.optimizedKeyword(chinese, ''),
+      /industrial robots/i,
+    )
+    assert.match(
+      intelligence.optimizedKeyword(english, ''),
+      /industrial robots/i,
+    )
+  })
+
   it('falls back safely when the target cannot be determined', async () => {
     const intent = await provider.parse('precision components Europe')
     assert.equal(intent.targetType, 'buyer')

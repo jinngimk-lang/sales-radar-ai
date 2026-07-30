@@ -106,13 +106,8 @@ export class SearchKeywordExpansionService {
       businessProblem,
       buyingSignals,
       'official company website',
+      'company news industry applications',
       locationSuffix,
-      '-vendor',
-      '-supplier',
-      '-reseller',
-      '-distributor',
-      '-case-study',
-      '-whitepaper',
     ]
       .filter(Boolean)
       .join(' ')

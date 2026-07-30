@@ -50,7 +50,11 @@ export function AppLayout() {
       {/* 侧边栏 */}
       <aside className="hidden w-[272px] shrink-0 flex-col border-r border-ink-200 bg-white lg:flex">
         <div className="flex h-[84px] items-center border-b border-ink-100 px-6">
-          <Link to="/app/dashboard" className="flex items-center gap-3">
+          <Link
+            to="/"
+            aria-label="返回 Sales Radar AI 首页"
+            className="flex items-center gap-3"
+          >
             <Logo />
             <span className="hidden rounded-md border border-ink-200 bg-ink-50 px-1.5 py-1 text-[8px] font-bold tracking-[0.16em] text-ink-500 xl:inline">
               WORKSPACE
@@ -113,7 +117,7 @@ export function AppLayout() {
       <div className="flex flex-1 flex-col overflow-hidden bg-ink-50">
         {/* 顶部栏（移动端） */}
         <header className="flex h-16 items-center justify-between border-b border-ink-200 bg-white px-4 lg:hidden">
-          <Link to="/app/dashboard">
+          <Link to="/" aria-label="返回 Sales Radar AI 首页">
             <Logo />
           </Link>
           <div className="flex items-center gap-1">

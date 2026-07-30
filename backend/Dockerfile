@@ -30,11 +30,10 @@ ENV PATH=/usr/local/bin:${PATH}
 
 WORKDIR /app
 
-RUN npm install --global mcporter@0.12.3 exa-mcp-server@3.2.1 prisma@6.7.0 \
+RUN npm install --global mcporter@0.12.3 prisma@6.7.0 \
     && node --version \
     && command -v mcporter \
     && mcporter --version \
-    && command -v exa-mcp-server \
     && command -v prisma \
     && prisma --version
 
