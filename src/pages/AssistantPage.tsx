@@ -155,7 +155,7 @@ export function AssistantPage() {
             </div>
             <div>
               <p className="workspace-kicker">SALES ACTION</p>
-              <h1 className="mt-1 text-sm font-semibold text-ink-900">销售助手</h1>
+              <h1 className="mt-1 text-sm font-semibold text-ink-900">AI 销售助手</h1>
               <p className="flex items-center gap-1 text-xs text-ink-500">
                 把已确认的研究转化为触达与跟进建议
               </p>

@@ -23,7 +23,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: typeof User }> = [
   { key: 'crm', label: 'CRM 管理', icon: Users },
 ]
 
-/** 个人中心 */
+/** 我的工作区 */
 export function AccountPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('account')
 
@@ -33,8 +33,8 @@ export function AccountPage() {
       <div className="workspace-heading">
         <div>
           <p className="workspace-kicker">WORKSPACE SETTINGS</p>
-          <h1>个人中心</h1>
-          <p>管理账户信息、产品偏好与销售工作记录。</p>
+          <h1>我的工作区</h1>
+          <p>集中管理账户信息、产品偏好与销售研究记录。</p>
         </div>
       </div>
 

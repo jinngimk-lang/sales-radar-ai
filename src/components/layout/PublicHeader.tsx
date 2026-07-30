@@ -17,8 +17,8 @@ export function PublicHeader() {
   const location = useLocation()
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-200 bg-white">
-      <div className="mx-auto flex h-[68px] max-w-7xl items-center justify-between px-5 sm:px-8 lg:px-10">
+    <header className="sticky top-0 z-40 border-b border-ink-200/90 bg-white/95 backdrop-blur-xl">
+      <div className="mx-auto flex h-[74px] max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-12">
         <Link to="/" className="flex items-center">
           <Logo />
         </Link>
@@ -28,9 +28,10 @@ export function PublicHeader() {
             <a
               key={link.href}
               href={link.href}
-              className="px-3 py-2 text-xs font-medium tracking-wide text-ink-500 transition-colors hover:text-ink-900"
+              className="group relative px-3 py-2 text-xs font-medium tracking-wide text-ink-500 transition-colors hover:text-ink-900"
             >
               {link.label}
+              <span className="absolute inset-x-3 bottom-0 h-px origin-left scale-x-0 bg-brand-600 transition-transform duration-300 group-hover:scale-x-100" />
             </a>
           ))}
         </nav>
@@ -47,9 +48,10 @@ export function PublicHeader() {
           </Link>
           <Link
             to="/app/discover"
-            className="inline-flex items-center rounded-full bg-brand-900 px-5 py-2.5 text-xs font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-brand-700"
+            className="group inline-flex items-center gap-2 rounded-full bg-brand-950 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-card-hover"
           >
             开始发现
+            <span className="transition-transform group-hover:translate-x-0.5">→</span>
           </Link>
         </div>
 

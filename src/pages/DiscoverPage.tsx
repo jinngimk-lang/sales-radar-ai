@@ -1011,7 +1011,7 @@ function SearchFailureState({
         {authenticationRequired
           ? '登录状态已失效'
           : providerBusy
-            ? '市场信息服务当前繁忙'
+            ? '本次扫描尚未完成'
           : systemError
             ? '暂时无法读取判断结果'
             : '暂时无法完成本次搜索'}
@@ -1020,7 +1020,7 @@ function SearchFailureState({
         {authenticationRequired
           ? '请重新登录后查看本次市场扫描结果。'
           : providerBusy
-            ? '真实来源服务当前达到访问限制，系统已经自动重试。请稍后再次搜索。'
+            ? '真实来源暂未返回可展示信息。系统已完成自动重试，本次不会混入历史或模拟结果。'
           : systemError
             ? '市场信息已经完成处理，但判断结果暂时无法读取，请稍后重试。'
             : '系统暂时无法获取新的市场信息，请稍后重试。'}
@@ -1028,7 +1028,7 @@ function SearchFailureState({
       <button onClick={onRetry} className="btn-primary mt-5">
         <Radar className="h-4 w-4" />
         {authenticationRequired || systemError || providerBusy
-          ? '重新尝试'
+          ? '重新扫描'
           : '重新搜索'}
       </button>
     </div>

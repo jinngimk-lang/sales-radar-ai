@@ -3,9 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   Building2,
+  Check,
   CircleDot,
   Compass,
   Factory,
+  FileSearch,
+  Globe2,
+  Newspaper,
   Radar,
   Search,
   ShieldCheck,
@@ -15,77 +19,93 @@ import {
 import { QUICK_INDUSTRY_TAGS } from '@/data/meta'
 
 const PLACEHOLDERS = [
-  '欧洲工业机器人市场',
-  '日本包装设备经销商',
-  '东南亚制造业数字化升级',
-  '德国工厂扩张',
+  '工业机器人，欧洲汽车制造企业',
+  '包装自动化，东南亚食品工厂',
+  'CRM SaaS，欧洲中小企业',
+  '新能源设备，寻找渠道合作伙伴',
 ]
 
-const SIGNALS = [
+const TYPEWRITER_SIGNALS = [
+  '企业扩张',
+  '投资动态',
+  '数字化升级',
+  '招聘变化',
+]
+
+const ORBIT_SIGNALS = [
   {
     icon: Factory,
-    title: '企业扩张',
-    description: '工厂、产线与产能变化',
-    position: 'radar-signal radar-signal-one',
+    title: '工厂扩张',
+    meta: '企业变化',
+    className: 'signal-node signal-node-one',
   },
   {
     icon: TrendingUp,
     title: '投资动态',
-    description: '资本投入与业务增长方向',
-    position: 'radar-signal radar-signal-two',
+    meta: '市场变化',
+    className: 'signal-node signal-node-two',
   },
   {
     icon: Building2,
     title: '数字化升级',
-    description: '自动化与软件改造机会',
-    position: 'radar-signal radar-signal-three',
+    meta: '升级方向',
+    className: 'signal-node signal-node-three',
+  },
+  {
+    icon: Newspaper,
+    title: '公开信息',
+    meta: '真实来源',
+    className: 'signal-node signal-node-four',
   },
 ]
 
-const STEPS = [
+const WORKFLOW = [
   {
-    number: '一',
-    title: '说清你卖什么',
-    description: '输入产品、目标行业和市场方向。',
+    number: '01',
+    title: '定义销售方向',
+    description: '输入产品、目标市场和希望寻找的企业角色。',
   },
   {
-    number: '二',
-    title: '发现正在发生的变化',
-    description: '从真实来源中寻找企业投资、扩张与升级动态。',
+    number: '02',
+    title: '读取市场变化',
+    description: '从企业官网、新闻、招聘与公开页面获取真实信息。',
   },
   {
-    number: '三',
-    title: '判断是否值得跟进',
-    description: '核验公司与来源，理解它与你的产品为什么相关。',
+    number: '03',
+    title: '评估销售关系',
+    description: '分别标注匹配度、可信度、风险和需要确认的内容。',
   },
   {
-    number: '四',
+    number: '04',
     title: '进入销售行动',
-    description: '研究公司与联系人方向，准备有依据的触达策略。',
+    description: '研究企业、理解切入点，再决定是否值得跟进。',
   },
 ]
 
-const FEATURES = [
+const CAPABILITIES = [
   {
-    icon: Compass,
+    icon: Globe2,
     eyebrow: 'DISCOVER',
-    title: '看见变化',
+    title: '看见正在发生的变化',
     description:
-      '把分散的企业投资、工厂扩张和数字化升级信息，整理成销售人员容易理解的机会。',
+      '把分散在企业官网、行业新闻、招聘与公开页面中的变化，整理成可以浏览的市场信息。',
+    detail: '来源被保留，原始页面可以随时打开核对。',
   },
   {
     icon: ShieldCheck,
-    eyebrow: 'VERIFY',
-    title: '保留依据',
+    eyebrow: 'ASSESS',
+    title: '让不确定性清楚可见',
     description:
-      '每个事实回到真实来源。信息不足时明确标记待确认，不把市场动向写成采购事实。',
+      '机会、潜在机会、市场信号和待确认信息分层展示，不用一个结论覆盖所有真实信息。',
+    detail: '分数帮助排序，不代表企业已经成为客户。',
   },
   {
-    icon: CircleDot,
-    eyebrow: 'ACT',
-    title: '找到切入点',
+    icon: FileSearch,
+    eyebrow: 'RESEARCH',
+    title: '从发现走到企业研究',
     description:
-      '围绕企业变化与产品方向，给出研究建议和下一步行动，让发现真正进入销售工作。',
+      '围绕机会背景、企业身份、产品关联和真实来源，形成下一步研究与销售行动建议。',
+    detail: '建议始终和事实分开，不虚构采购行为。',
   },
 ]
 
@@ -111,48 +131,53 @@ export function LandingPage() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setPlaceholderIndex((current) => (current + 1) % PLACEHOLDERS.length)
-    }, 3200)
+    }, 3600)
 
     return () => window.clearInterval(timer)
   }, [])
 
   return (
     <main className="landing-shell overflow-hidden">
-      <section className="relative">
-        <div className="landing-grid pointer-events-none absolute inset-0" />
-        <div className="mx-auto grid min-h-[680px] max-w-7xl items-center gap-10 px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-[1.08fr_0.92fr] lg:px-10 lg:py-16">
+      <section className="landing-hero-wrap">
+        <div className="landing-hero-grid" aria-hidden="true" />
+        <div className="landing-aurora landing-aurora-one" aria-hidden="true" />
+        <div className="landing-aurora landing-aurora-two" aria-hidden="true" />
+
+        <div className="relative mx-auto grid min-h-[760px] max-w-[1440px] items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[0.92fr_1.08fr] lg:px-12 lg:py-20">
           <div className="relative z-10 max-w-2xl">
-            <div className="landing-reveal flex items-center gap-3 text-xs font-semibold tracking-[0.18em] text-ink-500">
-              <span className="h-px w-9 bg-vermilion" />
+            <div className="landing-reveal inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-2 text-[11px] font-semibold tracking-[0.16em] text-white/75 backdrop-blur">
+              <span className="landing-status-dot" />
               SALES OPPORTUNITY RADAR
             </div>
 
-            <h1 className="landing-reveal landing-delay-1 mt-7 text-[3.7rem] font-medium leading-[1.03] tracking-[-0.06em] text-ink-900 sm:text-[4.9rem] lg:text-[5.15rem]">
-              发现市场变化
-              <span className="mt-2 block font-normal text-brand-700">
-                看见销售机会
-              </span>
+            <h1 className="landing-reveal landing-delay-1 mt-8 text-[3.45rem] font-semibold leading-[0.98] tracking-[-0.065em] text-white sm:text-[4.75rem] lg:text-[5.25rem]">
+              让市场变化
+              <span className="mt-2 block text-sky-300">成为销售方向</span>
             </h1>
 
-            <p className="landing-reveal landing-delay-2 mt-6 max-w-2xl text-lg leading-8 text-ink-600 sm:text-xl sm:leading-9">
-              输入你的产品和目标市场，发现正在发生变化的企业、行业机会和潜在客户。
-              从真实来源出发，更安静、更准确地找到值得跟进的方向。
+            <div className="landing-reveal landing-delay-2 mt-7 flex min-h-8 items-center gap-2 text-sm font-medium text-white/70 sm:text-base">
+              <span>雷达可以发现</span>
+              <TypewriterSignal />
+            </div>
+
+            <p className="landing-reveal landing-delay-2 mt-4 max-w-xl text-base leading-8 text-white/65 sm:text-lg">
+              输入你的产品和目标市场，从真实网页中发现企业变化、市场机会和潜在销售目标，再用清晰评分决定下一步。
             </p>
 
-            <div className="landing-reveal landing-delay-3 mt-8 max-w-2xl">
-              <div className="landing-search group">
-                <Search className="ml-1 h-5 w-5 shrink-0 text-ink-400 transition-colors group-focus-within:text-brand-600" />
+            <div className="landing-reveal landing-delay-3 mt-9 max-w-2xl">
+              <div className="landing-search landing-search-dark group">
+                <Search className="ml-2 h-5 w-5 shrink-0 text-white/45 transition-colors group-focus-within:text-sky-300" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => event.key === 'Enter' && handleSearch()}
                   placeholder={`试试：${PLACEHOLDERS[placeholderIndex]}`}
                   aria-label="输入产品和目标市场"
-                  className="min-w-0 flex-1 bg-transparent px-2 py-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 sm:text-base"
+                  className="min-w-0 flex-1 bg-transparent px-2 py-3 text-sm text-white outline-none placeholder:text-white/35 sm:text-base"
                 />
                 <button
                   onClick={() => handleSearch()}
-                  className="landing-search-button"
+                  className="landing-search-button landing-search-button-light"
                 >
                   开始发现
                   <ArrowRight className="h-4 w-4" />
@@ -160,116 +185,141 @@ export function LandingPage() {
               </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="mr-1 text-xs text-ink-400">快速开始</span>
+                <span className="mr-1 text-xs text-white/35">快速开始</span>
                 {QUICK_INDUSTRY_TAGS.slice(0, 4).map((tag) => (
                   <button
                     key={tag}
                     onClick={() => handleSearch(tag)}
-                    className="rounded-full border border-ink-300 bg-white px-3 py-1.5 text-xs text-ink-700 transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:text-brand-700"
+                    className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs text-white/65 transition-all hover:-translate-y-0.5 hover:border-sky-300/50 hover:bg-white/10 hover:text-white"
                   >
                     {tag}
                   </button>
                 ))}
               </div>
             </div>
+
+            <div className="landing-reveal landing-delay-3 mt-9 flex flex-wrap gap-x-6 gap-y-3 text-xs text-white/45">
+              {['真实来源', '中英文理解', '全部结果分层展示'].map((item) => (
+                <span key={item} className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-sky-300" />
+                  {item}
+                </span>
+              ))}
+            </div>
           </div>
 
-          <div className="landing-reveal landing-delay-2 relative mx-auto hidden h-[540px] w-full max-w-[540px] lg:block">
-            <div className="radar-stage">
-              <div className="radar-circle radar-circle-one" />
-              <div className="radar-circle radar-circle-two" />
-              <div className="radar-circle radar-circle-three" />
-              <div className="radar-axis radar-axis-horizontal" />
-              <div className="radar-axis radar-axis-vertical" />
-              <div className="radar-sweep" />
-              <div className="radar-core">
-                <Radar className="h-5 w-5" />
+          <div className="landing-reveal landing-delay-2 relative mx-auto hidden h-[620px] w-full max-w-[650px] lg:block">
+            <div className="signal-universe">
+              <div className="signal-orbit signal-orbit-one">
+                <span />
+              </div>
+              <div className="signal-orbit signal-orbit-two">
+                <span />
+              </div>
+              <div className="signal-orbit signal-orbit-three">
+                <span />
+              </div>
+              <div className="signal-axis signal-axis-horizontal" />
+              <div className="signal-axis signal-axis-vertical" />
+              <div className="signal-sweep" />
+
+              <div className="signal-core">
+                <span className="signal-core-pulse" />
+                <Radar className="h-7 w-7" />
+                <strong>市场雷达</strong>
+                <small>等待你的销售方向</small>
               </div>
 
-              {SIGNALS.map((signal) => (
-                <div key={signal.title} className={signal.position}>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+              {ORBIT_SIGNALS.map((signal) => (
+                <div key={signal.title} className={signal.className}>
+                  <span className="signal-node-icon">
                     <signal.icon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-ink-800">
-                      {signal.title}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-ink-400">
-                      {signal.description}
-                    </p>
-                  </div>
+                  </span>
+                  <span>
+                    <strong>{signal.title}</strong>
+                    <small>{signal.meta}</small>
+                  </span>
                 </div>
               ))}
 
-              <div className="radar-note">
-                <span className="radar-live-dot" />
-                正在关注企业与市场变化
+              <div className="signal-activity">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-[11px] font-semibold text-white/75">
+                    <Sparkles className="h-3.5 w-3.5 text-sky-300" />
+                    开始搜索后
+                  </span>
+                  <span className="rounded-full border border-white/10 px-2 py-1 text-[9px] tracking-[0.14em] text-white/35">
+                    EVIDENCE FIRST
+                  </span>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {[
+                    '读取企业官网与公开页面',
+                    '核对事件、时间和企业主体',
+                    '评估与当前销售目标的关系',
+                  ].map((item, index) => (
+                    <div key={item} className="flex items-center gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[9px] text-sky-300">
+                        0{index + 1}
+                      </span>
+                      <span className="text-[11px] text-white/55">{item}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-
-            <span className="absolute right-1 top-10 text-[10px] tracking-[0.22em] text-ink-300 [writing-mode:vertical-rl]">
-              MARKET MOVEMENT · SALES DIRECTION
-            </span>
           </div>
         </div>
 
-        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
-          <div className="grid border-y border-ink-900/10 py-7 sm:grid-cols-3">
-            {[
-              ['01', '快速发现销售目标'],
-              ['02', '捕捉企业变化机会'],
-              ['03', '基于真实来源判断'],
-            ].map(([number, label], index) => (
-              <div
-                key={number}
-                className={`flex items-center gap-4 py-3 sm:px-7 ${
-                  index > 0 ? 'sm:border-l sm:border-ink-900/10' : ''
-                }`}
-              >
-                <span className="font-mono text-[11px] text-vermilion">
-                  {number}
-                </span>
-                <span className="text-sm tracking-wide text-ink-700">
-                  {label}
-                </span>
-              </div>
-            ))}
+        <div className="relative mx-auto max-w-[1440px] px-5 pb-8 sm:px-8 lg:px-12">
+          <div className="landing-source-strip">
+            <span>企业官网</span>
+            <span>公开新闻</span>
+            <span>招聘变化</span>
+            <span>投资公告</span>
+            <span>社交平台</span>
+            <span>行业媒体</span>
           </div>
         </div>
       </section>
 
       <section id="solutions" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 lg:px-10">
-        <div className="grid gap-14 lg:grid-cols-[0.72fr_1.28fr]">
-          <div>
-            <p className="landing-kicker">HOW IT WORKS</p>
-            <h2 className="mt-5 max-w-sm text-3xl font-medium leading-tight tracking-[-0.035em] text-ink-900 sm:text-5xl">
-              从一个方向，
+        <div className="grid gap-14 lg:grid-cols-[0.7fr_1.3fr]">
+          <div className="lg:sticky lg:top-28 lg:self-start">
+            <p className="landing-kicker">ONE CONTINUOUS WORKFLOW</p>
+            <h2 className="mt-5 max-w-md text-3xl font-semibold leading-tight tracking-[-0.045em] text-ink-900 sm:text-5xl">
+              从一个市场方向，
               <br />
-              走到一次行动。
+              走到一次销售行动。
             </h2>
-            <p className="mt-6 max-w-sm text-sm leading-7 text-ink-500">
-              不追求堆满结果。先看见变化，再理解公司，最后决定是否值得投入销售时间。
+            <p className="mt-6 max-w-md text-sm leading-7 text-ink-500">
+              不是把网页堆成列表，而是保留真实来源，再说明它和你当前销售目标有什么关系。
             </p>
           </div>
 
-          <div className="border-t border-ink-900/10">
-            {STEPS.map((step) => (
-              <div
-                key={step.number}
-                className="group grid gap-3 border-b border-ink-200 py-7 transition-colors hover:bg-ink-50 sm:grid-cols-[52px_190px_1fr] sm:items-center sm:px-4"
-              >
-                <span className="text-xs text-vermilion">{step.number}</span>
-                <h3 className="text-base font-semibold text-ink-900">
-                  {step.title}
-                </h3>
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm leading-6 text-ink-500">
+          <div className="landing-workflow">
+            {WORKFLOW.map((step, index) => (
+              <article key={step.number} className="landing-workflow-step">
+                <span className="landing-workflow-number">{step.number}</span>
+                <div>
+                  <p className="text-[10px] font-semibold tracking-[0.16em] text-brand-600">
+                    {index === 0
+                      ? 'INPUT'
+                      : index === 1
+                        ? 'SOURCE'
+                        : index === 2
+                          ? 'ASSESSMENT'
+                          : 'ACTION'}
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold text-ink-900">
+                    {step.title}
+                  </h3>
+                  <p className="mt-3 max-w-md text-sm leading-7 text-ink-500">
                     {step.description}
                   </p>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-ink-300 transition-transform group-hover:translate-x-1 group-hover:text-brand-600" />
                 </div>
-              </div>
+                <ArrowRight className="h-5 w-5 text-ink-300" />
+              </article>
             ))}
           </div>
         </div>
@@ -277,44 +327,97 @@ export function LandingPage() {
 
       <section id="features" className="border-y border-ink-200 bg-ink-50">
         <div className="mx-auto max-w-7xl px-5 py-28 sm:px-8 lg:px-10">
-          <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+          <div className="flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
             <div>
-              <p className="landing-kicker">QUIET INTELLIGENCE</p>
-              <h2 className="mt-5 text-3xl font-medium tracking-[-0.035em] text-ink-900 sm:text-5xl">
-                少一点噪音，
+              <p className="landing-kicker">MARKET TO ACTION</p>
+              <h2 className="mt-5 text-3xl font-semibold tracking-[-0.045em] text-ink-900 sm:text-5xl">
+                更多真实信息，
                 <br />
-                多一点判断。
+                更清楚的销售判断。
               </h2>
             </div>
             <p className="max-w-md text-sm leading-7 text-ink-500">
-              销售机会、市场变化和已确认客户始终保持清晰边界。系统帮助研究，不替你编造事实。
+              系统展示找到的信息，也展示风险和待确认项。销售人员保留最终判断权。
             </p>
           </div>
 
-          <div className="mt-16 grid gap-px overflow-hidden border border-ink-900/10 bg-ink-900/10 md:grid-cols-3">
-            {FEATURES.map((feature, index) => (
+          <div className="mt-16 grid gap-5 lg:grid-cols-3">
+            {CAPABILITIES.map((capability, index) => (
               <article
-                key={feature.title}
-                className="group relative min-h-[320px] bg-white p-8 transition-colors duration-500 hover:bg-ink-50 sm:p-10"
+                key={capability.title}
+                className="landing-capability-card group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[10px] tracking-[0.2em] text-ink-400">
-                    {feature.eyebrow}
+                  <span className="font-mono text-[10px] tracking-[0.2em] text-brand-600">
+                    {capability.eyebrow}
                   </span>
                   <span className="font-mono text-[10px] text-ink-300">
                     0{index + 1}
                   </span>
                 </div>
-                <feature.icon className="mt-14 h-7 w-7 text-brand-700 transition-transform duration-500 group-hover:-translate-y-1" />
-                <h3 className="mt-7 text-2xl font-medium text-ink-900">
-                  {feature.title}
+                <span className="mt-14 flex h-12 w-12 items-center justify-center rounded-2xl border border-ink-200 bg-white text-brand-700 shadow-sm">
+                  <capability.icon className="h-5 w-5" />
+                </span>
+                <h3 className="mt-7 text-2xl font-semibold tracking-tight text-ink-900">
+                  {capability.title}
                 </h3>
                 <p className="mt-4 text-sm leading-7 text-ink-500">
-                  {feature.description}
+                  {capability.description}
                 </p>
-                <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-vermilion transition-all duration-500 group-hover:w-full" />
+                <div className="mt-8 border-t border-ink-200 pt-5 text-xs leading-6 text-ink-400">
+                  {capability.detail}
+                </div>
               </article>
             ))}
+          </div>
+
+          <div className="mt-6 grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
+            <div className="landing-assessment-preview">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-semibold tracking-[0.18em] text-white/40">
+                    RADAR ASSESSMENT
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold text-white">
+                    每条真实信息，都有自己的判断状态
+                  </h3>
+                </div>
+                <CircleDot className="h-5 w-5 text-sky-300" />
+              </div>
+              <div className="mt-10 grid gap-3 sm:grid-cols-2">
+                {[
+                  ['🔥', '机会', '商业变化与当前目标高度相关'],
+                  ['🟡', '潜在机会', '可能相关，仍有信息需要验证'],
+                  ['🔵', '市场信号', '值得观察的行业或企业变化'],
+                  ['⚪', '待确认', '主体、角色或事件关系尚不充分'],
+                ].map(([icon, title, description]) => (
+                  <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.055] p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                      <span>{icon}</span>
+                      {title}
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-white/45">
+                      {description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-ink-200 bg-white p-7 shadow-card sm:p-9">
+              <Compass className="h-6 w-6 text-brand-700" />
+              <p className="mt-10 text-[10px] font-semibold tracking-[0.18em] text-ink-400">
+                USER CONTROL
+              </p>
+              <h3 className="mt-3 text-2xl font-semibold tracking-tight text-ink-900">
+                分数负责解释，
+                <br />
+                你负责决定。
+              </h3>
+              <p className="mt-5 text-sm leading-7 text-ink-500">
+                匹配度、可信度和风险分开显示。低分结果不会伪装成客户，也不会因为不确定就消失。
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -322,31 +425,31 @@ export function LandingPage() {
       <section id="industries" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 lg:px-10">
         <div className="grid gap-14 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
-            <p className="landing-kicker">EXPLORE BY INDUSTRY</p>
-            <h2 className="mt-5 text-3xl font-medium tracking-[-0.035em] text-ink-900 sm:text-5xl">
-              从你的行业开始。
+            <p className="landing-kicker">EXPLORE A DIRECTION</p>
+            <h2 className="mt-5 text-3xl font-semibold tracking-[-0.045em] text-ink-900 sm:text-5xl">
+              从你的产品与市场开始。
             </h2>
             <p className="mt-5 max-w-sm text-sm leading-7 text-ink-500">
-              选择一个方向，查看相关企业变化与可验证的销售目标。
+              选择一个方向，进入真实搜索与 Radar 判断工作区。
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2">
+          <div className="grid overflow-hidden rounded-[1.75rem] border border-ink-200 bg-white sm:grid-cols-2">
             {INDUSTRIES.map(([name, description], index) => (
               <button
                 key={name}
                 onClick={() => handleSearch(name)}
-                className={`group flex min-h-36 items-end justify-between border-ink-900/10 p-6 text-left transition-all hover:bg-white ${
-                  index % 2 === 1 ? 'sm:border-l' : ''
-                } ${index >= 2 ? 'border-t' : ''}`}
+                className={`group flex min-h-40 items-end justify-between p-6 text-left transition-all hover:bg-ink-50 sm:p-7 ${
+                  index % 2 === 1 ? 'sm:border-l sm:border-ink-200' : ''
+                } ${index >= 2 ? 'border-t border-ink-200' : ''}`}
               >
                 <div>
-                  <p className="text-lg font-medium text-ink-900">{name}</p>
-                  <p className="mt-2 text-xs tracking-wide text-ink-400">
+                  <p className="text-lg font-semibold text-ink-900">{name}</p>
+                  <p className="mt-2 text-xs leading-5 text-ink-400">
                     {description}
                   </p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-ink-300 transition-all group-hover:translate-x-1 group-hover:text-vermilion" />
+                <ArrowRight className="h-4 w-4 text-ink-300 transition-all group-hover:translate-x-1 group-hover:text-brand-600" />
               </button>
             ))}
           </div>
@@ -360,19 +463,19 @@ export function LandingPage() {
           <div className="relative z-10 max-w-2xl">
             <div className="flex items-center gap-3 text-xs tracking-[0.18em] text-white/55">
               <Sparkles className="h-3.5 w-3.5" />
-              START WITH A DIRECTION
+              START WITH A SALES DIRECTION
             </div>
-            <h2 className="mt-6 text-3xl font-medium tracking-[-0.04em] text-white sm:text-5xl">
-              下一个销售机会，
+            <h2 className="mt-6 text-3xl font-semibold tracking-[-0.045em] text-white sm:text-5xl">
+              下一条值得关注的变化，
               <br />
               也许正在发生。
             </h2>
-            <p className="mt-6 max-w-xl text-sm leading-7 text-white/65">
-              从你的产品和目标市场开始，让分散的企业变化成为清晰、可研究的销售方向。
+            <p className="mt-6 max-w-xl text-sm leading-7 text-white/60">
+              输入产品和目标市场，让真实网页信息进入雷达，再由清晰评分帮助你判断。
             </p>
             <button
               onClick={() => handleSearch()}
-              className="mt-9 inline-flex items-center gap-3 rounded-full bg-white px-6 py-3 text-sm font-semibold text-brand-900 transition-all hover:-translate-y-0.5 hover:bg-paper hover:shadow-2xl active:translate-y-0"
+              className="mt-9 inline-flex items-center gap-3 rounded-full bg-white px-6 py-3 text-sm font-semibold text-brand-950 transition-all hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-2xl active:translate-y-0"
             >
               开始发现销售机会
               <ArrowRight className="h-4 w-4" />
@@ -381,5 +484,44 @@ export function LandingPage() {
         </div>
       </section>
     </main>
+  )
+}
+
+function TypewriterSignal() {
+  const [signalIndex, setSignalIndex] = useState(0)
+  const [visibleCharacters, setVisibleCharacters] = useState(0)
+  const signal = TYPEWRITER_SIGNALS[signalIndex]
+
+  useEffect(() => {
+    const reducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches
+
+    if (reducedMotion) {
+      setVisibleCharacters(signal.length)
+      return
+    }
+
+    if (visibleCharacters < signal.length) {
+      const timer = window.setTimeout(
+        () => setVisibleCharacters((current) => current + 1),
+        90,
+      )
+      return () => window.clearTimeout(timer)
+    }
+
+    const timer = window.setTimeout(() => {
+      setVisibleCharacters(0)
+      setSignalIndex((current) => (current + 1) % TYPEWRITER_SIGNALS.length)
+    }, 1650)
+
+    return () => window.clearTimeout(timer)
+  }, [signal, visibleCharacters])
+
+  return (
+    <span className="inline-flex items-center rounded-full border border-sky-300/25 bg-sky-300/10 px-3 py-1 text-sky-200">
+      {signal.slice(0, visibleCharacters)}
+      <span className="typewriter-cursor" aria-hidden="true" />
+    </span>
   )
 }

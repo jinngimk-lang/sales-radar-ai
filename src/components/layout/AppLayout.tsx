@@ -48,15 +48,15 @@ export function AppLayout() {
   return (
     <div className="flex h-screen overflow-hidden bg-white">
       {/* 侧边栏 */}
-      <aside className="hidden w-[272px] shrink-0 flex-col border-r border-ink-200 bg-white lg:flex">
-        <div className="flex h-[84px] items-center border-b border-ink-100 px-6">
+      <aside className="app-sidebar hidden w-[272px] shrink-0 flex-col lg:flex">
+        <div className="flex h-[84px] items-center border-b border-white/10 px-6">
           <Link
             to="/"
             aria-label="返回 Sales Radar AI 首页"
             className="flex items-center gap-3"
           >
-            <Logo />
-            <span className="hidden rounded-md border border-ink-200 bg-ink-50 px-1.5 py-1 text-[8px] font-bold tracking-[0.16em] text-ink-500 xl:inline">
+            <Logo variant="light" />
+            <span className="hidden rounded-md border border-white/10 bg-white/[0.06] px-1.5 py-1 text-[8px] font-bold tracking-[0.16em] text-white/45 xl:inline">
               WORKSPACE
             </span>
           </Link>
@@ -65,13 +65,13 @@ export function AppLayout() {
         <div className="px-4 pt-5">
           <Link
             to="/app/dashboard"
-            className="group flex w-full items-center justify-between rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_-12px_rgba(37,99,235,0.65)] transition-all hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-[0_12px_24px_-12px_rgba(37,99,235,0.7)]"
+            className="group flex w-full items-center justify-between rounded-xl border border-sky-300/20 bg-sky-300 px-4 py-3.5 text-sm font-semibold text-brand-950 shadow-[0_12px_28px_-16px_rgba(56,189,248,0.9)] transition-all hover:-translate-y-0.5 hover:bg-sky-200"
           >
             <span className="flex items-center gap-2">
               <Telescope className="h-[18px] w-[18px]" />
               开始市场扫描
             </span>
-            <Sparkles className="h-4 w-4 text-blue-100" />
+            <Sparkles className="h-4 w-4 text-brand-800" />
           </Link>
         </div>
 
@@ -80,45 +80,45 @@ export function AppLayout() {
           <NavSection
             label="Personal"
             items={PERSONAL_ITEMS}
-            className="mt-8 border-t border-ink-100 pt-6"
+            className="mt-8 border-t border-white/10 pt-6"
           />
         </nav>
 
-        <div className="mx-4 mb-4 rounded-xl border border-ink-200 bg-ink-50 p-3.5">
-          <div className="flex items-center gap-2 text-xs font-semibold text-ink-800">
-            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white text-brand-600 shadow-sm">
+        <div className="mx-4 mb-4 rounded-xl border border-white/10 bg-white/[0.055] p-3.5">
+          <div className="flex items-center gap-2 text-xs font-semibold text-white/85">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 text-sky-300">
               <Sparkles className="h-3.5 w-3.5" />
             </span>
             销售工作流
           </div>
-          <p className="mt-2 text-[10px] leading-5 text-ink-500">
+          <p className="mt-2 text-[10px] leading-5 text-white/40">
             观察市场 → 发现机会 → 研究企业 → 形成行动
           </p>
         </div>
 
-        <div className="border-t border-ink-200 p-4">
+        <div className="border-t border-white/10 p-4">
           <Link
             to="/app/account"
-            className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-ink-50"
+            className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/[0.06]"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-500 shadow-sm">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.07] text-sky-300">
               <FolderHeart className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-ink-900">我的工作区</p>
-              <p className="truncate text-xs text-ink-500">收藏、历史与设置</p>
+              <p className="truncate text-sm font-semibold text-white/85">我的工作区</p>
+              <p className="truncate text-xs text-white/40">收藏、历史与设置</p>
             </div>
-            <Settings2 className="h-4 w-4 text-ink-400" />
+            <Settings2 className="h-4 w-4 text-white/30" />
           </Link>
         </div>
       </aside>
 
       {/* 主区域 */}
-      <div className="flex flex-1 flex-col overflow-hidden bg-ink-50">
+      <div className="app-workspace-canvas flex flex-1 flex-col overflow-hidden">
         {/* 顶部栏（移动端） */}
-        <header className="flex h-16 items-center justify-between border-b border-ink-200 bg-white px-4 lg:hidden">
+        <header className="flex h-16 items-center justify-between border-b border-white/10 bg-brand-950 px-4 lg:hidden">
           <Link to="/" aria-label="返回 Sales Radar AI 首页">
-            <Logo />
+            <Logo variant="light" />
           </Link>
           <div className="flex items-center gap-1">
             {[...WORKSPACE_ITEMS, ...PERSONAL_ITEMS].map((item) => (
@@ -130,8 +130,8 @@ export function AppLayout() {
                   cn(
                     'rounded-lg p-2 transition-colors',
                     isActive
-                      ? 'bg-brand-50 text-brand-700'
-                      : 'text-ink-500 hover:bg-ink-100',
+                      ? 'bg-white/10 text-sky-300'
+                      : 'text-white/45 hover:bg-white/[0.06] hover:text-white',
                   )
                 }
               >
@@ -168,7 +168,7 @@ function NavSection({
 }) {
   return (
     <section className={className}>
-      <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-ink-400">
+      <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/30">
         {label}
       </p>
       <div className="space-y-1">
@@ -180,17 +180,17 @@ function NavSection({
               cn(
                 'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all',
                 isActive
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-ink-600 hover:bg-ink-50 hover:text-ink-900',
+                  ? 'bg-white/10 text-white'
+                  : 'text-white/55 hover:bg-white/[0.055] hover:text-white',
               )
             }
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-500 shadow-sm transition-colors group-hover:text-brand-600">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.055] text-white/45 transition-colors group-hover:text-sky-300">
               <item.icon className="h-4 w-4" />
             </span>
             <span className="min-w-0">
               <span className="block font-semibold">{item.label}</span>
-              <span className="mt-0.5 block truncate text-[10px] font-normal text-ink-500">
+              <span className="mt-0.5 block truncate text-[10px] font-normal text-white/35">
                 {item.desc}
               </span>
             </span>

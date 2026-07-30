@@ -8,7 +8,7 @@ const FOOTER_LINKS = [
       { label: '销售机会', href: '/app/discover' },
       { label: 'AI 销售助手', href: '/app/assistant' },
       { label: '市场机会中心', href: '/app/dashboard' },
-      { label: '客户详情', href: '/app/customer/cus_001' },
+      { label: '我的工作区', href: '/app/account' },
     ],
   },
   {
@@ -23,19 +23,19 @@ const FOOTER_LINKS = [
   {
     title: '资源',
     links: [
-      { label: '帮助中心', href: '/#' },
-      { label: 'API 文档', href: '/#' },
-      { label: '行业报告', href: '/#' },
-      { label: '博客', href: '/#' },
+      { label: '工作流程', href: '/#solutions' },
+      { label: '能力说明', href: '/#features' },
+      { label: '探索方向', href: '/#industries' },
+      { label: '开始发现', href: '/#start' },
     ],
   },
   {
     title: '公司',
     links: [
-      { label: '关于我们', href: '/#' },
-      { label: '加入我们', href: '/#' },
-      { label: '联系销售', href: '/#' },
-      { label: '隐私政策', href: '/#' },
+      { label: '产品定位', href: '/#features' },
+      { label: '真实来源原则', href: '/#features' },
+      { label: '市场机会中心', href: '/app/dashboard' },
+      { label: '销售工作区', href: '/app/account' },
     ],
   },
 ]
