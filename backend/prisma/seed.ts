@@ -1,4 +1,9 @@
-import { OpportunityType, Prisma, PrismaClient } from '@prisma/client'
+import {
+  OpportunityIntegrityStatus,
+  OpportunityType,
+  Prisma,
+  PrismaClient,
+} from '@prisma/client'
 import { DEMO_USER } from '../src/config/demo-user.js'
 import { mockAIAnalyzer } from '../src/providers/ai/mock-ai-analyzer.js'
 import { searchProviderFactory } from '../src/providers/search/provider.factory.js'
@@ -92,6 +97,7 @@ async function main(): Promise<void> {
       update: {
         userId: user.id,
         searchTaskId: searchTask.id,
+        integrityStatus: OpportunityIntegrityStatus.LEGACY_INVALID,
         type: fixture.type,
         dedupeKey: fixture.dedupeKey,
         companyName: null,
@@ -107,6 +113,7 @@ async function main(): Promise<void> {
         ...fixture,
         userId: user.id,
         searchTaskId: searchTask.id,
+        integrityStatus: OpportunityIntegrityStatus.LEGACY_INVALID,
         companyName: null,
         productContextSnapshot,
         detectionVersion: 'seed-v1',

@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils'
 const NAV_LINKS = [
   { label: '产品', href: '/#features' },
   { label: '解决方案', href: '/#solutions' },
-  { label: '行业', href: '/#industries' },
-  { label: '价格', href: '/#pricing' },
+  { label: '探索方向', href: '/#industries' },
+  { label: '开始使用', href: '/#start' },
 ]
 
 /** Landing Page 顶部导航 */

@@ -125,6 +125,54 @@ enum OpportunityType {
   DIGITAL_UPGRADE
 }
 
+enum OpportunityIntegrityStatus {
+  EVIDENCE_LINKED
+  LEGACY_INVALID
+}
+
+enum RadarEntityRole {
+  END_CUSTOMER
+  SUPPLIER
+  PARTNER
+  DISTRIBUTOR
+  COMPETITOR
+  UNKNOWN
+}
+
+enum RadarCustomerGoal {
+  FIND_BUYERS
+  FIND_SUPPLIERS
+  FIND_PARTNERS
+  FIND_DISTRIBUTORS
+  RESEARCH_COMPETITORS
+  EXPLORE_MARKET
+  UNKNOWN
+}
+
+enum RadarAssessmentDecision {
+  OPPORTUNITY_CREATED
+  POTENTIAL_OPPORTUNITY
+  MARKET_SIGNAL_ONLY
+  NEEDS_REVIEW
+  BLOCKED
+}
+
+enum RadarRecommendedAction {
+  CONTACT_RESEARCH
+  VERIFY_ENTITY
+  VERIFY_ROLE
+  CHECK_PARTNERSHIP
+  MONITOR_SIGNAL
+  REVIEW_SOURCE
+  NO_ACTION
+}
+
+enum RadarRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 enum MarketSignalType {
   FACTORY_EXPANSION
   INVESTMENT
@@ -260,6 +308,7 @@ model User {
   leadResearchFeedbacks LeadResearchFeedback[]
   leadOutcomes          LeadOutcome[]
   opportunities         Opportunity[]
+  radarAssessments      RadarAssessment[]
   marketSignals         MarketSignal[]
   companyProfiles       CompanyProfile[]
   dataSources           DataSource[]
@@ -386,29 +435,29 @@ model RawSourceDocument {
 }
 
 model ProductProfile {
-  id                           String                        @id @default(cuid())
-  userId                       String
-  productName                  String
-  category                     String
-  industry                     String
-  applications                 String[]                      @default([])
-  keywords                     String[]                      @default([])
-  relatedProducts              String[]                      @default([])
-  buyerPersona                 Json
-  decisionMakerRoles           Json
-  buyerKeywords                String[]                      @default([])
-  channelKeywords              String[]                      @default([])
-  targetCountries              String[]                      @default([])
-  targetLanguages              String[]                      @default([])
-  recommendedPlatforms         String[]                      @default([])
-  buyingSignals                String[]                      @default([])
-  painPoints                   String[]                      @default([])
-  valueAngles                  String[]                      @default([])
-  user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  leadResearches               LeadResearch[]
-  searchTasks                  SearchTask[]
-  createdAt                    DateTime                      @default(now())
-  updatedAt                    DateTime                      @updatedAt
+  id                   String         @id @default(cuid())
+  userId               String
+  productName          String
+  category             String
+  industry             String
+  applications         String[]       @default([])
+  keywords             String[]       @default([])
+  relatedProducts      String[]       @default([])
+  buyerPersona         Json
+  decisionMakerRoles   Json
+  buyerKeywords        String[]       @default([])
+  channelKeywords      String[]       @default([])
+  targetCountries      String[]       @default([])
+  targetLanguages      String[]       @default([])
+  recommendedPlatforms String[]       @default([])
+  buyingSignals        String[]       @default([])
+  painPoints           String[]       @default([])
+  valueAngles          String[]       @default([])
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadResearches       LeadResearch[]
+  searchTasks          SearchTask[]
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
   @@unique([userId, productName])
   @@index([userId, updatedAt])
@@ -636,30 +685,31 @@ model LeadOutcome {
 }
 
 model SearchTask {
-  id               String           @id @default(cuid())
+  id               String            @id @default(cuid())
   userId           String
   productProfileId String?
   keyword          String
-  platforms        Platform[]       @default([])
-  regions          Region[]         @default([])
-  provider         String           @default("mock")
-  status           SearchTaskStatus @default(PENDING)
-  progress         Int              @default(0)
-  resultCount      Int              @default(0)
-  retryCount       Int              @default(0)
+  platforms        Platform[]        @default([])
+  regions          Region[]          @default([])
+  provider         String            @default("mock")
+  status           SearchTaskStatus  @default(PENDING)
+  progress         Int               @default(0)
+  resultCount      Int               @default(0)
+  retryCount       Int               @default(0)
   parameters       Json?
   errorCode        String?
-  errorMessage     String?          @db.Text
+  errorMessage     String?           @db.Text
   startedAt        DateTime?
   completedAt      DateTime?
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productProfile   ProductProfile?  @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productProfile   ProductProfile?   @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
   leads            Lead[]
   resultLinks      SearchTaskLead[]
   searchEvidence   SearchEvidence[]
   opportunities    Opportunity[]
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  radarAssessments RadarAssessment[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([userId, createdAt])
   @@index([productProfileId, createdAt])
@@ -693,6 +743,7 @@ model SearchEvidence {
   searchTask             SearchTask                     @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
   lead                   Lead?                          @relation(fields: [leadId], references: [id], onDelete: SetNull)
   opportunityEvidence    OpportunityEvidence[]
+  radarAssessments       RadarAssessment[]
   companySources         CompanySource[]
   createdAt              DateTime                       @default(now())
   updatedAt              DateTime                       @updatedAt
@@ -728,31 +779,34 @@ model MarketSignal {
 }
 
 model Opportunity {
-  id                           String                        @id @default(cuid())
-  userId                       String
-  searchTaskId                 String
-  type                         OpportunityType
-  dedupeKey                    String
-  companyName                  String?
-  title                        String
-  summary                      String                        @db.Text
-  whyItMatters                 String                        @db.Text
-  recommendedNextStep          String                        @db.Text
-  confidence                   Int
-  productContextSnapshot       Json
-  detectionVersion             String                        @default("v1")
-  user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  searchTask                   SearchTask                    @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
-  evidence                     OpportunityEvidence[]
-  companySources               CompanySource[]
-  companyProfiles              CompanyOpportunity[]
-  createdAt                    DateTime                      @default(now())
-  updatedAt                    DateTime                      @updatedAt
+  id                     String                     @id @default(cuid())
+  userId                 String
+  searchTaskId           String
+  integrityStatus        OpportunityIntegrityStatus @default(LEGACY_INVALID)
+  type                   OpportunityType
+  dedupeKey              String
+  companyName            String?
+  title                  String
+  summary                String                     @db.Text
+  whyItMatters           String                     @db.Text
+  recommendedNextStep    String                     @db.Text
+  confidence             Int
+  productContextSnapshot Json
+  detectionVersion       String                     @default("v1")
+  user                   User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  searchTask             SearchTask                 @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
+  evidence               OpportunityEvidence[]
+  companySources         CompanySource[]
+  companyProfiles        CompanyOpportunity[]
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
 
   @@unique([searchTaskId, dedupeKey])
   @@index([userId, createdAt])
   @@index([userId, type, createdAt])
+  @@index([userId, integrityStatus, createdAt])
   @@index([searchTaskId, confidence])
+  @@index([searchTaskId, integrityStatus, confidence])
 }
 
 model OpportunityEvidence {
@@ -768,6 +822,36 @@ model OpportunityEvidence {
 
   @@unique([opportunityId, searchEvidenceId])
   @@index([searchEvidenceId])
+}
+
+model RadarAssessment {
+  id                 String                  @id @default(cuid())
+  userId             String
+  searchTaskId       String
+  searchEvidenceId   String
+  assessmentVersion  String
+  detectionVersion   String
+  contextHash        String
+  userIntentSnapshot Json
+  entityRole         RadarEntityRole
+  customerGoal       RadarCustomerGoal
+  decision           RadarAssessmentDecision
+  recommendedAction  RadarRecommendedAction
+  confidenceScore    Int
+  matchScore         Int
+  riskLevel          RadarRiskLevel
+  reasonCodes        Json
+  scoreBreakdown     Json
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  searchTask         SearchTask              @relation(fields: [searchTaskId], references: [id], onDelete: Cascade)
+  searchEvidence     SearchEvidence          @relation(fields: [searchEvidenceId], references: [id], onDelete: Cascade)
+  createdAt          DateTime                @default(now())
+
+  @@unique([searchEvidenceId, assessmentVersion, detectionVersion, contextHash], map: "RadarAssessment_evidence_version_context_key")
+  @@index([userId, createdAt], map: "RadarAssessment_user_created_idx")
+  @@index([userId, decision, createdAt], map: "RadarAssessment_user_decision_created_idx")
+  @@index([searchTaskId, createdAt], map: "RadarAssessment_task_created_idx")
+  @@index([searchEvidenceId, createdAt], map: "RadarAssessment_evidence_created_idx")
 }
 
 model CompanyProfile {

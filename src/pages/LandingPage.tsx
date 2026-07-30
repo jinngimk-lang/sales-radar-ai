@@ -90,12 +90,12 @@ const FEATURES = [
 ]
 
 const INDUSTRIES = [
+  ['包装自动化', '包装设备 · 产线升级 · 食品医药'],
   ['工业制造', '机器人 · 自动化 · CNC'],
-  ['企业软件', 'CRM · 数据 · 营销自动化'],
-  ['医疗健康', '设备 · 医美 · 数字医疗'],
-  ['消费电子', '智能硬件 · 音频 · 可穿戴'],
-  ['贸易出口', '包装 · 家居 · 供应链'],
-  ['新能源', '电池 · 储能 · 生产设备'],
+  ['新能源设备', '电池 · 储能 · 生产设备'],
+  ['智能工厂', '数字化 · MES · 工业软件'],
+  ['供应链', '物流 · 仓储 · 采购协同'],
+  ['企业软件', 'CRM · 数据 · 运营效率'],
 ]
 
 export function LandingPage() {
@@ -120,26 +120,26 @@ export function LandingPage() {
     <main className="landing-shell overflow-hidden">
       <section className="relative">
         <div className="landing-grid pointer-events-none absolute inset-0" />
-        <div className="mx-auto grid min-h-[720px] max-w-7xl items-center gap-12 px-5 pb-20 pt-14 sm:px-8 lg:grid-cols-[1.04fr_0.96fr] lg:px-10 lg:py-20">
+        <div className="mx-auto grid min-h-[680px] max-w-7xl items-center gap-10 px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-[1.08fr_0.92fr] lg:px-10 lg:py-16">
           <div className="relative z-10 max-w-2xl">
             <div className="landing-reveal flex items-center gap-3 text-xs font-semibold tracking-[0.18em] text-ink-500">
               <span className="h-px w-9 bg-vermilion" />
               SALES OPPORTUNITY RADAR
             </div>
 
-            <h1 className="landing-reveal landing-delay-1 mt-8 text-[3.35rem] font-medium leading-[1.06] tracking-[-0.055em] text-ink-900 sm:text-7xl">
+            <h1 className="landing-reveal landing-delay-1 mt-7 text-[3.7rem] font-medium leading-[1.03] tracking-[-0.06em] text-ink-900 sm:text-[4.9rem] lg:text-[5.15rem]">
               发现市场变化
               <span className="mt-2 block font-normal text-brand-700">
                 看见销售机会
               </span>
             </h1>
 
-            <p className="landing-reveal landing-delay-2 mt-7 max-w-xl text-base leading-8 text-ink-600 sm:text-lg">
+            <p className="landing-reveal landing-delay-2 mt-6 max-w-2xl text-lg leading-8 text-ink-600 sm:text-xl sm:leading-9">
               输入你的产品和目标市场，发现正在发生变化的企业、行业机会和潜在客户。
               从真实来源出发，更安静、更准确地找到值得跟进的方向。
             </p>
 
-            <div className="landing-reveal landing-delay-3 mt-10 max-w-2xl">
+            <div className="landing-reveal landing-delay-3 mt-8 max-w-2xl">
               <div className="landing-search group">
                 <Search className="ml-1 h-5 w-5 shrink-0 text-ink-400 transition-colors group-focus-within:text-brand-600" />
                 <input
@@ -353,7 +353,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section id="pricing" className="mx-auto max-w-7xl px-5 pb-28 sm:px-8 lg:px-10">
+      <section id="start" className="mx-auto max-w-7xl px-5 pb-28 sm:px-8 lg:px-10">
         <div className="landing-cta relative overflow-hidden px-7 py-14 sm:px-14 sm:py-20">
           <div className="landing-cta-orbit landing-cta-orbit-one" />
           <div className="landing-cta-orbit landing-cta-orbit-two" />

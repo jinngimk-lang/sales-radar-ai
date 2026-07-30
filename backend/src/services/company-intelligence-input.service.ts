@@ -16,6 +16,10 @@ export class CompanyIntelligenceInputService {
       where: {
         id: command.opportunityId,
         userId: command.userId,
+        integrityStatus: 'EVIDENCE_LINKED',
+        evidence: {
+          some: {},
+        },
       },
       select: {
         id: true,

@@ -189,23 +189,19 @@ describe('Research Trace Phase 2A details', () => {
     )
   })
 
-  it('does not create a FACT when no explicit source exists', async () => {
-    const trace = await detailsService.getForUser(
-      noSourceOpportunityId,
-      ownerId,
-    )
-
-    assert.equal(
-      trace.steps.flatMap((step) => step.supportedClaims).filter(
-        (claim) => claim.claimType === 'FACT',
-      ).length,
-      0,
+  it('does not expose details for an Opportunity without Evidence', async () => {
+    await assert.rejects(
+      () => detailsService.getForUser(noSourceOpportunityId, ownerId),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 404 &&
+        error.code === 'RESEARCH_TRACE_NOT_FOUND',
     )
   })
 
   it('keeps ProductContext as background instead of an enterprise fact', async () => {
     const trace = await detailsService.getForUser(
-      noSourceOpportunityId,
+      opportunityId,
       ownerId,
     )
     const contextStep = trace.steps.find(

@@ -679,6 +679,10 @@ export async function getSearchTaskOpportunities(
     where: {
       searchTaskId: task.id,
       userId: user.id,
+      integrityStatus: 'EVIDENCE_LINKED',
+      evidence: {
+        some: {},
+      },
     },
     include: {
       evidence: {

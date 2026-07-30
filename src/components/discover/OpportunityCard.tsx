@@ -56,6 +56,9 @@ export function OpportunityCard({
             <span className="truncate text-xs font-semibold tracking-wide text-brand-700">
               {meta.label}
             </span>
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+              可能相关
+            </span>
           </div>
           <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-ink-200 bg-ink-50 px-2.5 py-1 text-xs font-semibold text-ink-700">
             <CircleGauge className="h-3.5 w-3.5 text-brand-600" />
@@ -76,6 +79,9 @@ export function OpportunityCard({
           <h3 className="mt-1 truncate text-lg font-semibold tracking-tight text-ink-900">
             {opportunity.companyName || '企业主体待确认'}
           </h3>
+          <p className="mt-2 text-[11px] font-medium text-ink-500">
+            企业角色 · 待进一步确认
+          </p>
           <h4 className="mt-3 line-clamp-2 text-sm font-semibold leading-6 text-ink-900">
             {opportunity.title}
           </h4>
@@ -106,6 +112,15 @@ export function OpportunityCard({
             </p>
             <p className="mt-2 text-[11px] text-ink-500">
               这是销售研究建议，需结合后续验证。
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-dashed border-ink-300 bg-white p-4">
+            <p className="text-xs font-semibold text-ink-800">
+              需要验证
+            </p>
+            <p className="mt-2 text-xs leading-5 text-ink-600">
+              企业角色、事件阶段与实际业务需求仍需回到来源并通过后续研究确认。
             </p>
           </section>
         </div>

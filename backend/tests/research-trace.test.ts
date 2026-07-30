@@ -193,27 +193,13 @@ describe('Company Intelligence Research Trace Phase 1', () => {
     )
   })
 
-  it('never emits a FACT without a source reference', async () => {
-    const trace = await service.getForUser(
-      noSourceOpportunityId,
-      ownerId,
-    )
-
-    for (const step of trace.steps) {
-      if (step.informationType === 'FACT') {
-        assert.ok(step.sourceReferences.length > 0)
-      }
-    }
-    assert.equal(
-      trace.steps.find(
-        (step) => step.stage === 'EVIDENCE_VALIDATION',
-      )?.informationType,
-      'ASSESSMENT',
-    )
-    assert.equal(
-      trace.steps.find((step) => step.stage === 'COMPANY_IDENTITY')
-        ?.informationType,
-      'ASSESSMENT',
+  it('does not expose a Research Trace for an Opportunity without Evidence', async () => {
+    await assert.rejects(
+      () => service.getForUser(noSourceOpportunityId, ownerId),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 404 &&
+        error.code === 'RESEARCH_TRACE_NOT_FOUND',
     )
   })
 

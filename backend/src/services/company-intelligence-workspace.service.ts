@@ -18,6 +18,10 @@ export class CompanyIntelligenceWorkspaceService {
       where: {
         id: opportunityId,
         userId,
+        integrityStatus: 'EVIDENCE_LINKED',
+        evidence: {
+          some: {},
+        },
         searchTask: {
           status: 'COMPLETED',
         },

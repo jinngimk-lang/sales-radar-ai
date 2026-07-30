@@ -17,6 +17,10 @@ export class OpportunityService {
       where: {
         id,
         userId,
+        integrityStatus: 'EVIDENCE_LINKED',
+        evidence: {
+          some: {},
+        },
         searchTask: {
           status: 'COMPLETED',
         },

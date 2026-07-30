@@ -88,7 +88,7 @@
   }
 
   .landing-search {
-    @apply flex items-center rounded-full border border-ink-300 bg-white p-1.5 shadow-card transition-all duration-300;
+    @apply flex min-h-[62px] items-center rounded-full border border-ink-300 bg-white p-1.5 shadow-card transition-all duration-300;
   }
 
   .landing-search:focus-within {
@@ -97,7 +97,7 @@
   }
 
   .landing-search-button {
-    @apply inline-flex shrink-0 items-center gap-2 rounded-full bg-brand-800 px-5 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-brand-700 active:scale-[0.98];
+    @apply inline-flex shrink-0 items-center gap-2 rounded-full bg-brand-800 px-6 py-3.5 text-base font-semibold text-white transition-all duration-300 hover:bg-brand-700 active:scale-[0.98];
   }
 
   .radar-stage {
