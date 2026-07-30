@@ -28,8 +28,16 @@ import { CURRENT_QUALIFICATION_VERSION } from '../contracts/qualification-versio
 import { opportunityDetection } from './opportunity-detection.service.js'
 import { opportunityPersistence } from './opportunity-persistence.service.js'
 import { captureMarketSignalsSafely } from './market-intelligence/market-intelligence.service.js'
+import {
+  providerHealthService,
+  type ProviderHealth,
+} from './provider-health.service.js'
+import type { SearchProvider } from '../providers/search/search-provider.interface.js'
 
 export type { SearchProductContext } from '../contracts/product-context.contract.js'
+
+const SEARCH_PROVIDER_UNAVAILABLE_MESSAGE =
+  'The search service is temporarily unavailable. Please try again later.'
 
 export interface CreateSearchTaskInput {
   userId?: string
@@ -64,7 +72,25 @@ export async function createSearchTask(input: CreateSearchTaskInput) {
   })
 }
 
-export async function processSearchTask(taskId: string): Promise<void> {
+export interface SearchTaskExecutionDependencies {
+  checkProviderHealth: (
+    provider: string,
+  ) => Promise<ProviderHealth | null>
+  resolveProvider: (provider: unknown) => SearchProvider
+}
+
+const defaultExecutionDependencies: SearchTaskExecutionDependencies = {
+  checkProviderHealth: async (provider) =>
+    provider === 'agent-reach'
+      ? providerHealthService.checkAgentReach()
+      : null,
+  resolveProvider: (provider) => searchProviderFactory.resolve(provider),
+}
+
+export async function processSearchTask(
+  taskId: string,
+  dependencies: SearchTaskExecutionDependencies = defaultExecutionDependencies,
+): Promise<void> {
   const task = await prisma.searchTask.update({
     where: { id: taskId },
     data: {
@@ -77,7 +103,36 @@ export async function processSearchTask(taskId: string): Promise<void> {
   })
 
   try {
-    const provider = searchProviderFactory.resolve(task.provider)
+    const providerHealth = await dependencies.checkProviderHealth(task.provider)
+    if (providerHealth) {
+      await recordProviderExecution(task.id, task.parameters, {
+        provider: task.provider,
+        health: {
+          state: providerHealth.state,
+          code: providerHealth.code,
+          checkedAt: providerHealth.checkedAt,
+        },
+      })
+
+      if (providerHealth.state !== 'AVAILABLE') {
+        await prisma.searchTask.update({
+          where: { id: task.id },
+          data: {
+            status: 'FAILED',
+            retryCount: { increment: 1 },
+            errorCode: 'SEARCH_PROVIDER_UNAVAILABLE',
+            errorMessage: SEARCH_PROVIDER_UNAVAILABLE_MESSAGE,
+            completedAt: new Date(),
+          },
+        })
+        console.warn(
+          `[SearchTaskService] Search task ${task.id} stopped because ${task.provider} health is ${providerHealth.state} (${providerHealth.code}).`,
+        )
+        return
+      }
+    }
+
+    const provider = dependencies.resolveProvider(task.provider)
     const providerResults = await provider.search({
       keyword: task.keyword,
       platforms: task.platforms,
@@ -331,9 +386,18 @@ export async function processSearchTask(taskId: string): Promise<void> {
       },
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown search task error'
     const errorCode =
       error instanceof ProviderError ? error.code : 'SEARCH_TASK_FAILED'
+    const errorMessage = userFacingSearchError(error)
+
+    await recordProviderExecution(task.id, task.parameters, {
+      provider: task.provider,
+      failure: {
+        code: errorCode,
+        message: errorMessage,
+        failedAt: new Date().toISOString(),
+      },
+    })
 
     await prisma.searchTask.update({
       where: { id: task.id },
@@ -341,12 +405,84 @@ export async function processSearchTask(taskId: string): Promise<void> {
         status: 'FAILED',
         retryCount: { increment: 1 },
         errorCode,
-        errorMessage: message,
+        errorMessage,
         completedAt: new Date(),
       },
     })
 
+    console.error(
+      `[SearchTaskService] Search task ${task.id} execution failed:`,
+      error,
+    )
     throw error
+  }
+}
+
+interface ProviderExecutionRecord {
+  provider: string
+  health?: {
+    state: ProviderHealth['state']
+    code: string
+    checkedAt: string
+  }
+  failure?: {
+    code: string
+    message: string
+    failedAt: string
+  }
+}
+
+async function recordProviderExecution(
+  taskId: string,
+  parameters: unknown,
+  execution: ProviderExecutionRecord,
+): Promise<void> {
+  const storedTask = await prisma.searchTask.findUnique({
+    where: { id: taskId },
+    select: { parameters: true },
+  })
+  const latestParameters = storedTask?.parameters ?? parameters
+  const currentParameters =
+    latestParameters &&
+    typeof latestParameters === 'object' &&
+    !Array.isArray(latestParameters)
+      ? (latestParameters as Record<string, unknown>)
+      : {}
+  const currentExecution =
+    currentParameters.providerExecution &&
+    typeof currentParameters.providerExecution === 'object' &&
+    !Array.isArray(currentParameters.providerExecution)
+      ? (currentParameters.providerExecution as Record<string, unknown>)
+      : {}
+
+  await prisma.searchTask.update({
+    where: { id: taskId },
+    data: {
+      parameters: toSafeJson({
+        ...currentParameters,
+        providerExecution: {
+          ...currentExecution,
+          ...execution,
+        },
+      }),
+    },
+  })
+}
+
+function userFacingSearchError(error: unknown): string {
+  if (!(error instanceof ProviderError)) {
+    return 'The search could not be completed. Please try again later.'
+  }
+
+  switch (error.code) {
+    case 'TIMEOUT':
+      return 'The search took too long to complete. Please try again.'
+    case 'RATE_LIMIT':
+      return 'The search service is temporarily busy. Please try again later.'
+    case 'AUTH_ERROR':
+      return SEARCH_PROVIDER_UNAVAILABLE_MESSAGE
+    case 'INVALID_RESPONSE':
+      return 'The search service returned an unreadable response. Please try again.'
   }
 }
 

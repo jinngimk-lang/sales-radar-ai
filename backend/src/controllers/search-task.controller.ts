@@ -9,7 +9,6 @@ import {
 } from '../services/search-task.service.js'
 import { AppError } from '../utils/app-error.js'
 import { globalSearchIntelligence } from '../services/global-search-intelligence.service.js'
-import { providerHealthService } from '../services/provider-health.service.js'
 import type { SearchProductContext } from '../contracts/product-context.contract.js'
 import { productContextSnapshotBuilder } from '../services/product-context-snapshot.service.js'
 import { searchIntentSnapshotBuilder } from '../services/search-intent-snapshot.service.js'
@@ -26,78 +25,87 @@ function parseEnumArray<T extends string>(
   return value as T[]
 }
 
-export const createSearchTaskController: RequestHandler = async (
-  request,
-  response,
-) => {
-  const keyword =
-    typeof request.body?.keyword === 'string' ? request.body.keyword.trim() : ''
+type SearchTaskScheduler = (taskId: string) => void
 
-  if (!keyword) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'keyword is required')
-  }
-
-  await providerHealthService.requireAgentReach()
-
-  const requestedProductContext = parseProductContext(
-    request.body?.productContext,
-  )
-  const productProfileId = readOptionalString(
-    request.body?.productProfileId,
-    'productProfileId',
-  )
-  const preparedContext = await productContextSnapshotBuilder.prepare({
-    productProfileId,
-    requestedContext: requestedProductContext,
-  })
-  const strategy = await globalSearchIntelligence.createStrategy(
-    keyword,
-    preparedContext.context,
-  )
-  const productContextSnapshot = productContextSnapshotBuilder.build(
-    preparedContext,
-    strategyProductContext(strategy),
-  )
-  const searchIntentSnapshot = searchIntentSnapshotBuilder.build(strategy)
-  const requestedRegions = parseEnumArray(
-    request.body?.regions,
-    Object.values(Region),
-    'regions',
-  )
-  const inferredRegion = Object.values(Region).includes(
-    strategy.intent.region as Region,
-  )
-    ? [strategy.intent.region as Region]
-    : []
-
-  const task = await createSearchTask({
-    userId: preparedContext.userId,
-    productProfileId: productContextSnapshot.productProfile?.id,
-    keyword: globalSearchIntelligence.optimizedKeyword(strategy, keyword),
-    platforms: parseEnumArray(
-      request.body?.platforms,
-      Object.values(Platform),
-      'platforms',
-    ),
-    regions:
-      requestedRegions.length > 0 ? requestedRegions : inferredRegion,
-    productContextSnapshot,
-    searchIntentSnapshot,
-  })
-
+const scheduleSearchTask: SearchTaskScheduler = (taskId) => {
   setImmediate(() => {
-    void processSearchTask(task.id).catch((error: unknown) => {
-      console.error(`Search task ${task.id} failed`, error)
+    void processSearchTask(taskId).catch((error: unknown) => {
+      console.error(`Search task ${taskId} failed`, error)
     })
   })
-
-  response.status(202).json({
-    data: task,
-    strategy,
-    productContext: productContextSnapshot,
-    searchIntent: searchIntentSnapshot,
-  })
 }
+
+export function buildCreateSearchTaskController(
+  scheduler: SearchTaskScheduler = scheduleSearchTask,
+): RequestHandler {
+  return async (request, response) => {
+    const keyword =
+      typeof request.body?.keyword === 'string'
+        ? request.body.keyword.trim()
+        : ''
+
+    if (!keyword) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'keyword is required')
+    }
+
+    const requestedProductContext = parseProductContext(
+      request.body?.productContext,
+    )
+    const productProfileId = readOptionalString(
+      request.body?.productProfileId,
+      'productProfileId',
+    )
+    const preparedContext = await productContextSnapshotBuilder.prepare({
+      productProfileId,
+      requestedContext: requestedProductContext,
+    })
+    const strategy = await globalSearchIntelligence.createStrategy(
+      keyword,
+      preparedContext.context,
+    )
+    const productContextSnapshot = productContextSnapshotBuilder.build(
+      preparedContext,
+      strategyProductContext(strategy),
+    )
+    const searchIntentSnapshot = searchIntentSnapshotBuilder.build(strategy)
+    const requestedRegions = parseEnumArray(
+      request.body?.regions,
+      Object.values(Region),
+      'regions',
+    )
+    const inferredRegion = Object.values(Region).includes(
+      strategy.intent.region as Region,
+    )
+      ? [strategy.intent.region as Region]
+      : []
+
+    const task = await createSearchTask({
+      userId: preparedContext.userId,
+      productProfileId: productContextSnapshot.productProfile?.id,
+      keyword: globalSearchIntelligence.optimizedKeyword(strategy, keyword),
+      platforms: parseEnumArray(
+        request.body?.platforms,
+        Object.values(Platform),
+        'platforms',
+      ),
+      regions:
+        requestedRegions.length > 0 ? requestedRegions : inferredRegion,
+      productContextSnapshot,
+      searchIntentSnapshot,
+    })
+
+    scheduler(task.id)
+
+    response.status(202).json({
+      data: task,
+      strategy,
+      productContext: productContextSnapshot,
+      searchIntent: searchIntentSnapshot,
+    })
+  }
+}
+
+export const createSearchTaskController = buildCreateSearchTaskController()
 
 export const getSearchTaskController: RequestHandler = async (
   request,
