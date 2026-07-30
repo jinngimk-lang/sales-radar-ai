@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1
+
+FROM node:20-bookworm-slim AS builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY prisma ./prisma
+RUN npm run prisma:generate
+
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+FROM node:20-bookworm-slim AS runtime
+
+ENV NODE_ENV=production
+ENV MCPORTER_CONFIG=/app/config/mcporter.json
+ENV PATH=/usr/local/bin:${PATH}
+
+WORKDIR /app
+
+RUN npm install --global mcporter@0.12.3 \
+    && node --version \
+    && command -v mcporter \
+    && mcporter --version
+
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+RUN npm ci --omit=dev \
+    && npm cache clean --force
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY config ./config
+
+RUN mcporter list --json
+
+USER node
+
+EXPOSE 8787
+
+CMD ["npm", "run", "start"]

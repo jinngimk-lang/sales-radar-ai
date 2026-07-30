@@ -1,4 +1,5 @@
-import { delimiter, dirname } from 'node:path'
+import { accessSync, constants } from 'node:fs'
+import { delimiter, dirname, isAbsolute, join } from 'node:path'
 
 export function resolveAgentReachCommand(): string {
   return (
@@ -34,4 +35,43 @@ export function buildAgentReachProcessEnv(
   ).join(delimiter)
 
   return environment
+}
+
+export function findAgentReachExecutable(
+  command: string = resolveAgentReachCommand(),
+  environment: NodeJS.ProcessEnv = process.env,
+): string | null {
+  const hasPathSeparator = command.includes('/') || command.includes('\\')
+  if (isAbsolute(command) || hasPathSeparator) {
+    return canExecute(command) ? command : null
+  }
+
+  const pathValue =
+    Object.entries(environment).find(([key]) => key.toLowerCase() === 'path')
+      ?.[1] ?? ''
+  const extensions =
+    process.platform === 'win32'
+      ? ['', '.exe', '.cmd', '.bat']
+      : ['']
+
+  for (const directory of pathValue.split(delimiter).filter(Boolean)) {
+    for (const extension of extensions) {
+      const candidate = join(directory, `${command}${extension}`)
+      if (canExecute(candidate)) return candidate
+    }
+  }
+
+  return null
+}
+
+function canExecute(path: string): boolean {
+  try {
+    accessSync(
+      path,
+      process.platform === 'win32' ? constants.F_OK : constants.X_OK,
+    )
+    return true
+  } catch {
+    return false
+  }
 }
