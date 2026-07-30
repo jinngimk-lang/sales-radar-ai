@@ -1,117 +1,111 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Radar,
   ArrowRight,
+  ArrowUpRight,
   Building2,
+  Clock3,
   Factory,
   Landmark,
+  Loader2,
+  Radar,
   RefreshCw,
   Scale,
+  ScanSearch,
   TrendingUp,
-  RadioTower,
-  Loader2,
-  ArrowUpRight,
-  Newspaper,
-  Clock3,
 } from 'lucide-react'
 import type { MarketSignal, MarketSignalType } from '@/types'
 import { getMarketSignals } from '@/services/api'
+import { cn } from '@/lib/utils'
 
-const OPPORTUNITY_AREAS = [
-  {
-    title: '企业投资',
-    description: '关注企业资本投入和业务扩张方向。',
-    icon: Landmark,
-    available: true,
-  },
-  {
-    title: '工厂扩张',
-    description: '发现新工厂、产线和产能变化。',
-    icon: Factory,
-    available: true,
-  },
-  {
-    title: '数字化升级',
-    description: '发现企业自动化、数字化改造机会。',
-    icon: RefreshCw,
-    available: true,
-  },
-  {
-    title: '政策机会',
-    description: '关注影响行业发展的政策变化。',
-    icon: Scale,
-    available: true,
-  },
-  {
-    title: '行业趋势',
-    description: '发现市场需求变化。',
-    icon: TrendingUp,
-    available: true,
-  },
-]
-
-const SCAN_AREAS = [
-  { label: '全球市场扫描', status: '随搜索更新', icon: Radar, active: true },
-  { label: '企业动向', status: '正在关注', icon: Building2, active: true },
-  { label: '行业变化', status: '持续发现', icon: TrendingUp, active: true },
-  { label: '政策机会', status: '持续关注', icon: Scale, active: true },
-]
+type SignalFilter = 'ALL' | MarketSignalType
 
 const SIGNAL_META: Record<
   MarketSignalType,
   {
     label: string
+    icon: typeof Factory
     whyItMatters: string
     recommendedNextStep: string
   }
 > = {
   FACTORY_EXPANSION: {
     label: '工厂扩张',
+    icon: Factory,
     whyItMatters:
-      '企业产能或生产布局正在变化，可能带来设备、软件和供应链相关需求。',
-    recommendedNextStep: '核实扩张范围，并研究相关采购部门和技术负责人。',
+      '企业产能或生产布局正在变化，可能带来设备、软件与供应链相关机会。',
+    recommendedNextStep: '核实扩张范围、项目阶段与相关业务部门。',
   },
   INVESTMENT: {
     label: '企业投资',
+    icon: Landmark,
     whyItMatters:
-      '新的资本投入可能推动产能、技术或业务扩张，形成相关产品和服务需求。',
-    recommendedNextStep: '核实投资用途、项目阶段和可能参与决策的业务部门。',
+      '资本投入可能推动产能、技术或业务扩张，值得进一步理解资金用途。',
+    recommendedNextStep: '确认投资方向，并研究可能受到影响的业务环节。',
   },
   DIGITAL_TRANSFORMATION: {
     label: '数字化升级',
+    icon: RefreshCw,
     whyItMatters:
-      '企业正在推进技术或流程升级，可能出现新的软件、自动化与服务需求。',
-    recommendedNextStep: '了解升级项目的业务目标、现有系统和项目负责人。',
+      '企业正在推进技术或流程升级，可能形成软件、自动化与服务机会。',
+    recommendedNextStep: '了解升级目标、现有系统与项目所处阶段。',
   },
   HIRING_SIGNAL: {
     label: '招聘变化',
+    icon: Building2,
     whyItMatters:
-      '相关岗位招聘可能反映企业正在建设新能力或推进新的业务项目。',
-    recommendedNextStep: '确认招聘部门与岗位职责，再判断对应的业务需求。',
+      '相关岗位招聘可能反映企业正在建设新能力，但不代表已经产生采购。',
+    recommendedNextStep: '核实招聘部门与职责，再判断对应的业务变化。',
   },
   POLICY_CHANGE: {
     label: '政策机会',
+    icon: Scale,
     whyItMatters:
-      '政策变化可能影响企业投资方向、合规要求或行业发展节奏。',
-    recommendedNextStep: '确认政策适用范围，并筛选可能受到影响的目标企业。',
+      '政策变化可能影响企业投资、合规要求与行业发展节奏。',
+    recommendedNextStep: '确认政策适用范围，并继续寻找受影响的企业主体。',
   },
   INDUSTRY_TREND: {
     label: '行业变化',
+    icon: TrendingUp,
     whyItMatters:
-      '行业需求变化可能形成新的销售窗口，但仍需进一步确认具体企业。',
-    recommendedNextStep: '结合产品和目标市场，继续寻找受趋势影响的企业主体。',
+      '行业需求变化可能形成销售窗口，但仍需要落实到具体企业。',
+    recommendedNextStep: '结合产品方向，继续验证相关企业和真实业务场景。',
   },
 }
 
-/** 市场机会中心 */
+const FILTERS: Array<{
+  key: SignalFilter
+  label: string
+  icon: typeof Radar
+}> = [
+  { key: 'ALL', label: '全部变化', icon: Radar },
+  { key: 'INVESTMENT', label: '企业投资', icon: Landmark },
+  { key: 'FACTORY_EXPANSION', label: '工厂扩张', icon: Factory },
+  { key: 'DIGITAL_TRANSFORMATION', label: '数字化升级', icon: RefreshCw },
+  { key: 'HIRING_SIGNAL', label: '招聘变化', icon: Building2 },
+  { key: 'POLICY_CHANGE', label: '政策机会', icon: Scale },
+  { key: 'INDUSTRY_TREND', label: '行业变化', icon: TrendingUp },
+]
+
+const WORKFLOW = [
+  ['01', '设置方向'],
+  ['02', '查看变化'],
+  ['03', '判断机会'],
+  ['04', '进入研究'],
+]
+
 export function DashboardPage() {
   const [signals, setSignals] = useState<MarketSignal[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeFilter, setActiveFilter] = useState<SignalFilter>('ALL')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   useEffect(() => {
     getMarketSignals()
-      .then(setSignals)
+      .then((items) => {
+        setSignals(items)
+        setSelectedId(items[0]?.id ?? null)
+      })
       .catch((error) => {
         console.error('[MarketCenter] Unable to load market signals', error)
         setSignals([])
@@ -119,220 +113,348 @@ export function DashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  const filteredSignals = useMemo(
+    () =>
+      activeFilter === 'ALL'
+        ? signals
+        : signals.filter((signal) => signal.signalType === activeFilter),
+    [activeFilter, signals],
+  )
+
+  const selectedSignal =
+    filteredSignals.find((signal) => signal.id === selectedId) ??
+    filteredSignals[0] ??
+    null
+
+  const handleFilter = (filter: SignalFilter) => {
+    setActiveFilter(filter)
+    const next =
+      filter === 'ALL'
+        ? signals[0]
+        : signals.find((signal) => signal.signalType === filter)
+    setSelectedId(next?.id ?? null)
+  }
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ink-900">市场机会中心</h1>
-        <p className="mt-1 text-sm text-ink-500">
-          关注企业变化、行业趋势和市场机会，发现值得跟进的销售方向。
-        </p>
-      </div>
-
-      <section className="relative overflow-hidden rounded-3xl border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-white p-6">
-        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full border border-brand-100/70">
-          <div className="absolute inset-10 rounded-full border border-brand-100/70" />
-          <div className="absolute inset-20 rounded-full border border-brand-200/70" />
-        </div>
-        <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-glow">
-            <RadioTower className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-ink-900">市场情报扫描</h2>
-            <p className="mt-0.5 text-xs text-ink-500">
-              正在关注企业变化和市场机会
-            </p>
-          </div>
-        </div>
-        <div className="relative mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {SCAN_AREAS.map((area) => {
-            const Icon = area.icon
-            return (
-              <div
-                key={area.label}
-                className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <Icon className="h-4 w-4 text-brand-600" />
-                  <span
-                    className={
-                      area.active
-                        ? 'h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-emerald-100'
-                        : 'h-2 w-2 rounded-full bg-ink-300 ring-4 ring-ink-100'
-                    }
-                  />
-                </div>
-                <p className="mt-3 text-sm font-semibold text-ink-900">
-                  {area.label}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-500">{area.status}</p>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className="mt-6">
+    <div className="workspace-page">
+      <header className="workspace-heading">
         <div>
-          <h2 className="font-semibold text-ink-900">关注的机会类型</h2>
-          <p className="mt-1 text-xs text-ink-500">
-            关注影响销售方向的企业动向与市场变化
-          </p>
+          <p className="workspace-kicker">MARKET RADAR</p>
+          <h1>市场机会中心</h1>
+          <p>按顺序查看市场变化，理解为什么值得关注，再决定下一步。</p>
         </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {OPPORTUNITY_AREAS.map((area) => {
-            const Icon = area.icon
-            return (
-              <div key={area.title} className="card p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <span className="rounded-full bg-ink-50 px-2 py-1 text-[10px] font-semibold text-ink-500">
-                    {area.available ? '可识别' : '待接入'}
-                  </span>
-                </div>
-                <h3 className="mt-4 font-semibold text-ink-900">
-                  {area.title}
-                </h3>
-                <p className="mt-1 text-xs leading-5 text-ink-500">
-                  {area.description}
-                </p>
-              </div>
-            )
-          })}
-        </div>
-      </section>
+        <Link to="/app/discover" className="workspace-primary-action">
+          <Radar className="h-4 w-4" />
+          设置销售目标
+        </Link>
+      </header>
 
-      <section className="mt-6 overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-card">
-        <div className="flex flex-col gap-3 border-b border-ink-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <Newspaper className="h-4 w-4 text-brand-600" />
-              <h2 className="font-semibold text-ink-900">市场情报浏览器</h2>
+      <section className="market-workspace">
+        <div className="market-workflow">
+          <div className="flex min-w-0 items-center gap-3 border-r border-ink-200 pr-5">
+            <span className="radar-live-dot" />
+            <div>
+              <p className="text-xs font-semibold text-ink-800">市场雷达运行中</p>
+              <p className="mt-0.5 text-[10px] tracking-wide text-ink-400">
+                随真实搜索持续更新
+              </p>
             </div>
-            <p className="mt-1 text-xs text-ink-500">
-              浏览最近搜索发现的企业变化与市场信息
-            </p>
           </div>
-          {signals.length > 0 && (
-            <Link to="/app/discover" className="btn-ghost text-xs">
-              继续发现机会
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          )}
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-16 text-sm text-ink-500">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin text-brand-500" />
-            正在加载最近发现
-          </div>
-        ) : signals.length > 0 ? (
-          <div className="divide-y divide-ink-100">
-            {signals.slice(0, 20).map((signal) => (
-              <MarketSignalCard
-                key={signal.id}
-                signal={signal}
-              />
+          <div className="grid min-w-[560px] flex-1 grid-cols-4">
+            {WORKFLOW.map(([number, label], index) => (
+              <div
+                key={number}
+                className="relative flex items-center gap-2 px-5 after:absolute after:right-0 after:top-1/2 after:h-px after:w-4 after:bg-ink-900/10 last:after:hidden"
+              >
+                <span
+                  className={cn(
+                    'flex h-6 w-6 items-center justify-center rounded-full border font-mono text-[9px]',
+                    index === 1
+                      ? 'border-brand-300 bg-brand-50 text-brand-700'
+                      : 'border-ink-300 bg-white text-ink-500',
+                  )}
+                >
+                  {number}
+                </span>
+                <span
+                  className={cn(
+                    'text-xs',
+                    index === 1 ? 'font-semibold text-brand-800' : 'text-ink-400',
+                  )}
+                >
+                  {label}
+                </span>
+              </div>
             ))}
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center bg-ink-50/30 px-6 py-14 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-600 shadow-sm">
-              <Radar className="h-6 w-6" />
+        </div>
+
+        <div className="market-workspace-body">
+          <aside className="market-filter-panel">
+            <div className="border-b border-ink-200 px-5 py-4">
+              <p className="text-xs font-semibold text-ink-800">关注方向</p>
+              <p className="mt-1 text-[10px] leading-4 text-ink-400">
+                选择一种变化，查看对应信息
+              </p>
             </div>
-            <h3 className="mt-4 font-semibold text-ink-900">
-              正在扫描市场变化
-            </h3>
-            <p className="mt-2 max-w-md text-sm leading-6 text-ink-500">
-              系统会根据企业投资、扩张、数字化升级和行业变化发现新的销售机会。
-            </p>
-            <Link to="/app/discover" className="btn-primary mt-5">
-              设置销售目标
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            <nav className="space-y-1 p-3">
+              {FILTERS.map((filter) => {
+                const Icon = filter.icon
+                const count =
+                  filter.key === 'ALL'
+                    ? signals.length
+                    : signals.filter((signal) => signal.signalType === filter.key)
+                        .length
+                return (
+                  <button
+                    key={filter.key}
+                    onClick={() => handleFilter(filter.key)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs transition-all',
+                      activeFilter === filter.key
+                        ? 'bg-white text-brand-800 shadow-sm'
+                        : 'text-ink-600 hover:bg-white hover:text-ink-900',
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="flex-1">{filter.label}</span>
+                    {count > 0 && (
+                      <span className="font-mono text-[9px] text-ink-400">
+                        {String(count).padStart(2, '0')}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </nav>
+          </aside>
+
+          <div className="market-feed-panel">
+            <div className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
+              <div>
+                <p className="text-xs font-semibold text-ink-800">市场变化</p>
+                <p className="mt-1 text-[10px] text-ink-400">
+                  选择一条信息查看判断依据
+                </p>
+              </div>
+              <ScanSearch className="h-4 w-4 text-ink-300" />
+            </div>
+
+            {loading ? (
+              <div className="flex h-80 items-center justify-center text-xs text-ink-400">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin text-brand-600" />
+                正在读取市场变化
+              </div>
+            ) : filteredSignals.length > 0 ? (
+              <div className="market-feed-scroll scrollbar-thin">
+                {filteredSignals.map((signal) => (
+                  <SignalRow
+                    key={signal.id}
+                    signal={signal}
+                    active={selectedSignal?.id === signal.id}
+                    onSelect={() => setSelectedId(signal.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <MarketEmptyState />
+            )}
           </div>
-        )}
+
+          <aside className="market-detail-panel">
+            {selectedSignal ? (
+              <SignalDetail signal={selectedSignal} />
+            ) : (
+              <div className="flex h-full min-h-96 flex-col items-center justify-center px-8 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700">
+                  <Radar className="h-5 w-5" />
+                </div>
+                <h2 className="mt-5 text-sm font-semibold text-ink-900">
+                  正在扫描市场变化
+                </h2>
+                <p className="mt-2 max-w-xs text-xs leading-6 text-ink-500">
+                  运行一次销售机会搜索后，真实企业变化会按顺序进入这里。
+                </p>
+                <Link to="/app/discover" className="workspace-secondary-action mt-6">
+                  开始发现
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            )}
+          </aside>
+        </div>
       </section>
     </div>
   )
 }
 
-function MarketSignalCard({
+function SignalRow({
   signal,
+  active,
+  onSelect,
 }: {
   signal: MarketSignal
+  active: boolean
+  onSelect: () => void
 }) {
   const meta = SIGNAL_META[signal.signalType]
-  const region = signal.country || signal.region || '地区待确认'
-  const sourceName = readableSource(signal.sourceUrl)
-  const TypeIcon =
-    signal.signalType === 'FACTORY_EXPANSION'
-      ? Factory
-      : signal.signalType === 'INVESTMENT'
-        ? Landmark
-        : signal.signalType === 'POLICY_CHANGE'
-          ? Scale
-          : signal.signalType === 'INDUSTRY_TREND'
-            ? TrendingUp
-            : signal.signalType === 'HIRING_SIGNAL'
-              ? Building2
-              : RefreshCw
+  const Icon = meta.icon
 
   return (
-    <article className="group flex flex-col gap-4 px-6 py-5 transition-colors hover:bg-brand-50/30 sm:flex-row">
-      <div className="flex h-28 w-full shrink-0 items-center justify-center rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50 to-white text-brand-500 sm:w-40">
-        <TypeIcon className="h-8 w-8" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full bg-brand-50 px-2.5 py-1 font-semibold text-brand-700">
+    <button
+      onClick={onSelect}
+      className={cn(
+        'group flex w-full gap-3 border-b border-ink-200 px-5 py-4 text-left transition-all',
+        active ? 'bg-brand-50' : 'hover:bg-ink-50',
+      )}
+    >
+      <span
+        className={cn(
+          'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border',
+          active
+            ? 'border-brand-200 bg-white text-brand-700'
+            : 'border-ink-300 bg-white text-ink-500',
+        )}
+      >
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 text-[10px]">
+          <span className="font-semibold text-brand-700">{meta.label}</span>
+          <span className="text-ink-300">·</span>
+          <span className="text-ink-400">
+            {signal.country || signal.region || '地区待确认'}
+          </span>
+        </span>
+        <span className="mt-1.5 line-clamp-2 block text-xs font-semibold leading-5 text-ink-800">
+          {signal.title}
+        </span>
+        <span className="mt-1.5 block truncate text-[10px] text-ink-400">
+          {signal.companyName || '相关主体待确认'}
+        </span>
+      </span>
+      <ArrowRight
+        className={cn(
+          'mt-2 h-3.5 w-3.5 shrink-0 transition-transform',
+          active
+            ? 'translate-x-0.5 text-brand-600'
+            : 'text-ink-300 group-hover:translate-x-0.5',
+        )}
+      />
+    </button>
+  )
+}
+
+function SignalDetail({ signal }: { signal: MarketSignal }) {
+  const meta = SIGNAL_META[signal.signalType]
+  const Icon = meta.icon
+
+  return (
+    <div className="market-detail-scroll scrollbar-thin">
+      <div className="border-b border-ink-200 px-6 py-5">
+        <div className="flex items-center justify-between">
+          <span className="inline-flex items-center gap-2 text-[10px] font-semibold tracking-wide text-brand-700">
+            <Icon className="h-3.5 w-3.5" />
             {meta.label}
           </span>
-          <span className="text-ink-400">{region}</span>
-          <span className="text-ink-300">·</span>
-          <span className="inline-flex items-center gap-1 text-ink-400">
-            <Clock3 className="h-3.5 w-3.5" />
+          <span className="inline-flex items-center gap-1 text-[10px] text-ink-400">
+            <Clock3 className="h-3 w-3" />
             {new Date(signal.detectedAt).toLocaleDateString('zh-CN')}
           </span>
         </div>
-        <h3 className="mt-2 text-base font-semibold leading-6 text-ink-900 group-hover:text-brand-700">
+        <h2 className="mt-5 text-xl font-medium leading-8 tracking-[-0.02em] text-ink-900">
           {signal.title}
-        </h3>
-        <p className="mt-1 text-xs font-medium text-ink-500">
-          {signal.companyName || '相关主体待确认'}
-        </p>
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-500">
-          {signal.summary}
-        </p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl bg-brand-50/70 p-3">
-            <p className="text-xs font-semibold text-brand-700">
-              为什么值得关注
-            </p>
-            <p className="mt-1 text-xs leading-5 text-ink-600">
-              {meta.whyItMatters}
-            </p>
-          </div>
-          <div className="rounded-xl bg-ink-50 p-3">
-            <p className="text-xs font-semibold text-ink-700">推荐下一步</p>
-            <p className="mt-1 text-xs leading-5 text-ink-600">
-              {meta.recommendedNextStep}
-            </p>
-          </div>
-        </div>
-        <a
-          href={signal.sourceUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
-        >
-          {sourceName}
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        </a>
+        </h2>
+        <p className="mt-3 text-xs leading-6 text-ink-500">{signal.summary}</p>
       </div>
-    </article>
+
+      <div className="space-y-6 px-6 py-6">
+        <DetailBlock
+          number="01"
+          title="发生了什么"
+          content={signal.summary}
+          tone="fact"
+        />
+        <DetailBlock
+          number="02"
+          title="为什么值得关注"
+          content={meta.whyItMatters}
+          tone="assessment"
+        />
+        <DetailBlock
+          number="03"
+          title="推荐下一步"
+          content={meta.recommendedNextStep}
+          tone="recommendation"
+        />
+
+        <div className="border-t border-ink-200 pt-5">
+          <p className="text-[10px] font-semibold tracking-wide text-ink-400">
+            真实来源
+          </p>
+          <a
+            href={signal.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-ink-300 bg-white px-4 py-3 text-xs font-semibold text-ink-800 transition-colors hover:border-brand-400 hover:text-brand-700"
+          >
+            <span className="truncate">{readableSource(signal.sourceUrl)}</span>
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+          </a>
+        </div>
+
+        <Link to="/app/discover" className="workspace-primary-action w-full">
+          继续判断销售机会
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+        <p className="text-center text-[10px] leading-4 text-ink-400">
+          市场变化不等于已确认客户，仍需经过机会与客户验证。
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function DetailBlock({
+  number,
+  title,
+  content,
+  tone,
+}: {
+  number: string
+  title: string
+  content: string
+  tone: 'fact' | 'assessment' | 'recommendation'
+}) {
+  return (
+    <div className="grid grid-cols-[30px_1fr] gap-3">
+      <span
+        className={cn(
+          'font-mono text-[9px]',
+          tone === 'fact' ? 'text-brand-600' : 'text-vermilion',
+        )}
+      >
+        {number}
+      </span>
+      <div>
+        <h3 className="text-xs font-semibold text-ink-800">{title}</h3>
+        <p className="mt-2 text-xs leading-6 text-ink-500">{content}</p>
+      </div>
+    </div>
+  )
+}
+
+function MarketEmptyState() {
+  return (
+    <div className="flex h-80 flex-col items-center justify-center px-6 text-center">
+      <ScanSearch className="h-6 w-6 text-ink-300" />
+      <p className="mt-4 text-xs font-semibold text-ink-700">
+        这个方向还没有新变化
+      </p>
+      <p className="mt-2 max-w-xs text-[11px] leading-5 text-ink-400">
+        可以选择其他关注方向，或重新设置产品和目标市场。
+      </p>
+    </div>
   )
 }
 

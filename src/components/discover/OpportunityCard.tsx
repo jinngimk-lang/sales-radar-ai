@@ -1,11 +1,12 @@
 import {
   ArrowRight,
   ArrowUpRight,
-  Building2,
   CircleGauge,
   Factory,
   Landmark,
+  Lightbulb,
   RefreshCw,
+  Route,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type {
@@ -29,68 +30,128 @@ export function OpportunityCard({
 }) {
   const meta = TYPE_META[opportunity.type]
   const Icon = meta.icon
-  const source = opportunity.evidence[0]?.searchEvidence
+  const primaryEvidence =
+    opportunity.evidence.find((item) => item.isPrimary) ??
+    opportunity.evidence[0]
+  const source = primaryEvidence?.searchEvidence
+  const confidence = Math.max(0, Math.min(100, opportunity.confidence))
+
+  let sourceHost = ''
+  if (source?.rawUrl) {
+    try {
+      sourceHost = new URL(source.rawUrl).hostname.replace(/^www\./, '')
+    } catch {
+      sourceHost = ''
+    }
+  }
 
   return (
-    <article className="card flex h-full flex-col p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-            <Icon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-brand-600">
+    <article className="group flex h-full flex-col overflow-hidden rounded-3xl border border-ink-200 bg-white shadow-card transition duration-300 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-hover">
+      <div className="border-b border-ink-100 px-5 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="inline-flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+              <Icon className="h-4 w-4" />
+            </span>
+            <span className="truncate text-xs font-semibold tracking-wide text-brand-700">
               {meta.label}
+            </span>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-ink-200 bg-ink-50 px-2.5 py-1 text-xs font-semibold text-ink-700">
+            <CircleGauge className="h-3.5 w-3.5 text-brand-600" />
+            判断可信度 {confidence}%
+          </span>
+        </div>
+        <div className="mt-3 h-1 overflow-hidden rounded-full bg-ink-100">
+          <div
+            className="h-full rounded-full bg-brand-600 transition-[width] duration-500"
+            style={{ width: `${confidence}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col p-5">
+        <div>
+          <p className="text-xs font-medium text-ink-500">相关企业</p>
+          <h3 className="mt-1 truncate text-lg font-semibold tracking-tight text-ink-900">
+            {opportunity.companyName || '企业主体待确认'}
+          </h3>
+          <h4 className="mt-3 line-clamp-2 text-sm font-semibold leading-6 text-ink-900">
+            {opportunity.title}
+          </h4>
+          <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-ink-600">
+            {opportunity.summary}
+          </p>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          <section className="rounded-2xl bg-brand-50/75 p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-brand-800">
+              <Lightbulb className="h-3.5 w-3.5" />
+              为什么值得关注
+              <span className="font-medium text-brand-600">商业判断</span>
+            </div>
+            <p className="mt-2 line-clamp-3 text-xs leading-5 text-ink-700">
+              {opportunity.whyItMatters}
             </p>
-            <h3 className="mt-0.5 truncate font-semibold text-ink-900">
-              {opportunity.companyName || '公司待确认'}
-            </h3>
+          </section>
+
+          <section className="rounded-2xl border border-ink-200 bg-ink-50/70 p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-ink-800">
+              <Route className="h-3.5 w-3.5 text-brand-600" />
+              建议下一步
+            </div>
+            <p className="mt-2 line-clamp-2 text-xs leading-5 text-ink-600">
+              {opportunity.recommendedNextStep}
+            </p>
+            <p className="mt-2 text-[11px] text-ink-500">
+              这是销售研究建议，需结合后续验证。
+            </p>
+          </section>
+        </div>
+
+        <div className="mt-5 border-t border-ink-100 pt-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-400">
+                真实来源 · {opportunity.evidence.length} 条依据
+              </p>
+              {source ? (
+                <>
+                  <p className="mt-1 truncate text-xs font-medium text-ink-700">
+                    {source.title || sourceHost || '查看来源页面'}
+                  </p>
+                  {primaryEvidence?.excerpt && (
+                    <p className="mt-1 line-clamp-1 text-xs text-ink-500">
+                      {primaryEvidence.excerpt}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-1 text-xs text-ink-500">来源待确认</p>
+              )}
+            </div>
+            {source && (
+              <a
+                href={source.rawUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="打开真实来源"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ink-200 text-ink-500 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+              >
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </a>
+            )}
           </div>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink-50 px-2.5 py-1 text-xs font-medium text-ink-600">
-          <CircleGauge className="h-3.5 w-3.5" />
-          匹配度 {opportunity.confidence}%
-        </span>
-      </div>
 
-      <h4 className="mt-4 text-sm font-semibold leading-6 text-ink-900">
-        {opportunity.title}
-      </h4>
-      <p className="mt-2 line-clamp-3 text-sm leading-6 text-ink-600">
-        {opportunity.summary}
-      </p>
-
-      <div className="mt-4 rounded-xl bg-brand-50/60 p-3">
-        <p className="text-xs font-semibold text-brand-700">为什么值得关注</p>
-        <p className="mt-1 text-xs leading-5 text-ink-600">
-          {opportunity.whyItMatters}
-        </p>
-      </div>
-
-      <div className="mt-4 flex items-start gap-2 text-xs leading-5 text-ink-600">
-        <Building2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-400" />
-        <span>{opportunity.recommendedNextStep}</span>
-      </div>
-
-      <div className="mt-auto flex items-center justify-between gap-3 pt-4">
         <Link
           to={`/app/opportunities/${opportunity.id}`}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
+          className="mt-4 inline-flex items-center justify-between rounded-xl bg-ink-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-brand-700"
         >
-          查看机会
-          <ArrowRight className="h-3.5 w-3.5" />
+          查看机会详情
+          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </Link>
-        {source && (
-          <a
-            href={source.rawUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-700"
-          >
-            真实来源
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </a>
-        )}
       </div>
     </article>
   )

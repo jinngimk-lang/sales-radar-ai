@@ -1,0 +1,7 @@
+backend
+docs
+.agent
+dist
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts

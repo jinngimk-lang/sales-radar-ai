@@ -64,9 +64,19 @@ import {
 import { delay, scoreToLevel } from '@/lib/utils'
 import * as crmStore from '@/lib/crmStore'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL)
 const SEARCH_TASK_POLL_INTERVAL_MS = 500
 const SEARCH_TASK_MAX_POLL_ATTEMPTS = 240
+
+function normalizeApiBaseUrl(value: string | undefined): string {
+  const configuredBaseUrl = value?.trim() || '/api'
+
+  if (configuredBaseUrl === '/') {
+    return ''
+  }
+
+  return configuredBaseUrl.replace(/\/+$/, '')
+}
 
 interface ApiEnvelope<T> {
   data: T

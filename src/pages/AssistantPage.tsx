@@ -76,18 +76,18 @@ export function AssistantPage() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full bg-white">
       {/* 左侧：历史客户 */}
       <aside className="hidden w-72 shrink-0 flex-col border-r border-ink-200 bg-white md:flex">
         <div className="p-3">
-          <Link to="/app/discover" className="btn-primary w-full justify-start">
+          <Link to="/app/discover" className="workspace-primary-action w-full justify-start">
             <Plus className="h-4 w-4" />
             选择销售机会
           </Link>
         </div>
 
         <div className="px-3">
-          <div className="flex items-center gap-2 rounded-xl bg-ink-50 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-full border border-ink-300 bg-white px-3 py-2">
             <Search className="h-4 w-4 text-ink-400" />
             <input
               placeholder="搜索已确认客户"
@@ -146,18 +146,18 @@ export function AssistantPage() {
       </aside>
 
       {/* 右侧：聊天窗口 */}
-      <div className="flex flex-1 flex-col bg-ink-50/30">
+      <div className="flex flex-1 flex-col bg-ink-50">
         {/* 头部 */}
-        <header className="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:px-6">
+        <header className="flex min-h-[76px] items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700">
               <Bot className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-sm font-semibold text-ink-900">销售助手</h1>
+              <p className="workspace-kicker">SALES ACTION</p>
+              <h1 className="mt-1 text-sm font-semibold text-ink-900">销售助手</h1>
               <p className="flex items-center gap-1 text-xs text-ink-500">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                分析潜在客户 · 总结真实来源 · 制定触达与跟进策略
+                把已确认的研究转化为触达与跟进建议
               </p>
             </div>
           </div>
@@ -171,8 +171,8 @@ export function AssistantPage() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin">
           <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6">
             {!activeSession && messages.length === 0 && (
-              <div className="mx-auto mt-16 max-w-lg rounded-2xl border border-ink-200 bg-white px-8 py-10 text-center shadow-sm">
-                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+              <div className="mx-auto mt-16 max-w-lg rounded-2xl border border-ink-200 bg-white px-8 py-10 text-center shadow-card">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700">
                   <ShieldCheck className="h-5 w-5" />
                 </div>
                 <h2 className="mt-4 text-base font-semibold text-ink-900">
@@ -182,7 +182,7 @@ export function AssistantPage() {
                   销售助手只分析企业身份、官网、真实来源和产品匹配度都已确认的客户。
                 </p>
                 {sessions.length === 0 && !sessionsLoading && !sessionsError && (
-                  <Link to="/app/discover" className="btn-primary mt-5 inline-flex">
+                  <Link to="/app/discover" className="workspace-primary-action mt-5 inline-flex">
                     前往销售机会
                   </Link>
                 )}
@@ -204,11 +204,11 @@ export function AssistantPage() {
             ))}
             {loading && (
               <div className="flex items-center gap-2 text-sm text-ink-400">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700">
                   <Sparkles className="h-4 w-4" />
                 </div>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>AI 正在思考...</span>
+                <span>正在整理销售建议...</span>
               </div>
             )}
           </div>
@@ -224,7 +224,7 @@ export function AssistantPage() {
                   <button
                     key={p.text}
                     onClick={() => handleSend(p.text)}
-                    className="chip flex items-center gap-1.5 border border-ink-200 bg-white text-ink-600 transition-all hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                    className="chip flex items-center gap-1.5 border border-ink-300 bg-white text-ink-700 transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:text-brand-700"
                   >
                     <Icon className="h-3.5 w-3.5" />
                     {p.text}
@@ -238,7 +238,7 @@ export function AssistantPage() {
         {/* 输入框 */}
         <div className="border-t border-ink-200 bg-white px-4 py-4 sm:px-6">
           <div className="mx-auto max-w-3xl">
-            <div className="flex items-end gap-2 rounded-2xl border border-ink-200 bg-white p-2 shadow-sm transition-all focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-500/10">
+            <div className="flex items-end gap-2 rounded-[1.5rem] border border-ink-300 bg-white p-2 shadow-sm transition-all focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/10">
               <textarea
                 value={input}
                 disabled={!activeSession}
@@ -260,7 +260,7 @@ export function AssistantPage() {
               <button
                 onClick={() => handleSend()}
                 disabled={!activeSession || !input.trim() || loading}
-                className="btn-primary shrink-0 p-2.5"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-900 text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="发送"
               >
                 <Send className="h-4 w-4" />
@@ -292,7 +292,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
           isUser
             ? 'bg-ink-200 text-ink-700'
-            : 'bg-gradient-to-br from-brand-500 to-brand-700 text-white'
+            : 'border border-brand-200 bg-brand-50 text-brand-700'
         }`}
       >
         {isUser ? <span className="text-xs font-bold">我</span> : <Sparkles className="h-4 w-4" />}

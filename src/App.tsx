@@ -21,8 +21,10 @@ const CompanyResearchWorkspacePage = lazy(() =>
 const AssistantPage = lazy(() =>
   import('@/pages/AssistantPage').then((m) => ({ default: m.AssistantPage })),
 )
-const DashboardPage = lazy(() =>
-  import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+const MarketIntelligenceWorkspacePage = lazy(() =>
+  import('@/pages/MarketIntelligenceWorkspacePage').then((m) => ({
+    default: m.MarketIntelligenceWorkspacePage,
+  })),
 )
 const AccountPage = lazy(() =>
   import('@/pages/AccountPage').then((m) => ({ default: m.AccountPage })),
@@ -47,13 +49,13 @@ export default function App() {
 
       {/* 工作台 */}
       <Route path="/app" element={<AppLayout />}>
-        <Route index element={<Navigate to="/app/discover" replace />} />
+        <Route index element={<Navigate to="/app/dashboard" replace />} />
         <Route path="discover" element={<Suspense fallback={<PageFallback />}><DiscoverPage /></Suspense>} />
         <Route path="opportunities/:id" element={<Suspense fallback={<PageFallback />}><OpportunityDetailPage /></Suspense>} />
         <Route path="opportunities/:id/research" element={<Suspense fallback={<PageFallback />}><CompanyResearchWorkspacePage /></Suspense>} />
         <Route path="customer/:id" element={<Suspense fallback={<PageFallback />}><CustomerDetailPage /></Suspense>} />
         <Route path="assistant" element={<Suspense fallback={<PageFallback />}><AssistantPage /></Suspense>} />
-        <Route path="dashboard" element={<Suspense fallback={<PageFallback />}><DashboardPage /></Suspense>} />
+        <Route path="dashboard" element={<Suspense fallback={<PageFallback />}><MarketIntelligenceWorkspacePage /></Suspense>} />
         <Route path="account" element={<Suspense fallback={<PageFallback />}><AccountPage /></Suspense>} />
       </Route>
 

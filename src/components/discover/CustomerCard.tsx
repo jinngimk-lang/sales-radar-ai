@@ -73,7 +73,7 @@ export function CustomerCard({ customer, onGenerateEmail }: CustomerCardProps) {
 
   return (
     <article
-      className="card group relative flex flex-col p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover"
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-ink-200 bg-white p-5 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-card-hover"
       onClick={() => navigate(`/app/customer/${customer.id}`)}
     >
       {/* 左上角收藏按钮 */}

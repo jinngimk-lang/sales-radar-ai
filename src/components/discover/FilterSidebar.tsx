@@ -15,6 +15,7 @@ interface FilterSidebarProps {
   filters: SearchFilters
   onChange: (filters: SearchFilters) => void
   resultCount: number
+  mode?: 'opportunities' | 'leads'
 }
 
 /** 多选勾选项 */
@@ -66,7 +67,12 @@ function FilterGroup({ title, children }: { title: string; children: React.React
 }
 
 /** 左侧筛选栏 */
-export function FilterSidebar({ filters, onChange, resultCount }: FilterSidebarProps) {
+export function FilterSidebar({
+  filters,
+  onChange,
+  resultCount,
+  mode = 'opportunities',
+}: FilterSidebarProps) {
   const togglePlatform = (p: Platform) => {
     onChange({
       ...filters,
@@ -127,13 +133,16 @@ export function FilterSidebar({ filters, onChange, resultCount }: FilterSidebarP
     })
   }
 
-  const hasActiveFilters =
+  const hasSearchFilters =
     filters.platforms.length > 0 ||
     filters.regions.length > 0 ||
-    filters.customerTypes.length > 0 ||
+    filters.customerTypes.length > 0
+  const hasLeadFilters =
     filters.intentLevels.length > 0 ||
     (filters.followUpStatuses?.length ?? 0) > 0 ||
     filters.favoritesOnly
+  const hasActiveFilters =
+    hasSearchFilters || (mode === 'leads' && hasLeadFilters)
 
   return (
     <aside className="card flex flex-col">
@@ -154,38 +163,55 @@ export function FilterSidebar({ filters, onChange, resultCount }: FilterSidebarP
       </div>
 
       <div className="px-2">
-        {/* 收藏快捷过滤 */}
-        <div className="py-3">
-          <button
-            onClick={toggleFavoriteOnly}
-            className={cn(
-              'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-              filters.favoritesOnly
-                ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
-                : 'text-ink-600 hover:bg-ink-50',
-            )}
-          >
-            <Star className={cn('h-4 w-4', filters.favoritesOnly && 'fill-amber-400 text-amber-500')} />
-            仅看收藏客户
-          </button>
-        </div>
+        {mode === 'leads' && (
+          <>
+            {/* 客户管理条件只属于已确认客户，不用于机会判断 */}
+            <div className="py-3">
+              <button
+                onClick={toggleFavoriteOnly}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                  filters.favoritesOnly
+                    ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+                    : 'text-ink-600 hover:bg-ink-50',
+                )}
+              >
+                <Star
+                  className={cn(
+                    'h-4 w-4',
+                    filters.favoritesOnly &&
+                      'fill-amber-400 text-amber-500',
+                  )}
+                />
+                仅看收藏客户
+              </button>
+            </div>
 
-        <FilterGroup title="跟进状态">
-          {ALL_FOLLOW_UP_STATUSES.map((s) => (
-            <CheckItem
-              key={s.key}
-              checked={filters.followUpStatuses?.includes(s.key) ?? false}
-              onChange={() => toggleFollowUp(s.key)}
-            >
-              <span className="flex items-center gap-2">
-                <span className={cn('h-1.5 w-1.5 rounded-full', s.dotClass)} />
-                {s.label}
-              </span>
-            </CheckItem>
-          ))}
-        </FilterGroup>
+            <FilterGroup title="跟进状态">
+              {ALL_FOLLOW_UP_STATUSES.map((s) => (
+                <CheckItem
+                  key={s.key}
+                  checked={
+                    filters.followUpStatuses?.includes(s.key) ?? false
+                  }
+                  onChange={() => toggleFollowUp(s.key)}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'h-1.5 w-1.5 rounded-full',
+                        s.dotClass,
+                      )}
+                    />
+                    {s.label}
+                  </span>
+                </CheckItem>
+              ))}
+            </FilterGroup>
+          </>
+        )}
 
-        <FilterGroup title="平台">
+        <FilterGroup title="真实来源平台">
           {ALL_PLATFORMS.map((p) => (
             <CheckItem
               key={p.name}
@@ -224,22 +250,26 @@ export function FilterSidebar({ filters, onChange, resultCount }: FilterSidebarP
           ))}
         </FilterGroup>
 
-        <FilterGroup title="购买意向">
-          {ALL_INTENT_LEVELS.map((l) => (
-            <CheckItem
-              key={l.key}
-              checked={filters.intentLevels.includes(l.key)}
-              onChange={() => toggleIntent(l.key)}
-            >
-              {l.label}
-            </CheckItem>
-          ))}
-        </FilterGroup>
+        {mode === 'leads' && (
+          <FilterGroup title="购买意向">
+            {ALL_INTENT_LEVELS.map((l) => (
+              <CheckItem
+                key={l.key}
+                checked={filters.intentLevels.includes(l.key)}
+                onChange={() => toggleIntent(l.key)}
+              >
+                {l.label}
+              </CheckItem>
+            ))}
+          </FilterGroup>
+        )}
       </div>
 
       <div className="border-t border-ink-100 px-5 py-3">
         <p className="text-xs text-ink-500">
-          已为你筛选出 <span className="font-semibold text-brand-600">{resultCount}</span> 个销售机会
+          当前显示{' '}
+          <span className="font-semibold text-brand-600">{resultCount}</span>{' '}
+          个{mode === 'opportunities' ? '销售机会' : '已确认客户'}
         </p>
         {filters.platforms.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
