@@ -39,7 +39,7 @@ export type { SearchProductContext } from '../contracts/product-context.contract
 
 const SEARCH_PROVIDER_UNAVAILABLE_MESSAGE =
   'The search service is temporarily unavailable. Please try again later.'
-const PROVIDER_RATE_LIMIT_RETRY_DELAYS_MS = [2_000, 5_000] as const
+const PROVIDER_RATE_LIMIT_RETRY_DELAYS_MS = [3_000, 10_000, 20_000] as const
 
 export interface CreateSearchTaskInput {
   userId?: string

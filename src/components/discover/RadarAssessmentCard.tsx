@@ -17,6 +17,7 @@ import type {
   RadarRiskLevel,
 } from '@/types'
 import { cn } from '@/lib/utils'
+import { resolveSourcePlatform } from '@/lib/sourcePlatform'
 
 const ROLE_LABELS: Record<RadarEntityRole, string> = {
   END_CUSTOMER: '客户',
@@ -134,18 +135,6 @@ const REASON_LABELS: Record<string, string> = {
   ROLE_VERIFICATION_REQUIRED: '企业角色需要确认',
 }
 
-const SOURCE_TYPE_LABELS: Record<string, string> = {
-  Website: '网页',
-  Reddit: '社区讨论',
-  X: '社交动态',
-  Instagram: '社交内容',
-  Facebook: '社交内容',
-  TikTok: '短视频',
-  LinkedIn: '职业网络',
-  Xiaohongshu: '社交内容',
-  YouTube: '视频',
-}
-
 export function RadarAssessmentCard({
   assessment,
 }: {
@@ -156,6 +145,10 @@ export function RadarAssessmentCard({
   const companyName =
     assessment.evidence.companyName || '企业主体待确认'
   const sourceHost = sourceHostname(assessment.evidence.rawUrl)
+  const sourcePlatform = resolveSourcePlatform(
+    assessment.evidence.rawUrl,
+    assessment.evidence.platform,
+  )
   const scoreItems = getScoreItems(assessment)
 
   return (
@@ -173,6 +166,9 @@ export function RadarAssessmentCard({
             </span>
             <span className="rounded-full border border-ink-200 bg-white px-2.5 py-1 text-[11px] font-medium text-ink-700">
               {ROLE_LABELS[assessment.entityRole]}
+            </span>
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-800">
+              来源 · {sourcePlatform.label}
             </span>
           </div>
           <div className="text-right">
@@ -318,9 +314,7 @@ export function RadarAssessmentCard({
                 {sourceHost || assessment.evidence.provider}
               </p>
               <p className="mt-1 text-[11px] text-ink-500">
-                来源类型：
-                {SOURCE_TYPE_LABELS[assessment.evidence.platform] ||
-                  assessment.evidence.platform}
+                来源平台：{sourcePlatform.label}
               </p>
               <p className="mt-1 flex items-center gap-1 text-[11px] text-ink-500">
                 <CalendarDays className="h-3 w-3" />

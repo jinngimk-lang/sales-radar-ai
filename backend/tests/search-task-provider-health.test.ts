@@ -235,7 +235,7 @@ describe('SearchTask provider health execution boundary', () => {
     })
     assert.equal(stored.status, 'COMPLETED')
     assert.equal(providerCalls, 2)
-    assert.deepEqual(retryDelays, [2_000])
+    assert.deepEqual(retryDelays, [3_000])
   })
 
   it('persists one idempotent RadarAssessment for each SearchEvidence before completing', async () => {

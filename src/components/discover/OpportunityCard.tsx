@@ -13,6 +13,7 @@ import type {
   OpportunityType,
   SalesOpportunity,
 } from '@/types'
+import { resolveSourcePlatform } from '@/lib/sourcePlatform'
 
 const TYPE_META: Record<
   OpportunityType,
@@ -34,6 +35,9 @@ export function OpportunityCard({
     opportunity.evidence.find((item) => item.isPrimary) ??
     opportunity.evidence[0]
   const source = primaryEvidence?.searchEvidence
+  const sourcePlatform = source
+    ? resolveSourcePlatform(source.rawUrl, source.platform)
+    : null
   const confidence = Math.max(0, Math.min(100, opportunity.confidence))
 
   let sourceHost = ''
@@ -135,6 +139,9 @@ export function OpportunityCard({
                 <>
                   <p className="mt-1 truncate text-xs font-medium text-ink-700">
                     {source.title || sourceHost || '查看来源页面'}
+                  </p>
+                  <p className="mt-1 text-[11px] font-medium text-sky-700">
+                    来源平台 · {sourcePlatform?.label}
                   </p>
                   {primaryEvidence?.excerpt && (
                     <p className="mt-1 line-clamp-1 text-xs text-ink-500">

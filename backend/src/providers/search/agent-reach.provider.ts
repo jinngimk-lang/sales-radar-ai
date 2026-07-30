@@ -12,6 +12,7 @@ import type {
   SearchProviderInput,
   SearchResult,
 } from './search-provider.interface.js'
+import { ProviderRequestScheduler } from './provider-request-scheduler.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -47,7 +48,7 @@ const PLATFORM_DOMAINS: Partial<Record<Platform, string[]>> = {
   [Platform.Facebook]: ['facebook.com'],
   [Platform.TikTok]: ['tiktok.com'],
   [Platform.LinkedIn]: ['linkedin.com'],
-  [Platform.Xiaohongshu]: ['xiaohongshu.com'],
+  [Platform.Xiaohongshu]: ['xiaohongshu.com', 'xhslink.com'],
   [Platform.YouTube]: ['youtube.com', 'youtu.be'],
 }
 
@@ -73,6 +74,12 @@ export class AgentReachProvider implements SearchProvider {
     this.readPositiveInteger(process.env.AGENT_REACH_MAX_RESULTS, 10),
     10,
   )
+  private readonly requestScheduler = new ProviderRequestScheduler(
+    this.readPositiveInteger(
+      process.env.AGENT_REACH_MIN_INTERVAL_MS,
+      1_500,
+    ),
+  )
 
   async search(input: SearchProviderInput): Promise<SearchResult[]> {
     const platforms =
@@ -80,7 +87,9 @@ export class AgentReachProvider implements SearchProvider {
         ? input.platforms
         : [...PUBLIC_DEFAULT_PLATFORMS]
     const query = this.buildQuery(input.keyword, platforms, input.regions)
-    const rawOutput = await this.executeSearch(query)
+    const rawOutput = await this.requestScheduler.run(() =>
+      this.executeSearch(query),
+    )
     const rawResults = parseAgentReachOutput(rawOutput)
     const outputDiagnostics = inspectAgentReachOutput(rawOutput)
 
