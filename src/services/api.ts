@@ -480,10 +480,7 @@ export async function searchCustomers(
     request<ApiEnvelope<RadarAssessment[]>>(
       `/radar/assessments?searchTaskId=${encodeURIComponent(task.id)}&includeBlocked=true`,
       { cache: 'no-store' },
-    ).catch((error) => {
-      console.error('[API] Radar assessments unavailable', error)
-      return { data: [] as RadarAssessment[] }
-    }),
+    ),
   ])
   let results = leadResponse.data.map(toCustomer)
 

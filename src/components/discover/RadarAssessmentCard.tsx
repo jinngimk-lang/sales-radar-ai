@@ -32,23 +32,23 @@ const DECISION_META: Record<
   { label: string; className: string }
 > = {
   OPPORTUNITY_CREATED: {
-    label: '高匹配机会',
+    label: '🔥 机会',
     className: 'border-brand-200 bg-brand-50 text-brand-800',
   },
   POTENTIAL_OPPORTUNITY: {
-    label: '潜在机会',
+    label: '🟡 潜在机会',
     className: 'border-violet-200 bg-violet-50 text-violet-800',
   },
   MARKET_SIGNAL_ONLY: {
-    label: '市场信号',
+    label: '🔵 市场信号',
     className: 'border-sky-200 bg-sky-50 text-sky-800',
   },
   NEEDS_REVIEW: {
-    label: '需要判断',
+    label: '⚪ 待确认',
     className: 'border-amber-200 bg-amber-50 text-amber-800',
   },
   BLOCKED: {
-    label: '暂不推荐',
+    label: '⚪ 待确认',
     className: 'border-ink-200 bg-ink-50 text-ink-600',
   },
 }

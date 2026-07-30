@@ -32,6 +32,7 @@ import {
   providerHealthService,
   type ProviderHealth,
 } from './provider-health.service.js'
+import { radarAssessmentPersistence } from './radar-assessment-persistence.service.js'
 import type { SearchProvider } from '../providers/search/search-provider.interface.js'
 
 export type { SearchProductContext } from '../contracts/product-context.contract.js'
@@ -77,6 +78,10 @@ export interface SearchTaskExecutionDependencies {
     provider: string,
   ) => Promise<ProviderHealth | null>
   resolveProvider: (provider: unknown) => SearchProvider
+  persistRadarAssessment?: (input: {
+    userId: string
+    searchEvidenceId: string
+  }) => Promise<unknown>
 }
 
 const defaultExecutionDependencies: SearchTaskExecutionDependencies = {
@@ -85,6 +90,8 @@ const defaultExecutionDependencies: SearchTaskExecutionDependencies = {
       ? providerHealthService.checkAgentReach()
       : null,
   resolveProvider: (provider) => searchProviderFactory.resolve(provider),
+  persistRadarAssessment: (input) =>
+    radarAssessmentPersistence.createForEvidence(input),
 }
 
 export async function processSearchTask(
@@ -145,6 +152,7 @@ export async function processSearchTask(
     let qualifiedCount = 0
     let opportunityCount = 0
     let marketSignalCount = 0
+    let radarAssessmentCount = 0
 
     for (const result of providerResults) {
       const title =
@@ -191,6 +199,15 @@ export async function processSearchTask(
           leadId: null,
         },
       })
+
+      await (
+        dependencies.persistRadarAssessment ??
+        defaultExecutionDependencies.persistRadarAssessment!
+      )({
+        userId: task.userId,
+        searchEvidenceId: evidence.id,
+      })
+      radarAssessmentCount += 1
 
       const marketSignals = await captureMarketSignalsSafely({
         userId: task.userId,
@@ -377,7 +394,7 @@ export async function processSearchTask(
     }
 
     console.info(
-      `[SearchTaskService] ${provider.name} task outcome: adapterResults=${providerResults.length}, evidence=${providerResults.length}, marketSignals=${marketSignalCount}, opportunities=${opportunityCount}, resultCountQualifiedLeads=${qualifiedCount}.`,
+      `[SearchTaskService] ${provider.name} task outcome: adapterResults=${providerResults.length}, evidence=${providerResults.length}, radarAssessments=${radarAssessmentCount}, marketSignals=${marketSignalCount}, opportunities=${opportunityCount}, resultCountQualifiedLeads=${qualifiedCount}.`,
     )
     await prisma.searchTask.update({
       where: { id: task.id },

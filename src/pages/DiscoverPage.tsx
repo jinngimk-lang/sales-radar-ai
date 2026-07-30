@@ -34,6 +34,7 @@ import type {
   RadarAssessment,
 } from '@/types'
 import {
+  ApiRequestError,
   searchCustomers,
   generateOutreach,
   understandProduct,
@@ -199,7 +200,7 @@ export function DiscoverPage() {
       setCustomers([])
       setOpportunities([])
       setRadarAssessments([])
-      setSearchError('SEARCH_UNAVAILABLE')
+      setSearchError(searchFailureCode(error))
     } finally {
       if (searchRequestIdRef.current === searchRequestId) {
         setLoading(false)
@@ -511,7 +512,10 @@ export function DiscoverPage() {
             {loading ? (
               <ScanProgress query={filters.query} />
             ) : searchError ? (
-              <SearchFailureState onRetry={() => void runSearch(filters)} />
+              <SearchFailureState
+                errorCode={searchError}
+                onRetry={() => void runSearch(filters)}
+              />
             ) : (
               <>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -990,21 +994,52 @@ function ResultCategoryButton({
   )
 }
 
-function SearchFailureState({ onRetry }: { onRetry: () => void }) {
+function SearchFailureState({
+  errorCode,
+  onRetry,
+}: {
+  errorCode: string
+  onRetry: () => void
+}) {
+  const authenticationRequired = errorCode === 'AUTHENTICATION_REQUIRED'
+  const systemError = errorCode === 'RADAR_SYSTEM_ERROR'
+
   return (
     <div className="card px-6 py-10 text-center">
       <h3 className="text-base font-semibold text-ink-900">
-        暂时无法完成本次搜索
+        {authenticationRequired
+          ? '登录状态已失效'
+          : systemError
+            ? '暂时无法读取判断结果'
+            : '暂时无法完成本次搜索'}
       </h3>
       <p className="mx-auto mt-2 max-w-xl text-sm text-ink-500">
-        系统暂时无法获取新的市场信息，请稍后重试。
+        {authenticationRequired
+          ? '请重新登录后查看本次市场扫描结果。'
+          : systemError
+            ? '市场信息已经完成处理，但判断结果暂时无法读取，请稍后重试。'
+            : '系统暂时无法获取新的市场信息，请稍后重试。'}
       </p>
       <button onClick={onRetry} className="btn-primary mt-5">
         <Radar className="h-4 w-4" />
-        重新搜索
+        {authenticationRequired || systemError ? '重新尝试' : '重新搜索'}
       </button>
     </div>
   )
+}
+
+function searchFailureCode(error: unknown) {
+  if (error instanceof ApiRequestError) {
+    if (
+      error.status === 401 ||
+      error.status === 403 ||
+      error.code === 'AUTHENTICATION_REQUIRED'
+    ) {
+      return 'AUTHENTICATION_REQUIRED'
+    }
+    if (error.status >= 500) return 'RADAR_SYSTEM_ERROR'
+  }
+  return 'SEARCH_UNAVAILABLE'
 }
 
 function ProductContextPanel({

@@ -239,6 +239,19 @@ describe('Radar Intelligence Layer Phase 2C persistence', () => {
         },
       }),
     )
+
+    await assert.rejects(
+      () =>
+        service.listForSearchTask({
+          userId: otherUserId,
+          searchTaskId: buyerTaskId,
+          includeBlocked: true,
+        }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 404 &&
+        error.code === 'SEARCH_TASK_NOT_FOUND',
+    )
   })
 
   it('does not overwrite an existing Assessment snapshot', async () => {

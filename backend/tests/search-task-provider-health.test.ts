@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, before, describe, it } from 'node:test'
+import { Industry, Platform, Region } from '@prisma/client'
 import type { Request, Response } from 'express'
 import { prisma } from '../src/prisma/client.js'
 import { buildCreateSearchTaskController } from '../src/controllers/search-task.controller.js'
@@ -193,5 +194,61 @@ describe('SearchTask provider health execution boundary', () => {
     assert.equal(stored.errorCode, null)
     assert.equal(parameters?.providerExecution?.health?.state, 'AVAILABLE')
     assert.equal(parameters?.providerExecution?.health?.code, 'OK')
+  })
+
+  it('persists one idempotent RadarAssessment for each SearchEvidence before completing', async () => {
+    const task = await createSearchTask({
+      userId,
+      keyword: `radar-runtime-${suffix}`,
+      platforms: [Platform.Website],
+      regions: [Region.Europe],
+    })
+    taskIds.push(task.id)
+    const dependencies: SearchTaskExecutionDependencies = {
+      checkProviderHealth: async () => providerHealth('AVAILABLE', 'OK'),
+      resolveProvider: () => ({
+        name: 'agent-reach',
+        search: async () => [
+          {
+            externalId: `radar-runtime-evidence-${suffix}`,
+            platform: Platform.Website,
+            sourceUrl: `https://example.com/radar-runtime/${suffix}`,
+            profileUrl: `https://example.com/radar-runtime/${suffix}`,
+            company: 'Runtime Manufacturing GmbH',
+            customerName: 'Runtime Manufacturing GmbH',
+            country: 'Germany',
+            region: Region.Europe,
+            industry: Industry.IndustrialManufacturing,
+            rawContent:
+              'Runtime Manufacturing GmbH announced an expansion of its European factory. The official update describes a new production line, project timing, and increased manufacturing capacity.',
+            metadata: {
+              title:
+                'Runtime Manufacturing GmbH expands European factory',
+              entityRole: 'end_customer',
+              publishedAt: '2026-07-30',
+            },
+          },
+        ],
+      }),
+    }
+
+    await processSearchTask(task.id, dependencies)
+    await processSearchTask(task.id, dependencies)
+
+    const stored = await prisma.searchTask.findUniqueOrThrow({
+      where: { id: task.id },
+      include: {
+        searchEvidence: true,
+        radarAssessments: true,
+      },
+    })
+
+    assert.equal(stored.status, 'COMPLETED')
+    assert.equal(stored.searchEvidence.length, 1)
+    assert.equal(stored.radarAssessments.length, 1)
+    assert.equal(
+      stored.radarAssessments[0]?.searchEvidenceId,
+      stored.searchEvidence[0]?.id,
+    )
   })
 })

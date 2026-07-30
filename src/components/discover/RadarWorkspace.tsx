@@ -5,7 +5,6 @@ import {
   CircleGauge,
   RadioTower,
   Search,
-  ShieldAlert,
   Sparkles,
 } from 'lucide-react'
 import type {
@@ -17,7 +16,10 @@ import type {
 import { cn } from '@/lib/utils'
 import { RadarAssessmentCard } from './RadarAssessmentCard'
 
-type DecisionFilter = RadarAssessmentDecision | 'ALL'
+type DecisionFilter =
+  | Exclude<RadarAssessmentDecision, 'BLOCKED' | 'NEEDS_REVIEW'>
+  | 'REVIEW'
+  | 'ALL'
 type RoleFilter = RadarEntityRole | 'ALL'
 type RiskFilter = RadarRiskLevel | 'ALL'
 type RadarSort =
@@ -35,28 +37,23 @@ const DECISION_FILTERS: Array<{
   { key: 'ALL', label: '全部', icon: Search },
   {
     key: 'OPPORTUNITY_CREATED',
-    label: '高匹配机会',
+    label: '🔥 机会',
     icon: Sparkles,
   },
   {
     key: 'POTENTIAL_OPPORTUNITY',
-    label: '潜在机会',
+    label: '🟡 潜在机会',
     icon: CircleGauge,
   },
   {
     key: 'MARKET_SIGNAL_ONLY',
-    label: '市场信号',
+    label: '🔵 市场信号',
     icon: RadioTower,
   },
   {
-    key: 'NEEDS_REVIEW',
-    label: '需要判断',
+    key: 'REVIEW',
+    label: '⚪ 待确认',
     icon: CircleAlert,
-  },
-  {
-    key: 'BLOCKED',
-    label: '暂不推荐',
-    icon: ShieldAlert,
   },
 ]
 
@@ -96,7 +93,11 @@ export function RadarWorkspace({
   const visibleAssessments = useMemo(() => {
     const filtered = assessments.filter((assessment) => {
       const decisionMatches =
-        decision === 'ALL' || assessment.decision === decision
+        decision === 'ALL' ||
+        (decision === 'REVIEW'
+          ? assessment.decision === 'NEEDS_REVIEW' ||
+            assessment.decision === 'BLOCKED'
+          : assessment.decision === decision)
       const roleMatches =
         entityRole === 'ALL' || assessment.entityRole === entityRole
       const riskMatches =
@@ -179,11 +180,17 @@ export function RadarWorkspace({
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-400">
             判断分类
           </p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
             {DECISION_FILTERS.map((item) => {
               const count =
                 item.key === 'ALL'
                   ? assessments.length
+                  : item.key === 'REVIEW'
+                    ? assessments.filter(
+                        (assessment) =>
+                          assessment.decision === 'NEEDS_REVIEW' ||
+                          assessment.decision === 'BLOCKED',
+                      ).length
                   : assessments.filter(
                       (assessment) =>
                         assessment.decision === item.key,
