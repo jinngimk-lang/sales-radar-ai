@@ -47,8 +47,6 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY config ./config
 
-RUN mcporter config get exa --json
-
 USER node
 
 EXPOSE 8787

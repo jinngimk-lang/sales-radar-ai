@@ -36,5 +36,6 @@ describe('production Exa MCP runtime configuration', () => {
     assert.match(dockerfile, /exa-mcp-server@3\.2\.1/)
     assert.match(dockerfile, /command -v exa-mcp-server/)
     assert.doesNotMatch(dockerfile, /EXA_API_KEY\s*=/)
+    assert.doesNotMatch(dockerfile, /RUN\s+mcporter\s+config\s+get/)
   })
 })
