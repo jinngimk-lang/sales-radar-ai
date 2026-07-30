@@ -10,9 +10,14 @@ export interface ExaMcpRuntimeStatus {
   transport: 'local-stdio' | 'remote-http' | 'unknown'
 }
 
-export function resolveAgentReachCommand(): string {
+export function resolveAgentReachCommand(
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
   return (
-    process.env.AGENT_REACH_MCPORTER_PATH?.trim() ||
+    readEnvironmentValue(
+      environment,
+      'AGENT_REACH_MCPORTER_PATH',
+    )?.trim() ||
     (process.platform === 'win32' ? 'mcporter.cmd' : 'mcporter')
   )
 }

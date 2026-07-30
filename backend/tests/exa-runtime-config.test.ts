@@ -38,4 +38,18 @@ describe('production Exa MCP runtime configuration', () => {
     assert.doesNotMatch(dockerfile, /EXA_API_KEY\s*=/)
     assert.doesNotMatch(dockerfile, /RUN\s+mcporter\s+config\s+get/)
   })
+
+  it('allows enough time for the Railway container healthcheck', () => {
+    const railwayConfig = JSON.parse(
+      readFileSync(join(process.cwd(), 'railway.json'), 'utf8'),
+    ) as {
+      deploy?: {
+        healthcheckPath?: string
+        healthcheckTimeout?: number
+      }
+    }
+
+    assert.equal(railwayConfig.deploy?.healthcheckPath, '/api/health')
+    assert.equal(railwayConfig.deploy?.healthcheckTimeout, 300)
+  })
 })
