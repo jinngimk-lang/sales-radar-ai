@@ -84,14 +84,17 @@ export class AssistantLeadService {
 
     return candidates
       .filter((candidate) => this.isVisible(candidate, userId))
-      .map(({ analyses, searchTaskLinks: _links, ...lead }) => ({
-        ...lead,
-        analysis: analyses[0] ?? null,
-        communicationProfile: deriveCommunicationProfile(lead),
-        audienceType: this.classifyAudience(lead),
-        contactReadiness: this.contactReadiness(lead),
-        assistantScores: this.scoreCandidate(lead),
-      }))
+      .map((candidate) => {
+        const { analyses, searchTaskLinks: _links, ...lead } = candidate
+        return {
+          ...lead,
+          analysis: analyses[0] ?? null,
+          communicationProfile: deriveCommunicationProfile(lead),
+          audienceType: this.classifyAudience(candidate),
+          contactReadiness: this.contactReadiness(candidate),
+          assistantScores: this.scoreCandidate(candidate),
+        }
+      })
   }
 
   private isVisible(candidate: AssistantLeadCandidate, userId: string) {
