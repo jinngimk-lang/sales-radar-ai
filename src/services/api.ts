@@ -839,6 +839,7 @@ export async function getChatSessions(): Promise<ChatSession[]> {
     customerName: lead.company ?? lead.displayName,
     displayName: lead.displayName,
     company: lead.company,
+    avatarUrl: lead.avatarUrl,
     initials: lead.initials,
     platform: lead.platform,
     jobTitle: lead.jobTitle,
@@ -876,6 +877,7 @@ export async function runSalesAgent(input: {
   message: string
   leadId?: string
   history?: SalesAgentHistoryMessage[]
+  model?: string
 }): Promise<SalesAgentRunResult> {
   const response = await request<ApiEnvelope<SalesAgentRunResult>>(
     '/assistant/agent',

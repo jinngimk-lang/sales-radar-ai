@@ -28,12 +28,14 @@ import type {
   OutreachGeneration,
   SalesAgentAction,
   SalesAgentHistoryMessage,
+  SalesAgentModelOption,
 } from '@/types'
 import {
   ApiRequestError,
   generateOutreachBundle,
   getChatSessions,
   discoverContacts,
+  getRuntimeCapabilities,
   runSalesAgent,
 } from '@/services/api'
 import { Avatar } from '@/components/ui/Avatar'
@@ -248,10 +250,11 @@ export function AssistantPage() {
           </div>
         </div>
         <div className="mt-3 flex-1 space-y-1 overflow-y-auto px-2 pb-3 scrollbar-thin">
-          <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">
-            全部真实来源对象 · {sessions.length}
-          </p>
-          {sessionsLoading ? (
+          {!query.trim() ? (
+            <div className="mx-1 rounded-2xl border border-dashed border-ink-200 bg-ink-50/60 px-4 py-5 text-xs leading-5 text-ink-500">
+              输入联系人、企业或职位关键词后，这里才会展示匹配的真实来源对象。
+            </div>
+          ) : sessionsLoading ? (
             Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="flex items-center gap-3 rounded-xl p-2">
                 <div className="h-9 w-9 animate-pulse rounded-full bg-ink-100" />
@@ -270,44 +273,49 @@ export function AssistantPage() {
             </div>
           ) : filteredSessions.length === 0 ? (
             <div className="px-3 py-4 text-xs leading-relaxed text-ink-500">
-              <p>{query.trim() ? '没有匹配该关键词的联系人或企业。' : '还没有可用对象。先搜索真实来源并选择联系人、企业、供应商或中介。'}</p>
+              <p>没有匹配该关键词的联系人或企业。</p>
               <Link to="/app/discover?selectFor=assistant" className="mt-2 inline-flex items-center gap-1 font-semibold text-brand-700">
                 去发现销售机会 <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
           ) : (
-            filteredSessions.map((session) => (
-              <button
-                key={session.id}
-                type="button"
-                onClick={() => chooseSession(session.id)}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors',
-                  activeSessionId === session.id ? 'bg-brand-50' : 'hover:bg-ink-50',
-                )}
-              >
-                <Avatar initials={session.initials} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-medium text-ink-900">{session.customerName}</span>
-                    <PlatformIcon platform={session.platform} className="h-3 w-3" />
+            <>
+              <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">
+                搜索结果 · {filteredSessions.length}
+              </p>
+              {filteredSessions.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => chooseSession(session.id)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors',
+                    activeSessionId === session.id ? 'bg-brand-50' : 'hover:bg-ink-50',
+                  )}
+                >
+                  <Avatar initials={session.initials} src={session.avatarUrl} alt={session.customerName} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-medium text-ink-900">{session.customerName}</span>
+                      <PlatformIcon platform={session.platform} className="h-3 w-3" />
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-ink-500">
+                      {audienceLabel(session.audienceType)} · 综合 {sessionScore(session).overall}
+                    </span>
+                    <span className={cn(
+                      'mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                      session.contactReadiness === 'ready'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : session.contactReadiness === 'review'
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-brand-50 text-brand-700',
+                    )}>
+                      {readinessLabel(session.contactReadiness)}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block truncate text-xs text-ink-500">
-                    {audienceLabel(session.audienceType)} · 综合 {sessionScore(session).overall}
-                  </span>
-                  <span className={cn(
-                    'mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
-                    session.contactReadiness === 'ready'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : session.contactReadiness === 'review'
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-brand-50 text-brand-700',
-                  )}>
-                    {readinessLabel(session.contactReadiness)}
-                  </span>
-                </span>
-              </button>
-            ))
+                </button>
+              ))}
+            </>
           )}
         </div>
       </aside>
@@ -566,6 +574,24 @@ const AGENT_STARTERS = [
   '研究当前选中的对象，补充公开联系人，并按对方内容习惯生成中文和英文销售话术。',
 ]
 
+const FALLBACK_AGENT_MODELS: SalesAgentModelOption[] = [
+  {
+    id: 'gpt-5.6-sol',
+    label: 'GPT-5.6 Sol',
+    description: '复杂寻客、研究与多步销售编排，质量优先',
+  },
+  {
+    id: 'gpt-5.6-terra',
+    label: 'GPT-5.6 Terra',
+    description: '日常研究与话术生成，速度和成本更均衡',
+  },
+  {
+    id: 'gpt-5.6-luna',
+    label: 'GPT-5.6 Luna',
+    description: '快速筛选、联系人整理与高频轻量任务',
+  },
+]
+
 function SalesAgentPanel({
   activeSession,
   onRefreshLeads,
@@ -579,10 +605,49 @@ function SalesAgentPanel({
   const [input, setInput] = useState('')
   const [running, setRunning] = useState(false)
   const [agentError, setAgentError] = useState<string | null>(null)
+  const [modelOptions, setModelOptions] = useState<SalesAgentModelOption[]>(FALLBACK_AGENT_MODELS)
+  const [selectedModel, setSelectedModel] = useState(FALLBACK_AGENT_MODELS[0].id)
+  const [agentConfigured, setAgentConfigured] = useState<boolean | null>(null)
+  const [checkingConfiguration, setCheckingConfiguration] = useState(false)
+
+  const loadAgentCapability = useCallback(async () => {
+    setCheckingConfiguration(true)
+    try {
+      const capabilities = await getRuntimeCapabilities()
+      const capability = capabilities.salesAgent
+      const options = capability?.models?.length
+        ? capability.models
+        : FALLBACK_AGENT_MODELS
+      setModelOptions(options)
+      setSelectedModel((current) => {
+        if (options.some((option) => option.id === current)) return current
+        if (capability?.model && options.some((option) => option.id === capability.model)) {
+          return capability.model
+        }
+        return options[0]?.id ?? FALLBACK_AGENT_MODELS[0].id
+      })
+      setAgentConfigured(Boolean(capability?.enabled))
+    } catch {
+      setAgentConfigured(null)
+    } finally {
+      setCheckingConfiguration(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAgentCapability()
+  }, [loadAgentCapability])
+
+  const selectedModelDetails =
+    modelOptions.find((option) => option.id === selectedModel) ?? modelOptions[0]
 
   const submit = async (preset?: string) => {
     const content = (preset ?? input).trim()
     if (!content || running) return
+    if (agentConfigured === false) {
+      setAgentError(missingOpenAIKeyMessage())
+      return
+    }
     const userMessage: AgentChatEntry = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -601,6 +666,7 @@ function SalesAgentPanel({
         message: content,
         leadId: activeSession?.id,
         history,
+        model: selectedModel,
       })
       setMessages((current) => [
         ...current,
@@ -618,11 +684,13 @@ function SalesAgentPanel({
       }
       if (result.leadIds[0]) onSelectLead(result.leadIds[0])
     } catch (requestError) {
-      setAgentError(
-        requestError instanceof ApiRequestError
-          ? requestError.message
-          : 'GPT 销售代理暂时无法执行，请稍后重试。',
-      )
+      if (
+        requestError instanceof ApiRequestError &&
+        requestError.code === 'OPENAI_NOT_CONFIGURED'
+      ) {
+        setAgentConfigured(false)
+      }
+      setAgentError(agentErrorMessage(requestError))
     } finally {
       setRunning(false)
     }
@@ -646,14 +714,62 @@ function SalesAgentPanel({
               </p>
             </div>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            {activeSession ? `当前对象：${activeSession.customerName}` : '自主选择工具'}
-          </span>
+          <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+            <label className="flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-ink-500">
+              模型
+              <select
+                value={selectedModel}
+                onChange={(event) => setSelectedModel(event.target.value)}
+                disabled={running}
+                className="max-w-[180px] bg-transparent text-xs font-semibold text-ink-800 focus:outline-none"
+                aria-label="选择 AI 销售模型"
+              >
+                {modelOptions.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <span className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold',
+              agentConfigured === false
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : agentConfigured === true
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-ink-200 bg-ink-50 text-ink-500',
+            )}>
+              <span className={cn(
+                'h-1.5 w-1.5 rounded-full',
+                agentConfigured === false
+                  ? 'bg-rose-500'
+                  : agentConfigured === true
+                    ? 'bg-emerald-500'
+                    : 'bg-ink-300',
+              )} />
+              {agentConfigured === false
+                ? 'Railway 后端未配置密钥'
+                : agentConfigured === null
+                  ? '正在检测后端配置'
+                  : activeSession
+                    ? `当前对象：${activeSession.customerName}`
+                    : '自主选择工具'}
+            </span>
+          </div>
         </div>
       </div>
 
       <div className="p-4 sm:p-5">
+        <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-ink-200 bg-ink-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-ink-800">{selectedModelDetails?.label ?? selectedModel}</p>
+            <p className="mt-0.5 text-[10px] leading-4 text-ink-500">{selectedModelDetails?.description}</p>
+          </div>
+          {agentConfigured === false && (
+            <button type="button" onClick={() => void loadAgentCapability()} disabled={checkingConfiguration} className="btn-secondary shrink-0 px-3 py-1.5 text-[10px] disabled:opacity-60">
+              <RefreshCw className={cn('h-3 w-3', checkingConfiguration && 'animate-spin')} />
+              重新检测配置
+            </button>
+          )}
+        </div>
         {messages.length === 0 ? (
           <div className="grid gap-2 lg:grid-cols-3">
             {AGENT_STARTERS.map((starter, index) => (
@@ -772,6 +888,31 @@ function toolLabel(tool: string) {
   return labels[tool] ?? tool
 }
 
+function missingOpenAIKeyMessage() {
+  return '生产后端没有读取到 OPENAI_API_KEY。请把密钥添加到 Railway 目标 Service 的 Production Variables（不要放进 VITE_* 或浏览器变量），保存后重新部署，再点击“重新检测配置”。'
+}
+
+function agentErrorMessage(error: unknown) {
+  if (!(error instanceof ApiRequestError)) {
+    return 'GPT 销售代理暂时无法执行，请稍后重试。'
+  }
+  if (error.code === 'OPENAI_NOT_CONFIGURED') {
+    return missingOpenAIKeyMessage()
+  }
+  if (error.code === 'UNSUPPORTED_OPENAI_MODEL') {
+    return '所选模型没有被当前后端启用，请换用模型列表中的其他模型。'
+  }
+  if (error.code === 'OPENAI_RESPONSES_ERROR') {
+    if (/model|access|permission|not exist|not found/i.test(error.message)) {
+      return `后端已读取到 API Key，但当前账号没有所选模型权限。请换一个模型或在 OpenAI 项目中开通权限。OpenAI 返回：${error.message}`
+    }
+    if (/api.?key|auth|unauthor|invalid.*key/i.test(error.message)) {
+      return `后端已读取到 API Key，但 OpenAI 拒绝了认证。请检查密钥所属项目、状态与额度。OpenAI 返回：${error.message}`
+    }
+  }
+  return error.message
+}
+
 function AssistantStartState({
   sessions,
   loading,
@@ -797,7 +938,7 @@ function AssistantStartState({
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {sessions.slice(0, 6).map((session) => (
               <button key={session.id} type="button" onClick={() => onSelect(session.id)} className="flex items-center gap-3 rounded-2xl border border-ink-200 p-3 text-left transition hover:border-brand-300 hover:bg-brand-50/35">
-                <Avatar initials={session.initials} size="sm" />
+                <Avatar initials={session.initials} src={session.avatarUrl} alt={session.customerName} size="sm" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-ink-900">{session.customerName}</span>
                   <span className="mt-0.5 block truncate text-xs text-ink-500">{audienceLabel(session.audienceType)} · 综合 {sessionScore(session).overall}</span>
@@ -817,7 +958,7 @@ function AudienceHeader({ session, contact }: { session: ChatSession; contact: C
   return (
     <section className="workspace-panel flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-4">
-        <Avatar initials={session.initials} size="lg" />
+        <Avatar initials={session.initials} src={session.avatarUrl} alt={session.customerName} size="lg" />
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-ink-900">{contact?.name !== 'Unknown' ? contact?.name : session.customerName}</h2>

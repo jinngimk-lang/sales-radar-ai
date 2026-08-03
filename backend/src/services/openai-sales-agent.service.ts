@@ -12,6 +12,7 @@ export interface SalesAgentRunInput {
   leadId?: string
   history?: SalesAgentHistoryMessage[]
   userId?: string
+  model?: string
 }
 
 export interface SalesAgentAction {
@@ -41,6 +42,30 @@ export interface OpenAISalesAgentConfig {
   timeoutMs: number
   maxToolRounds: number
 }
+
+export interface SalesAgentModelOption {
+  id: string
+  label: string
+  description: string
+}
+
+export const SALES_AGENT_MODEL_OPTIONS: readonly SalesAgentModelOption[] = [
+  {
+    id: 'gpt-5.6-sol',
+    label: 'GPT-5.6 Sol',
+    description: '复杂寻客、研究与多步销售编排，质量优先',
+  },
+  {
+    id: 'gpt-5.6-terra',
+    label: 'GPT-5.6 Terra',
+    description: '日常研究与话术生成，速度和成本更均衡',
+  },
+  {
+    id: 'gpt-5.6-luna',
+    label: 'GPT-5.6 Luna',
+    description: '快速筛选、联系人整理与高频轻量任务',
+  },
+] as const
 
 export function readOpenAISalesAgentConfig(
   environment: NodeJS.ProcessEnv = process.env,
@@ -78,6 +103,42 @@ export function readOpenAISalesAgentConfig(
       10,
     ),
   }
+}
+
+export function listSalesAgentModelOptions(
+  config: OpenAISalesAgentConfig = readOpenAISalesAgentConfig(),
+): SalesAgentModelOption[] {
+  const configuredModel = config.model.trim()
+  const options = [...SALES_AGENT_MODEL_OPTIONS]
+  if (
+    configuredModel &&
+    !options.some((option) => option.id === configuredModel)
+  ) {
+    options.unshift({
+      id: configuredModel,
+      label: configuredModel,
+      description: 'Railway 后端当前配置的自定义 OpenAI 模型',
+    })
+  }
+  return options
+}
+
+export function resolveSalesAgentModel(
+  requestedModel: string | undefined,
+  config: OpenAISalesAgentConfig,
+): string {
+  const requested = requestedModel?.trim()
+  if (!requested) return config.model
+  if (
+    !listSalesAgentModelOptions(config).some((option) => option.id === requested)
+  ) {
+    throw new AppError(
+      400,
+      'UNSUPPORTED_OPENAI_MODEL',
+      'The requested model is not enabled for this Sales Agent.',
+    )
+  }
+  return requested
 }
 
 interface OpenAIResponseItem {
@@ -335,6 +396,8 @@ export class OpenAISalesAgentService {
       )
     }
 
+    const selectedModel = resolveSalesAgentModel(input.model, this.config)
+
     const traceId = `tr_${crypto.randomUUID()}`
     const actions: SalesAgentAction[] = []
     const leadIds = new Set<string>()
@@ -353,10 +416,10 @@ export class OpenAISalesAgentService {
       },
     ]
 
-    let model = this.config.model
+    let model = selectedModel
     for (let round = 0; round <= this.config.maxToolRounds; round += 1) {
       const response = await this.client.create({
-        model: this.config.model,
+        model: selectedModel,
         store: false,
         include: ['reasoning.encrypted_content'],
         reasoning: { effort: this.config.reasoningEffort },

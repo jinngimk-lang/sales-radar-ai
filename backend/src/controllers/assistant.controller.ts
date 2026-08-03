@@ -73,6 +73,10 @@ export const runSalesAgentController: RequestHandler = async (
 
   const result = await openAISalesAgent.run({
     message,
+    model:
+      typeof request.body?.model === 'string' && request.body.model.trim()
+        ? request.body.model.trim().slice(0, 100)
+        : undefined,
     leadId:
       typeof request.body?.leadId === 'string' && request.body.leadId.trim()
         ? request.body.leadId.trim()
