@@ -870,6 +870,48 @@ export interface MarketSignal {
   updatedAt: string
 }
 
+export type MarketResearchSourceType =
+  | 'company'
+  | 'news'
+  | 'jobs'
+  | 'investment'
+  | 'industry'
+  | 'other'
+
+export interface MarketResearchSource {
+  id: string
+  url: string
+  title: string
+  summary: string | null
+  hostname: string
+  sourceType: MarketResearchSourceType
+  status: 'consulted' | 'cited'
+  accessedAt: string
+}
+
+export interface MarketResearchTraceStep {
+  id: string
+  action: 'search' | 'open_page' | 'find_in_page'
+  label: string
+  query: string | null
+  url: string | null
+  status: 'completed'
+}
+
+export interface MarketResearchSession {
+  id: string
+  status: 'completed' | 'no_results'
+  provider: 'openai-web' | 'qwen-web'
+  model: string
+  startedAt: string
+  completedAt: string
+  summary: string
+  queries: string[]
+  sources: MarketResearchSource[]
+  trace: MarketResearchTraceStep[]
+  signals: MarketSignal[]
+}
+
 export interface SearchExecutionResult {
   taskId: string
   status: 'success' | 'empty'
@@ -910,10 +952,64 @@ export interface ChatMessage {
 export interface ChatSession {
   id: string
   customerName: string
+  displayName: string
+  company: string | null
   initials: string
   platform: Platform
+  jobTitle: string | null
+  sourceUrl: string
+  profileUrl: string
+  postContent: string
+  contacts: ContactProfile[]
+  communicationProfile: {
+    language: 'zh' | 'en' | 'mixed' | 'unknown'
+    tone: 'concise' | 'detailed' | 'technical' | 'conversational'
+    preferredPlatform: string
+    observedTopics: string[]
+    evidenceExcerpt: string
+    basis: string
+  }
   lastMessage: string
   updatedAt: string
+}
+
+export interface OutreachGeneration {
+  provider: string
+  generatedAt: string
+  context: {
+    role: string
+    stage: string
+    angle: string
+    priority: 'A' | 'B' | 'C'
+  }
+  content: {
+    email: {
+      subjectOptions: string[]
+      opening: string
+      body: string
+      cta: string
+    }
+    linkedin: {
+      connectionMessage: string
+      firstMessage: string
+    }
+    whatsapp: { message: string }
+    callScript: { opening: string; questions: string[] }
+    observationAdvice?: string
+  }
+}
+
+export interface RuntimeCapability {
+  enabled: boolean
+  provider: string | null
+  model: string | null
+}
+
+export interface RuntimeCapabilities {
+  marketResearch: RuntimeCapability
+  salesAI: RuntimeCapability
+  publicContactDiscovery: RuntimeCapability
+  salesDiscovery: RuntimeCapability
 }
 
 /** 平台元数据（颜色 / 图标 key） */

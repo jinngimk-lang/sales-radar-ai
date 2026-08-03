@@ -14,6 +14,7 @@ import type { Request, Response } from 'express'
 import { createListAssistantLeadsController } from '../src/controllers/assistant.controller.js'
 import {
   AssistantLeadService,
+  deriveCommunicationProfile,
   type AssistantLeadCandidate,
   type AssistantLeadRepository,
 } from '../src/services/assistant-lead.service.js'
@@ -65,6 +66,7 @@ function candidate(
     createdAt: new Date(),
     updatedAt: new Date(),
     analyses: [],
+    contacts: [],
     searchTaskLinks: [
       {
         id: 'link-1',
@@ -101,6 +103,20 @@ function harness(records: AssistantLeadCandidate[], userId = 'user-1') {
 }
 
 describe('Assistant production trust boundary', () => {
+  it('exposes a communication profile based only on public source content', () => {
+    const profile = deriveCommunicationProfile({
+      postContent:
+        'Looking for an ERP API integration that can reduce manufacturing downtime.',
+      platform: 'LinkedIn',
+      interestTags: ['ERP', 'API', 'manufacturing'],
+    })
+
+    assert.equal(profile.language, 'en')
+    assert.equal(profile.tone, 'technical')
+    assert.equal(profile.basis, 'Observed public source content')
+    assert.deepEqual(profile.observedTopics, ['ERP', 'API', 'manufacturing'])
+  })
+
   it('returns a fully qualified, user-owned Lead', async () => {
     const test = harness([candidate()])
     const result = await test.service.listQualifiedLeads()

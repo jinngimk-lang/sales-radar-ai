@@ -52,7 +52,8 @@ export class AIProviderFactory {
   resolve(taskType?: AITaskType): AIProvider {
     if (
       taskType !== AITaskType.PRODUCT_UNDERSTANDING &&
-      taskType !== AITaskType.LEAD_RESEARCH
+      taskType !== AITaskType.LEAD_RESEARCH &&
+      taskType !== AITaskType.OUTREACH_GENERATION
     ) {
       return this.fallback
     }

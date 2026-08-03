@@ -8,7 +8,7 @@ const FOOTER_LINKS = [
       { label: '销售机会', href: '/app/discover' },
       { label: 'AI 销售助手', href: '/app/assistant' },
       { label: '市场机会中心', href: '/app/dashboard' },
-      { label: '我的工作区', href: '/app/account' },
+      { label: '账户与设置', href: '/app/account' },
     ],
   },
   {
@@ -35,7 +35,7 @@ const FOOTER_LINKS = [
       { label: '产品定位', href: '/#features' },
       { label: '真实来源原则', href: '/#features' },
       { label: '市场机会中心', href: '/app/dashboard' },
-      { label: '销售工作区', href: '/app/account' },
+      { label: '账户与设置', href: '/app/account' },
     ],
   },
 ]

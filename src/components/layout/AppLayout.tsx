@@ -4,7 +4,7 @@ import {
   BriefcaseBusiness,
   MessageCircleMore,
   ChartNoAxesCombined,
-  FolderHeart,
+  CircleUserRound,
   Settings2,
   Sparkles,
 } from 'lucide-react'
@@ -32,14 +32,12 @@ const WORKSPACE_ITEMS = [
   },
 ]
 
-const PERSONAL_ITEMS = [
-  {
-    to: '/app/account',
-    label: '我的工作区',
-    icon: FolderHeart,
-    desc: '收藏、历史记录与设置',
-  },
-]
+const ACCOUNT_ITEM = {
+  to: '/app/account',
+  label: '账户与设置',
+  icon: CircleUserRound,
+  desc: '账户、AI 与数据源状态',
+}
 
 /** 工作台主布局：左侧导航 + 顶部 + 内容区 */
 export function AppLayout() {
@@ -77,11 +75,6 @@ export function AppLayout() {
 
         <nav className="flex-1 overflow-y-auto px-4 py-7 scrollbar-thin">
           <NavSection label="Workspace" items={WORKSPACE_ITEMS} />
-          <NavSection
-            label="Personal"
-            items={PERSONAL_ITEMS}
-            className="mt-8 border-t border-white/10 pt-6"
-          />
         </nav>
 
         <div className="mx-4 mb-4 rounded-xl border border-white/10 bg-white/[0.055] p-3.5">
@@ -102,11 +95,11 @@ export function AppLayout() {
             className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/[0.06]"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.07] text-sky-300">
-              <FolderHeart className="h-4 w-4" />
+              <CircleUserRound className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white/85">我的工作区</p>
-              <p className="truncate text-xs text-white/40">收藏、历史与设置</p>
+              <p className="truncate text-sm font-semibold text-white/85">账户与设置</p>
+              <p className="truncate text-xs text-white/40">AI、数据源与工作区</p>
             </div>
             <Settings2 className="h-4 w-4 text-white/30" />
           </Link>
@@ -121,7 +114,7 @@ export function AppLayout() {
             <Logo variant="light" />
           </Link>
           <div className="flex items-center gap-1">
-            {[...WORKSPACE_ITEMS, ...PERSONAL_ITEMS].map((item) => (
+            {[...WORKSPACE_ITEMS, ACCOUNT_ITEM].map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}

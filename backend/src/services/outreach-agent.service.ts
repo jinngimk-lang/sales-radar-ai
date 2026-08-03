@@ -39,9 +39,17 @@ export interface OutreachGeneration {
   content: OutreachContent
 }
 
+export interface OutreachPreferences {
+  objective?: string
+  language?: 'auto' | 'zh' | 'en'
+  tone?: 'mirror' | 'formal' | 'concise' | 'consultative'
+}
+
 export class OutreachAgentService {
   constructor(
-    private readonly provider: AIProvider = aiProviderFactory.resolve(),
+    private readonly provider: AIProvider = aiProviderFactory.resolve(
+      AITaskType.OUTREACH_GENERATION,
+    ),
     private readonly fallbackProvider: AIProvider =
       aiProviderFactory.getFallback(),
     private readonly promptService: PromptTemplateService = promptTemplates,
@@ -51,6 +59,7 @@ export class OutreachAgentService {
     leadId: string,
     contactId?: string,
     outreachType: 'buyer' | 'channel' = 'buyer',
+    preferences: OutreachPreferences = {},
   ): Promise<OutreachGeneration> {
     const lead = await prisma.lead.findUnique({ where: { id: leadId } })
     if (!lead) throw new AppError(404, 'LEAD_NOT_FOUND', 'Lead not found')
@@ -84,7 +93,7 @@ export class OutreachAgentService {
       )
     }
     const context = {
-      ...this.buildContext(lead, research, contact),
+      ...this.buildContext(lead, research, contact, preferences),
       outreachType,
       channelProfile: channel
         ? {
@@ -139,7 +148,13 @@ export class OutreachAgentService {
       .catch(() => null)
     const prompt =
       template?.template ??
-      'Generate structured B2B outreach using only verified context. Return JSON matching the requested outreach schema.'
+      [
+        'Generate structured B2B outreach using only verified context.',
+        'Mirror the observed language, tone, platform norms and content habits when communicationStyle is available.',
+        'Use the requested objective, language and tone preferences, but never invent facts, relationships, private data or prior conversations.',
+        'Keep messages specific, respectful and easy to decline. Do not claim that the recipient was monitored.',
+        'Return JSON matching the requested outreach schema.',
+      ].join(' ')
     const request = {
       taskType: AITaskType.OUTREACH_GENERATION,
       prompt,
@@ -190,6 +205,10 @@ export class OutreachAgentService {
       jobTitle: string | null
       country: string
       postContent: string
+      platform: string
+      interestTags: string[]
+      sourceUrl: string
+      profileUrl: string
     },
     research: IntelligenceResearch,
     contact?: {
@@ -197,6 +216,7 @@ export class OutreachAgentService {
       jobTitle: string
       company: string
     } | null,
+    preferences: OutreachPreferences = {},
   ): OutreachContext {
     const profile = this.record(research.companyProfile)
     const salesAngle = this.record(research.salesAngle)
@@ -235,6 +255,16 @@ export class OutreachAgentService {
       painPoint: this.string(salesAngle.painPoint) ?? painPoints[0] ?? 'Unknown',
       valueProposition:
         this.string(salesAngle.valueProposition) ?? 'Unknown',
+      communicationStyle: deriveCommunicationStyle({
+        postContent: lead.postContent,
+        platform: lead.platform,
+        interestTags: lead.interestTags,
+      }),
+      preferences,
+      sourceContext: {
+        sourceUrl: lead.sourceUrl,
+        profileUrl: lead.profileUrl,
+      },
     }
   }
 
@@ -357,6 +387,43 @@ export class OutreachAgentService {
             typeof item === 'string' && Boolean(item.trim()),
         )
       : []
+  }
+}
+
+export function deriveCommunicationStyle(lead: {
+  postContent: string
+  platform: string
+  interestTags: string[]
+}): NonNullable<OutreachContext['communicationStyle']> {
+  const content = lead.postContent.replace(/\s+/g, ' ').trim()
+  const hasChinese = /[\u3400-\u9fff]/.test(content)
+  const hasEnglish = /[A-Za-z]{3,}/.test(content)
+  const language = hasChinese && hasEnglish
+    ? 'mixed'
+    : hasChinese
+      ? 'zh'
+      : hasEnglish
+        ? 'en'
+        : 'unknown'
+  const technical =
+    /\b(api|saas|erp|mes|automation|engineering|technical|specification|integration)\b|技术|参数|自动化|系统集成/i.test(
+      content,
+    )
+  const tone = technical
+    ? 'technical'
+    : content.length <= 280
+      ? 'concise'
+      : content.length >= 900
+        ? 'detailed'
+        : 'conversational'
+
+  return {
+    language,
+    tone,
+    preferredPlatform: lead.platform,
+    observedTopics: lead.interestTags.slice(0, 8),
+    evidenceExcerpt:
+      content.length <= 360 ? content : `${content.slice(0, 359).trimEnd()}…`,
   }
 }
 

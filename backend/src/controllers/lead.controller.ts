@@ -211,12 +211,28 @@ export const generateOutreachController: RequestHandler = async (
       : undefined
   const outreachType =
     request.body?.outreachType === 'channel' ? 'channel' : 'buyer'
+  const objective = readOptionalText(request.body?.objective, 300)
+  const language = ['auto', 'zh', 'en'].includes(request.body?.language)
+    ? request.body.language
+    : 'auto'
+  const tone = ['mirror', 'formal', 'concise', 'consultative'].includes(
+    request.body?.tone,
+  )
+    ? request.body.tone
+    : 'mirror'
   const generation = await outreachAgent.generate(
     request.params.id,
     contactId,
     outreachType,
+    { objective, language, tone },
   )
   response.status(201).json({ data: generation })
+}
+
+function readOptionalText(value: unknown, maxLength: number) {
+  return typeof value === 'string' && value.trim()
+    ? value.trim().slice(0, maxLength)
+    : undefined
 }
 
 export const listOutreachHistoryController: RequestHandler = async (

@@ -38,6 +38,10 @@ const assistantLeadInclude = Prisma.validator<Prisma.LeadInclude>()({
       },
     },
   },
+  contacts: {
+    orderBy: [{ priorityRank: 'asc' }, { confidence: 'desc' }],
+    take: 12,
+  },
 })
 
 export type AssistantLeadCandidate = Prisma.LeadGetPayload<{
@@ -104,6 +108,7 @@ export class AssistantLeadService {
       .map(({ analyses, searchTaskLinks: _links, ...lead }) => ({
         ...lead,
         analysis: analyses[0] ?? null,
+        communicationProfile: deriveCommunicationProfile(lead),
       }))
   }
 
@@ -190,6 +195,44 @@ export class AssistantLeadService {
       !Array.isArray(value) &&
       Object.keys(value).length > 0
     )
+  }
+}
+
+export function deriveCommunicationProfile(lead: {
+  postContent: string
+  platform: string
+  interestTags: string[]
+}) {
+  const content = lead.postContent.replace(/\s+/g, ' ').trim()
+  const hasChinese = /[\u3400-\u9fff]/.test(content)
+  const hasEnglish = /[A-Za-z]{3,}/.test(content)
+  const language = hasChinese && hasEnglish
+    ? 'mixed'
+    : hasChinese
+      ? 'zh'
+      : hasEnglish
+        ? 'en'
+        : 'unknown'
+  const technical =
+    /\b(api|saas|erp|mes|automation|engineering|technical|specification|integration)\b|技术|参数|自动化|系统集成/i.test(
+      content,
+    )
+  const tone = technical
+    ? 'technical'
+    : content.length <= 280
+      ? 'concise'
+      : content.length >= 900
+        ? 'detailed'
+        : 'conversational'
+
+  return {
+    language,
+    tone,
+    preferredPlatform: lead.platform,
+    observedTopics: lead.interestTags.slice(0, 8),
+    evidenceExcerpt:
+      content.length <= 360 ? content : `${content.slice(0, 359).trimEnd()}…`,
+    basis: 'Observed public source content',
   }
 }
 
