@@ -95,7 +95,7 @@ describe('Real AI Provider Integration v1', () => {
     )
     assert.equal(
       factory.resolve(AITaskType.OUTREACH_GENERATION).name,
-      'rule-based',
+      'qwen',
     )
   })
 

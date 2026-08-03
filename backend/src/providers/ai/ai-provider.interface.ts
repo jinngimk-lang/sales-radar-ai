@@ -42,6 +42,22 @@ export interface OutreachContext {
   }>
   painPoint: string
   valueProposition: string
+  communicationStyle?: {
+    language: 'zh' | 'en' | 'mixed' | 'unknown'
+    tone: 'concise' | 'detailed' | 'technical' | 'conversational'
+    preferredPlatform: string
+    observedTopics: string[]
+    evidenceExcerpt: string
+  }
+  preferences?: {
+    objective?: string
+    language?: 'auto' | 'zh' | 'en'
+    tone?: 'mirror' | 'formal' | 'concise' | 'consultative'
+  }
+  sourceContext?: {
+    sourceUrl: string
+    profileUrl: string
+  }
 }
 
 export interface OutreachContent {

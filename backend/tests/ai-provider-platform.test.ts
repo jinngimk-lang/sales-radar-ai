@@ -10,7 +10,10 @@ import type {
 import { AITaskType } from '../src/providers/ai-platform/ai-task-type.js'
 import { RuleBasedAIProvider } from '../src/providers/ai-platform/rule-based-ai.provider.js'
 import { AIResponseParser } from '../src/services/ai-response-parser.service.js'
-import { OutreachAgentService } from '../src/services/outreach-agent.service.js'
+import {
+  OutreachAgentService,
+  deriveCommunicationStyle,
+} from '../src/services/outreach-agent.service.js'
 import {
   PromptTemplateService,
   type PromptTemplateRepository,
@@ -82,7 +85,26 @@ describe('AI Provider Platform v1', () => {
       factory.resolve(AITaskType.PRODUCT_UNDERSTANDING),
       deepSeek,
     )
+    assert.equal(
+      factory.resolve(AITaskType.OUTREACH_GENERATION),
+      deepSeek,
+    )
     assert.equal(factory.getConfig().model, 'deepseek-chat')
+  })
+
+  it('derives language, tone and evidence from observed public content', () => {
+    const style = deriveCommunicationStyle({
+      postContent:
+        '我们正在评估 MES API 与自动化系统集成方案，重点关注技术参数和交付可靠性。',
+      platform: 'LinkedIn',
+      interestTags: ['MES', '自动化', '系统集成'],
+    })
+
+    assert.equal(style.language, 'mixed')
+    assert.equal(style.tone, 'technical')
+    assert.equal(style.preferredPlatform, 'LinkedIn')
+    assert.deepEqual(style.observedTopics, ['MES', '自动化', '系统集成'])
+    assert.match(style.evidenceExcerpt, /交付可靠性/)
   })
 
   it('returns a safe fallback for illegal JSON and missing fields', () => {

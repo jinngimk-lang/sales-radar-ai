@@ -54,6 +54,9 @@ import type {
   ResearchTrace,
   ResearchTraceDetails,
   MarketSignal,
+  MarketResearchSession,
+  OutreachGeneration,
+  RuntimeCapabilities,
   RadarAssessment,
 } from '@/types'
 import {
@@ -123,6 +126,8 @@ interface BackendLead {
   updatedAt: string
   sourceMetadata: Record<string, unknown> | null
   analysis: BackendAnalysis | null
+  contacts?: ContactProfile[]
+  communicationProfile?: ChatSession['communicationProfile']
 }
 
 interface BackendSearchTask {
@@ -139,35 +144,6 @@ interface CreateSearchTaskResponse {
   strategy: SearchStrategy
   productContext: ProductContextSnapshot
   searchIntent: SearchIntentSnapshot
-}
-
-interface BackendOutreachGeneration {
-  provider: string
-  generatedAt: string
-  context: {
-    role: string
-    stage: string
-    angle: string
-    priority: 'A' | 'B' | 'C'
-  }
-  content: {
-    email: {
-      subjectOptions: string[]
-      opening: string
-      body: string
-      cta: string
-    }
-    linkedin: {
-      connectionMessage: string
-      firstMessage: string
-    }
-    whatsapp: { message: string }
-    callScript: {
-      opening: string
-      questions: string[]
-    }
-    observationAdvice?: string
-  }
 }
 
 interface ApiErrorBody {
@@ -596,6 +572,31 @@ export async function getMarketSignals(): Promise<MarketSignal[]> {
   return response.data
 }
 
+export async function runMarketResearch(input: {
+  product: string
+  industry?: string
+  region?: string
+  customerType?: string
+  signalFocus?: string
+}): Promise<MarketResearchSession> {
+  const response = await request<ApiEnvelope<MarketResearchSession>>(
+    '/market-signals/scan',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  )
+  return response.data
+}
+
+export async function getRuntimeCapabilities(): Promise<RuntimeCapabilities> {
+  const response = await request<ApiEnvelope<RuntimeCapabilities>>(
+    '/health/capabilities',
+    { cache: 'no-store' },
+  )
+  return response.data
+}
+
 /**
  * 获取真实 Lead 详情并转换成前端 Customer。
  */
@@ -785,8 +786,23 @@ export async function getChatSessions(): Promise<ChatSession[]> {
   return response.data.map((lead) => ({
     id: lead.id,
     customerName: lead.company ?? lead.displayName,
+    displayName: lead.displayName,
+    company: lead.company,
     initials: lead.initials,
     platform: lead.platform,
+    jobTitle: lead.jobTitle,
+    sourceUrl: lead.sourceUrl,
+    profileUrl: lead.profileUrl,
+    postContent: lead.postContent,
+    contacts: lead.contacts ?? [],
+    communicationProfile: lead.communicationProfile ?? {
+      language: 'unknown',
+      tone: 'conversational',
+      preferredPlatform: lead.platform,
+      observedTopics: lead.interestTags,
+      evidenceExcerpt: lead.postContent.slice(0, 360),
+      basis: 'Observed public source content',
+    },
     lastMessage:
       lead.analysis?.suggestion ?? '查看证据、匹配原因与销售建议',
     updatedAt: formatRelativeTime(lead.updatedAt),
@@ -857,7 +873,7 @@ export async function generateOutreach(
   contactId?: string,
   outreachType: 'buyer' | 'channel' = 'buyer',
 ): Promise<string> {
-  const generated = await request<ApiEnvelope<BackendOutreachGeneration>>(
+  const generated = await request<ApiEnvelope<OutreachGeneration>>(
     `/leads/${customerId}/outreach`,
     {
       method: 'POST',
@@ -946,6 +962,32 @@ export async function generateOutreach(
   */
 }
 
+export async function generateOutreachBundle(
+  customerId: string,
+  input: {
+    contactId?: string
+    outreachType?: 'buyer' | 'channel'
+    objective?: string
+    language?: 'auto' | 'zh' | 'en'
+    tone?: 'mirror' | 'formal' | 'concise' | 'consultative'
+  } = {},
+): Promise<OutreachGeneration> {
+  const response = await request<ApiEnvelope<OutreachGeneration>>(
+    `/leads/${customerId}/outreach`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        contactId: input.contactId,
+        outreachType: input.outreachType ?? 'buyer',
+        objective: input.objective,
+        language: input.language ?? 'auto',
+        tone: input.tone ?? 'mirror',
+      }),
+    },
+  )
+  return response.data
+}
+
 /**
  * 生成跟进计划（多步骤、多渠道）
  * 未来替换为：POST ${API_BASE_URL}/ai/generate-follow-up-plan
@@ -954,7 +996,7 @@ export async function generateFollowUpPlan(
   customerId: string,
   contactId?: string,
 ): Promise<FollowUpStep[]> {
-  const generated = await request<ApiEnvelope<BackendOutreachGeneration>>(
+  const generated = await request<ApiEnvelope<OutreachGeneration>>(
     `/leads/${customerId}/outreach`,
     {
       method: 'POST',

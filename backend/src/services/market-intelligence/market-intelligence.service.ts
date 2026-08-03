@@ -3,6 +3,7 @@ import { prisma } from '../../prisma/client.js'
 import type { SearchResult } from '../../providers/search/search-provider.interface.js'
 import { AgentReachMarketSourceAdapter } from './agentreach.adapter.js'
 import { ExaMarketSourceAdapter } from './exa.adapter.js'
+import { HostedWebMarketSourceAdapter } from './hosted-web.adapter.js'
 import type {
   MarketSignalCandidate,
   MarketSourceAdapter,
@@ -78,6 +79,7 @@ export class MarketIntelligenceService {
     private readonly adapters: MarketSourceAdapter[] = [
       new AgentReachMarketSourceAdapter(),
       new ExaMarketSourceAdapter(),
+      new HostedWebMarketSourceAdapter(),
     ],
   ) {}
 
