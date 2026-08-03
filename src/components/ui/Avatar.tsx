@@ -1,7 +1,11 @@
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 interface AvatarProps {
   initials: string
+  /** 真实公开头像 URL，加载失败时自动回退到首字母。 */
+  src?: string | null
+  alt?: string
   /** 背景色，默认品牌蓝 */
   color?: string
   size?: 'sm' | 'md' | 'lg'
@@ -14,12 +18,27 @@ const sizeMap = {
   lg: 'w-14 h-14 text-base',
 }
 
-/** 头像组件，使用首字母 + 渐变色作为占位 */
-export function Avatar({ initials, color, size = 'md', className }: AvatarProps) {
+/** 优先展示来源返回的真实头像，缺失或失效时使用首字母占位。 */
+export function Avatar({
+  initials,
+  src,
+  alt,
+  color,
+  size = 'md',
+  className,
+}: AvatarProps) {
+  const [imageFailed, setImageFailed] = useState(false)
+
+  useEffect(() => {
+    setImageFailed(false)
+  }, [src])
+
+  const showImage = Boolean(src && !imageFailed)
+
   return (
     <div
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white',
+        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold text-white',
         sizeMap[size],
         className,
       )}
@@ -29,7 +48,18 @@ export function Avatar({ initials, color, size = 'md', className }: AvatarProps)
           : { background: 'linear-gradient(135deg, #3563f0 0%, #2046d8 100%)' }
       }
     >
-      {initials}
+      {showImage ? (
+        <img
+          src={src ?? undefined}
+          alt={alt || initials}
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        initials
+      )}
     </div>
   )
 }
