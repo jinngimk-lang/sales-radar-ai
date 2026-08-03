@@ -99,4 +99,54 @@ describe('OpenAI sales agent', () => {
         error instanceof Error && /OPENAI_API_KEY/.test(error.message),
     )
   })
+
+  it('uses a server-approved model selected by the customer', async () => {
+    const requests: Array<Record<string, unknown>> = []
+    const service = new OpenAISalesAgentService(
+      {
+        apiKey: 'test-key',
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-5.6-sol',
+        reasoningEffort: 'medium',
+        timeoutMs: 1_000,
+        maxToolRounds: 3,
+      },
+      {
+        async create(request) {
+          requests.push(request)
+          return { model: 'gpt-5.6-luna', output_text: '完成', output: [] }
+        },
+      },
+      { execute: async () => ({}) },
+    )
+
+    const result = await service.run({
+      message: '快速筛选现有客户',
+      model: 'gpt-5.6-luna',
+    })
+
+    assert.equal(requests[0]?.model, 'gpt-5.6-luna')
+    assert.equal(result.model, 'gpt-5.6-luna')
+  })
+
+  it('rejects arbitrary client model ids', async () => {
+    const service = new OpenAISalesAgentService(
+      {
+        apiKey: 'test-key',
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-5.6-sol',
+        reasoningEffort: 'medium',
+        timeoutMs: 1_000,
+        maxToolRounds: 3,
+      },
+      { create: async () => ({ output: [] }) },
+      { execute: async () => ({}) },
+    )
+
+    await assert.rejects(
+      service.run({ message: '寻找客户', model: 'arbitrary-model' }),
+      (error: unknown) =>
+        error instanceof Error && /not enabled/.test(error.message),
+    )
+  })
 })
