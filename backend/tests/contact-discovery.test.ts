@@ -7,6 +7,7 @@ import {
 
 const baseLead = {
   company: 'Acme Manufacturing',
+  normalizedDomain: null,
   jobTitle: null,
   platform: 'LinkedIn',
   sourceUrl: 'https://example.com/source',
@@ -81,5 +82,60 @@ describe('Contact Discovery Agent v1', () => {
     assert.deepEqual(first, existing)
     assert.deepEqual(second, existing)
     assert.equal(created, 0)
+  })
+
+  it('refreshes from observed company website fields without guessing', async () => {
+    let saved: Array<{ email: string; phone: string; evidence: unknown[] }> = []
+    const repository: ContactDiscoveryRepository = {
+      findContacts: async () => [],
+      findLead: async () => ({
+        ...baseLead,
+        normalizedDomain: 'acme.example.org',
+      }),
+      createContacts: async (_leadId, contacts) => {
+        saved = contacts
+        return contacts
+      },
+    }
+    const publicDiscovery = {
+      discover: async () => ({
+        status: 'COMPLETED' as const,
+        seedUrl: 'https://acme.example.org',
+        pagesVisited: ['https://acme.example.org/contact'],
+        organization: null,
+        contacts: [
+          {
+            name: 'Alex Morgan',
+            jobTitle: 'Procurement Director',
+            company: 'Acme Manufacturing',
+            emails: ['alex@acme.example.org'],
+            phones: ['+12125550100'],
+            socialProfiles: ['https://linkedin.com/in/alex-morgan'],
+            evidence: [
+              {
+                field: 'email' as const,
+                value: 'alex@acme.example.org',
+                sourceUrl: 'https://acme.example.org/contact',
+                extractionMethod: 'mailto' as const,
+                verificationStatus: 'OBSERVED' as const,
+                observedAt: '2026-08-03T00:00:00.000Z',
+              },
+            ],
+          },
+        ],
+        relatedBusinesses: [],
+        errors: [],
+      }),
+    }
+    const discovery = new ContactDiscoveryService(repository, publicDiscovery)
+
+    await discovery.discover('lead-1', true)
+
+    assert.equal(saved[0]?.email, 'alex@acme.example.org')
+    assert.equal(saved[0]?.phone, '+12125550100')
+    assert.equal(
+      (saved[0]?.evidence[0] as { sourceUrl?: string }).sourceUrl,
+      'https://acme.example.org/contact',
+    )
   })
 })

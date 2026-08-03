@@ -175,6 +175,29 @@ export type ContactRole =
   | 'technical_contact'
   | 'unknown'
 
+export interface ContactFieldEvidence {
+  field:
+    | 'name'
+    | 'jobTitle'
+    | 'company'
+    | 'email'
+    | 'phone'
+    | 'socialProfile'
+    | 'website'
+    | 'relationship'
+  value: string
+  sourceUrl: string
+  extractionMethod:
+    | 'mailto'
+    | 'tel'
+    | 'labeled_text'
+    | 'link'
+    | 'json_ld'
+    | 'provider_metadata'
+  verificationStatus: 'OBSERVED'
+  observedAt: string
+}
+
 export interface ContactProfile {
   id: string
   leadId: string
@@ -187,7 +210,7 @@ export interface ContactProfile {
   phone: string
   contactRole: ContactRole
   confidence: number
-  evidence: string[]
+  evidence: Array<string | ContactFieldEvidence>
   contactScore: number | null
   priorityRank: number | null
   recommendationReason: string | null
@@ -200,6 +223,8 @@ export type ChannelType =
   | 'reseller'
   | 'system_integrator'
   | 'trading_company'
+  | 'supplier'
+  | 'intermediary'
   | 'partner'
   | 'unknown'
 
