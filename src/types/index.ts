@@ -1014,6 +1014,30 @@ export interface OutreachGeneration {
   }
 }
 
+export interface SalesAgentHistoryMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface SalesAgentAction {
+  id: string
+  tool: string
+  status: 'completed' | 'failed'
+  summary: string
+  startedAt: string
+  completedAt: string
+}
+
+export interface SalesAgentRunResult {
+  message: string
+  actions: SalesAgentAction[]
+  leadIds: string[]
+  provider: 'openai'
+  model: string
+  traceId: string
+  requiresApproval: boolean
+}
+
 export interface RuntimeCapability {
   enabled: boolean
   provider: string | null
@@ -1023,6 +1047,7 @@ export interface RuntimeCapability {
 export interface RuntimeCapabilities {
   marketResearch: RuntimeCapability
   salesAI: RuntimeCapability
+  salesAgent?: RuntimeCapability
   publicContactDiscovery: RuntimeCapability
   salesDiscovery: RuntimeCapability
 }

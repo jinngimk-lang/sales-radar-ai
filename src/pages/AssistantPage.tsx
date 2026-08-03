@@ -26,12 +26,15 @@ import type {
   ContactProfile,
   OutreachChannel,
   OutreachGeneration,
+  SalesAgentAction,
+  SalesAgentHistoryMessage,
 } from '@/types'
 import {
   ApiRequestError,
   generateOutreachBundle,
   getChatSessions,
   discoverContacts,
+  runSalesAgent,
 } from '@/services/api'
 import { Avatar } from '@/components/ui/Avatar'
 import { PlatformIcon } from '@/components/ui/PlatformIcon'
@@ -316,9 +319,9 @@ export function AssistantPage() {
               <Bot className="h-5 w-5" />
             </div>
             <div>
-              <p className="workspace-kicker">PERSONALIZED OUTREACH</p>
-              <h1 className="mt-1 text-sm font-semibold text-ink-900">AI 销售联络助手</h1>
-              <p className="text-xs text-ink-500">依据公开内容习惯生成多渠道话术，发送前由你确认</p>
+              <p className="workspace-kicker">AGENTIC SALES EXECUTION</p>
+              <h1 className="mt-1 text-sm font-semibold text-ink-900">AI 销售执行助手</h1>
+              <p className="text-xs text-ink-500">一句话编排寻客、联系人补全、研究与个性化触达</p>
             </div>
           </div>
           <Link to="/app/discover?selectFor=assistant" className="btn-ghost text-xs">
@@ -353,6 +356,13 @@ export function AssistantPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-5 scrollbar-thin sm:px-6">
+          <div className="mx-auto mb-5 max-w-6xl">
+            <SalesAgentPanel
+              activeSession={activeSession}
+              onRefreshLeads={loadSessions}
+              onSelectLead={chooseSession}
+            />
+          </div>
           {!activeSession ? (
             <AssistantStartState
               sessions={filteredSessions}
@@ -543,6 +553,225 @@ export function AssistantPage() {
   )
 }
 
+interface AgentChatEntry extends SalesAgentHistoryMessage {
+  id: string
+  actions?: SalesAgentAction[]
+  model?: string
+  requiresApproval?: boolean
+}
+
+const AGENT_STARTERS = [
+  '帮我寻找 10 家正在扩张的工业自动化潜在客户，优先补全决策人联系方式并准备首封邮件。',
+  '从现有结果里选出最值得联系的 5 个个人或企业，说明证据、风险和下一步。',
+  '研究当前选中的对象，补充公开联系人，并按对方内容习惯生成中文和英文销售话术。',
+]
+
+function SalesAgentPanel({
+  activeSession,
+  onRefreshLeads,
+  onSelectLead,
+}: {
+  activeSession: ChatSession | null
+  onRefreshLeads: () => void
+  onSelectLead: (id: string) => void
+}) {
+  const [messages, setMessages] = useState<AgentChatEntry[]>([])
+  const [input, setInput] = useState('')
+  const [running, setRunning] = useState(false)
+  const [agentError, setAgentError] = useState<string | null>(null)
+
+  const submit = async (preset?: string) => {
+    const content = (preset ?? input).trim()
+    if (!content || running) return
+    const userMessage: AgentChatEntry = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content,
+    }
+    const history = messages.map(({ role, content: historyContent }) => ({
+      role,
+      content: historyContent,
+    }))
+    setMessages((current) => [...current, userMessage])
+    setInput('')
+    setAgentError(null)
+    setRunning(true)
+    try {
+      const result = await runSalesAgent({
+        message: content,
+        leadId: activeSession?.id,
+        history,
+      })
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: result.message,
+          actions: result.actions,
+          model: result.model,
+          requiresApproval: result.requiresApproval,
+        },
+      ])
+      if (result.actions.some((action) => action.tool === 'discover_leads')) {
+        onRefreshLeads()
+      }
+      if (result.leadIds[0]) onSelectLead(result.leadIds[0])
+    } catch (requestError) {
+      setAgentError(
+        requestError instanceof ApiRequestError
+          ? requestError.message
+          : 'GPT 销售代理暂时无法执行，请稍后重试。',
+      )
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <section className="overflow-hidden rounded-3xl border border-brand-200 bg-white shadow-card">
+      <div className="border-b border-brand-100 bg-gradient-to-r from-brand-50 via-white to-white p-5 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-sm">
+              <Bot className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="workspace-kicker">GPT SALES OPERATOR</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-[-0.025em] text-ink-900">
+                用一句话让 Agent 开始寻客和销售准备
+              </h2>
+              <p className="mt-1 max-w-3xl text-xs leading-5 text-ink-500">
+                Agent 会自行调用真实搜索、候选人列表、官网联系人补全、客户研究和多渠道话术工具，并把每一步结果展示在下方。
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold text-emerald-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            {activeSession ? `当前对象：${activeSession.customerName}` : '自主选择工具'}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-4 sm:p-5">
+        {messages.length === 0 ? (
+          <div className="grid gap-2 lg:grid-cols-3">
+            {AGENT_STARTERS.map((starter, index) => (
+              <button
+                key={starter}
+                type="button"
+                onClick={() => void submit(starter)}
+                disabled={running}
+                className="group rounded-2xl border border-ink-200 bg-ink-50/60 p-4 text-left transition hover:border-brand-300 hover:bg-brand-50/45 disabled:opacity-60"
+              >
+                <span className="text-[10px] font-semibold text-brand-700">任务 {index + 1}</span>
+                <span className="mt-2 block text-xs leading-5 text-ink-700">{starter}</span>
+                <span className="mt-3 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-700">
+                  直接执行 <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1 scrollbar-thin">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  'flex',
+                  message.role === 'user' ? 'justify-end' : 'justify-start',
+                )}
+              >
+                <div
+                  className={cn(
+                    'max-w-[92%] rounded-2xl px-4 py-3 sm:max-w-[82%]',
+                    message.role === 'user'
+                      ? 'bg-brand-600 text-white'
+                      : 'border border-ink-200 bg-ink-50 text-ink-800',
+                  )}
+                >
+                  <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
+                  {message.actions && message.actions.length > 0 && (
+                    <div className="mt-3 space-y-1.5 border-t border-ink-200/80 pt-3">
+                      {message.actions.map((action) => (
+                        <div key={action.id} className="flex items-start gap-2 text-[11px] leading-5 text-ink-600">
+                          <span className={cn(
+                            'mt-1.5 h-2 w-2 shrink-0 rounded-full',
+                            action.status === 'completed' ? 'bg-emerald-500' : 'bg-rose-500',
+                          )} />
+                          <span><strong className="font-semibold text-ink-800">{toolLabel(action.tool)}</strong> · {action.summary}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {message.role === 'assistant' && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-400">
+                      <span>{message.model}</span>
+                      {message.requiresApproval && <span>外部发送待确认</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {running && (
+              <div className="flex items-center gap-2 text-xs text-ink-500">
+                <Loader2 className="h-4 w-4 animate-spin text-brand-600" />
+                GPT 正在选择并调用销售工具，真实搜索可能需要 30–90 秒…
+              </div>
+            )}
+          </div>
+        )}
+
+        {agentError && (
+          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs leading-5 text-rose-700">
+            {agentError}
+          </div>
+        )}
+
+        <div className="mt-4 flex items-end gap-2 rounded-2xl border border-ink-200 bg-white p-2 shadow-sm focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-500/10">
+          <textarea
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                void submit()
+              }
+            }}
+            rows={2}
+            placeholder="例如：寻找新加坡 10–100 人电商公司，找到负责人联系方式，研究后生成第一轮触达方案"
+            className="min-h-[50px] flex-1 resize-none bg-transparent px-3 py-2 text-sm leading-6 text-ink-800 placeholder:text-ink-400 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={!input.trim() || running}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white transition hover:bg-brand-700 disabled:bg-ink-200"
+            aria-label="让 Agent 执行"
+          >
+            {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </button>
+        </div>
+        <p className="mt-2 text-[10px] leading-4 text-ink-400">
+          Agent 只使用真实来源字段；外部发送必须由已连接的邮箱/社交渠道返回消息 ID 后才会标记为已发送。
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function toolLabel(tool: string) {
+  const labels: Record<string, string> = {
+    discover_leads: '寻找新客户',
+    list_sales_candidates: '读取候选对象',
+    inspect_lead: '核对客户详情',
+    discover_public_contacts: '补全公开联系人',
+    research_lead: '研究客户与信号',
+    generate_outreach: '生成个性化话术',
+  }
+  return labels[tool] ?? tool
+}
+
 function AssistantStartState({
   sessions,
   loading,
@@ -552,68 +781,18 @@ function AssistantStartState({
   loading: boolean
   onSelect: (id: string) => void
 }) {
-  const steps = [
-    {
-      icon: Search,
-      number: '01',
-      title: '发现并选择对象',
-      description: '从真实公开来源选择个人、企业、供应商或中介。',
-    },
-    {
-      icon: ShieldCheck,
-      number: '02',
-      title: '核对来源与联系方式',
-      description: '确认邮箱、电话或社交主页；缺失项会明确标为待研究。',
-    },
-    {
-      icon: Sparkles,
-      number: '03',
-      title: '生成并确认话术',
-      description: 'AI 模仿公开内容习惯生成多渠道草稿，由你确认后打开对应渠道。',
-    },
-  ]
-
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <section className="rounded-3xl border border-ink-200 bg-white p-6 shadow-card sm:p-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="workspace-kicker">OUTREACH WORKFLOW</p>
-            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-ink-900">
-              从真实对象到可发送话术，三步完成
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-500">
-              左侧搜索会匹配姓名、公司、职位、邮箱和电话。选择对象后，主区域会显示来源、内容习惯、联系目标与下一步操作。
-            </p>
-          </div>
-          <Link to="/app/discover?selectFor=assistant" className="workspace-primary-action shrink-0 justify-center">
-            <Plus className="h-4 w-4" /> 选择新的销售机会
-          </Link>
-        </div>
-        <div className="mt-6 grid gap-3 md:grid-cols-3">
-          {steps.map((step) => {
-            const Icon = step.icon
-            return (
-              <div key={step.number} className="rounded-2xl border border-ink-200 bg-ink-50/55 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-700"><Icon className="h-4 w-4" /></span>
-                  <span className="text-[10px] font-semibold text-ink-300">{step.number}</span>
-                </div>
-                <h3 className="mt-4 text-sm font-semibold text-ink-900">{step.title}</h3>
-                <p className="mt-1.5 text-xs leading-5 text-ink-500">{step.description}</p>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
+    <div className="mx-auto max-w-6xl">
       {!loading && sessions.length > 0 && (
         <section className="rounded-3xl border border-ink-200 bg-white p-5 shadow-card sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-ink-900">选择一个对象开始</h2>
-              <p className="mt-1 text-xs text-ink-500">当前搜索匹配 {sessions.length} 个真实来源对象</p>
+              <h2 className="text-sm font-semibold text-ink-900">或者手动选择一个现有对象</h2>
+              <p className="mt-1 text-xs text-ink-500">当前有 {sessions.length} 个真实来源对象，可直接进入联系人与话术工作区</p>
             </div>
+            <Link to="/app/discover?selectFor=assistant" className="workspace-secondary-action shrink-0">
+              查看全部机会 <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {sessions.slice(0, 6).map((session) => (

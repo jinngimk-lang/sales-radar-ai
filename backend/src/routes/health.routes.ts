@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { readAIProviderConfig } from '../providers/ai-platform/ai-provider.factory.js'
+import { readOpenAISalesAgentConfig } from '../services/openai-sales-agent.service.js'
 import { readHostedResearchConfig } from '../services/market-intelligence/market-web-research.service.js'
 
 export const healthRouter = Router()
@@ -11,10 +12,12 @@ healthRouter.get('/', (_request, response) => {
 healthRouter.get('/capabilities', (_request, response) => {
   const market = readHostedResearchConfig()
   const sales = readAIProviderConfig()
+  const agent = readOpenAISalesAgentConfig()
   const exaEnabled = Boolean(process.env.EXA_API_KEY?.trim())
   const salesAIEnabled =
-    sales.provider === 'qwen' &&
+    ['qwen', 'openai'].includes(sales.provider) &&
     Boolean(sales.apiKey && sales.baseUrl && sales.model)
+  const salesAgentEnabled = Boolean(agent.apiKey && agent.baseUrl && agent.model)
 
   response.json({
     data: {
@@ -27,6 +30,11 @@ healthRouter.get('/capabilities', (_request, response) => {
         enabled: salesAIEnabled,
         provider: salesAIEnabled ? sales.provider : 'rule-based',
         model: salesAIEnabled ? sales.model : 'rules-v1',
+      },
+      salesAgent: {
+        enabled: salesAgentEnabled,
+        provider: salesAgentEnabled ? 'openai' : null,
+        model: salesAgentEnabled ? agent.model : null,
       },
       publicContactDiscovery: {
         enabled: true,
