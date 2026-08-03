@@ -58,6 +58,8 @@ import type {
   OutreachGeneration,
   RuntimeCapabilities,
   RadarAssessment,
+  SalesAgentHistoryMessage,
+  SalesAgentRunResult,
 } from '@/types'
 import {
   DASHBOARD_STATS,
@@ -868,6 +870,21 @@ export async function getChatSessions(): Promise<ChatSession[]> {
       lead.analysis?.suggestion ?? '查看证据、匹配原因与销售建议',
     updatedAt: formatRelativeTime(lead.updatedAt),
   }))
+}
+
+export async function runSalesAgent(input: {
+  message: string
+  leadId?: string
+  history?: SalesAgentHistoryMessage[]
+}): Promise<SalesAgentRunResult> {
+  const response = await request<ApiEnvelope<SalesAgentRunResult>>(
+    '/assistant/agent',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  )
+  return response.data
 }
 
 /**
