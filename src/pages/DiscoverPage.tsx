@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowRight,
   Building2,
@@ -31,6 +31,7 @@ import type {
   SearchStrategy,
   SalesOpportunity,
   RadarAssessment,
+  AudienceType,
 } from '@/types'
 import {
   ApiRequestError,
@@ -64,6 +65,15 @@ const DEFAULT_FILTERS: SearchFilters = {
 type SortKey = 'intent' | 'time'
 type OpportunitySortKey = 'recommended' | 'confidence' | 'latest'
 type ResultCategory = 'radar' | 'opportunities' | 'leads'
+type AudienceFilter = 'all' | AudienceType
+
+const AUDIENCE_META: Array<{ key: AudienceFilter; label: string }> = [
+  { key: 'all', label: '全部对象' },
+  { key: 'person', label: '个人联系人' },
+  { key: 'company', label: '企业客户' },
+  { key: 'supplier', label: '供应商' },
+  { key: 'intermediary', label: '中介 / 渠道' },
+]
 
 const CHANNELS: { key: OutreachChannel; label: string; icon: typeof Mail }[] = [
   { key: 'email', label: '开发信', icon: Mail },
@@ -73,7 +83,9 @@ const CHANNELS: { key: OutreachChannel; label: string; icon: typeof Mail }[] = [
 
 /** 客户搜索页面 */
 export function DiscoverPage() {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const selectingForAssistant = searchParams.get('selectFor') === 'assistant'
   const [filters, setFilters] = useState<SearchFilters>({
     ...DEFAULT_FILTERS,
     query: searchParams.get('q') || '',
@@ -91,6 +103,8 @@ export function DiscoverPage() {
   const [sortBy, setSortBy] = useState<SortKey>('intent')
   const [opportunitySort, setOpportunitySort] =
     useState<OpportunitySortKey>('recommended')
+  const [audienceFilter, setAudienceFilter] =
+    useState<AudienceFilter>('all')
   const [searchStrategy, setSearchStrategy] =
     useState<SearchStrategy | null>(null)
   const [productContext, setProductContext] =
@@ -192,7 +206,7 @@ export function DiscoverPage() {
       setCustomers(result.customers)
       setOpportunities(result.opportunities)
       setRadarAssessments(result.radarAssessments)
-      setResultCategory('radar')
+      setResultCategory(selectingForAssistant ? 'leads' : 'radar')
     } catch (error) {
       if (searchRequestIdRef.current !== searchRequestId) return
       console.error('[DiscoverPage] Search failed', error)
@@ -205,7 +219,7 @@ export function DiscoverPage() {
         setLoading(false)
       }
     }
-  }, [industryFocus, selectedProductId])
+  }, [industryFocus, selectedProductId, selectingForAssistant])
 
   useEffect(() => {
     if (initialSearchTriggeredRef.current) return
@@ -277,19 +291,31 @@ export function DiscoverPage() {
 
   // 排序
   const sortedCustomers = [...customers].sort((a, b) => {
-    const leadTypePriority = {
-      company: 0,
-      person: 1,
-      content: 2,
-      community: 3,
+    const audiencePriority: Record<AudienceType, number> = {
+      person: 0,
+      company: 1,
+      supplier: 2,
+      intermediary: 3,
     }
     const typeDifference =
-      leadTypePriority[a.leadType ?? 'content'] -
-      leadTypePriority[b.leadType ?? 'content']
+      audiencePriority[customerAudience(a)] - audiencePriority[customerAudience(b)]
     if (typeDifference !== 0) return typeDifference
     if (sortBy === 'intent') return b.analysis.intentScore - a.analysis.intentScore
     return 0 // 时间排序暂用原顺序
   })
+  const visibleCustomers =
+    audienceFilter === 'all'
+      ? sortedCustomers
+      : sortedCustomers.filter(
+          (customer) => customerAudience(customer) === audienceFilter,
+        )
+  const audienceCounts = customers.reduce<Record<AudienceType, number>>(
+    (counts, customer) => ({
+      ...counts,
+      [customerAudience(customer)]: counts[customerAudience(customer)] + 1,
+    }),
+    { person: 0, company: 0, supplier: 0, intermediary: 0 },
+  )
 
   const sortedOpportunities = [...opportunities].sort((a, b) => {
     if (opportunitySort === 'confidence') {
@@ -321,7 +347,7 @@ export function DiscoverPage() {
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-500 sm:text-base">
               告诉系统你销售什么、面向谁。我们会从真实来源中寻找企业变化，
-              并把值得研究的机会与已确认客户分开呈现。
+              并把值得研究的机会与个人、企业、供应商和中介分层呈现。
             </p>
           </div>
           <div className="hidden items-center gap-2 text-xs font-medium text-ink-500 lg:flex">
@@ -332,6 +358,26 @@ export function DiscoverPage() {
             <span className="text-brand-700">发现机会</span>
           </div>
         </header>
+
+        {selectingForAssistant && (
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-brand-900">
+                为 AI 销售助手选择联系对象
+              </p>
+              <p className="mt-1 text-xs leading-5 text-brand-800/75">
+                搜索后可从个人、企业、供应商或中介中选择。点击卡片底部“进入 AI 联络”继续生成话术。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/app/assistant')}
+              className="btn-secondary shrink-0 text-xs"
+            >
+              返回助手
+            </button>
+          </div>
+        )}
 
         <section className="overflow-hidden rounded-3xl border border-ink-200 bg-white shadow-card">
           <div className="border-b border-ink-100 px-5 py-4 sm:px-6">
@@ -538,11 +584,39 @@ export function DiscoverPage() {
                   <ResultCategoryButton
                     active={resultCategory === 'leads'}
                     icon={CheckCircle2}
-                    title={`已确认客户 ${customers.length}`}
-                    description="已通过身份、来源和相关性验证"
+                    title={`联系人与企业 ${customers.length}`}
+                    description="个人、企业、供应商与中介分层展示"
                     onClick={() => setResultCategory('leads')}
                   />
                 </div>
+
+                {resultCategory === 'leads' && customers.length > 0 && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-ink-200 bg-white p-2.5">
+                    {AUDIENCE_META.map((item) => {
+                      const count = item.key === 'all'
+                        ? customers.length
+                        : audienceCounts[item.key]
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => setAudienceFilter(item.key)}
+                          className={cn(
+                            'rounded-xl px-3 py-2 text-xs font-medium transition',
+                            audienceFilter === item.key
+                              ? 'bg-brand-600 text-white shadow-sm'
+                              : 'text-ink-600 hover:bg-ink-50 hover:text-ink-900',
+                          )}
+                        >
+                          {item.label} <span className="ml-1 opacity-70">{count}</span>
+                        </button>
+                      )
+                    })}
+                    <p className="ml-auto px-2 text-[10px] text-ink-400">
+                      不因缺少公司域名隐藏个人账号；评分用于排序，不作为展示门槛
+                    </p>
+                  </div>
+                )}
 
                 {resultCategory !== 'radar' && <div className="mt-5 flex items-center justify-between border-b border-ink-200 pb-4">
                   <p className="text-sm text-ink-600">
@@ -637,9 +711,9 @@ export function DiscoverPage() {
                           ))}
                         </div>
                       ) : resultCategory === 'leads' &&
-                        sortedCustomers.length > 0 ? (
+                        visibleCustomers.length > 0 ? (
                         <div className="grid gap-4 xl:grid-cols-2">
-                          {sortedCustomers.map((customer) => (
+                          {visibleCustomers.map((customer) => (
                             <CustomerCard
                               key={customer.id}
                               customer={customer}
@@ -806,7 +880,7 @@ function DiscoveryStartState({ hasTarget }: { hasTarget: boolean }) {
     {
       icon: Sparkles,
       title: '查看本次发现',
-      description: '销售机会与已确认客户分层展示，不混作客户事实。',
+      description: '个人、企业、供应商与中介分层展示，评分不作为隐藏门槛。',
     },
   ]
 
@@ -1069,6 +1143,14 @@ function knownValue(
   return value && value !== 'Unknown' ? value : '待确认'
 }
 
+function customerAudience(customer: Customer): AudienceType {
+  if (customer.audienceType) return customer.audienceType
+  if (customer.customerType === 'Individual' || customer.leadType === 'person') {
+    return 'person'
+  }
+  return customer.customerType === 'Agent' ? 'intermediary' : 'company'
+}
+
 function EmptyState({
   category,
   onRetry,
@@ -1084,7 +1166,7 @@ function EmptyState({
       <h3 className="mt-4 text-lg font-semibold text-ink-900">
         {category === 'opportunities'
           ? '暂时没有发现匹配机会'
-          : '暂时没有已确认客户'}
+          : '暂时没有联系人或企业结果'}
       </h3>
       {category === 'opportunities' ? (
         <div className="mt-3 max-w-sm text-left text-sm text-ink-500">
