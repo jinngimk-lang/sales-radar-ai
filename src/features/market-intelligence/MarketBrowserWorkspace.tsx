@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowUpRight,
   Building2,
@@ -8,6 +9,7 @@ import {
   Newspaper,
   Search,
   Sparkles,
+  CornerDownLeft,
 } from 'lucide-react'
 import type {
   MarketResearchSession,
@@ -36,6 +38,16 @@ const SOURCE_META: Record<
   other: { label: '其他来源', icon: Globe2 },
 }
 
+type SourceFilter = 'all' | MarketResearchSourceType
+
+const PRIMARY_SOURCE_TYPES: MarketResearchSourceType[] = [
+  'company',
+  'news',
+  'jobs',
+  'investment',
+  'industry',
+]
+
 export function MarketBrowserWorkspace({
   session,
   signal,
@@ -49,11 +61,54 @@ export function MarketBrowserWorkspace({
   status: AgentWorkspaceStatus
   onSelectSource: (id: string) => void
 }) {
+  const [activeSourceType, setActiveSourceType] =
+    useState<SourceFilter>('all')
+  const [addressInput, setAddressInput] = useState('')
+  const [addressError, setAddressError] = useState('')
+  const filteredSources = useMemo(
+    () =>
+      session?.sources.filter(
+        (source) =>
+          activeSourceType === 'all' || source.sourceType === activeSourceType,
+      ) ?? [],
+    [activeSourceType, session],
+  )
   const selectedSource =
-    session?.sources.find((source) => source.id === selectedSourceId) ??
-    session?.sources[0] ??
+    filteredSources.find((source) => source.id === selectedSourceId) ??
+    filteredSources[0] ??
     null
-  const address = selectedSource?.hostname ?? readableSource(signal?.sourceUrl)
+  const address = selectedSource?.url ?? signal?.sourceUrl ?? ''
+
+  useEffect(() => {
+    setAddressInput(address)
+    setAddressError('')
+  }, [address])
+
+  const selectSourceType = (sourceType: SourceFilter) => {
+    setActiveSourceType(sourceType)
+    const first = session?.sources.find(
+      (source) => sourceType === 'all' || source.sourceType === sourceType,
+    )
+    if (first) onSelectSource(first.id)
+  }
+
+  const submitAddress = () => {
+    const normalized = normalizeExternalAddress(addressInput)
+    if (!normalized) {
+      setAddressError('请输入有效的 http(s) 网址')
+      return
+    }
+    const matchingSource = session?.sources.find(
+      (source) => normalizeExternalAddress(source.url) === normalized,
+    )
+    if (matchingSource) {
+      setActiveSourceType(matchingSource.sourceType)
+      onSelectSource(matchingSource.id)
+      return
+    }
+    window.open(normalized, '_blank', 'noopener,noreferrer')
+    setAddressError('该网址未在本次研究中抓取，已在新标签页安全打开。')
+  }
 
   return (
     <Surface className="overflow-hidden">
@@ -63,32 +118,48 @@ export function MarketBrowserWorkspace({
           <span className="h-2.5 w-2.5 rounded-full bg-ink-200" />
           <span className="h-2.5 w-2.5 rounded-full bg-brand-200" />
         </div>
-        <div className="mx-4 flex min-w-0 max-w-2xl flex-1 items-center gap-2 rounded-lg border border-ink-200 bg-white px-3 py-2 text-[11px] text-ink-500 shadow-sm">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            submitAddress()
+          }}
+          className="mx-4 flex min-w-0 max-w-2xl flex-1 items-center gap-2 rounded-lg border border-ink-200 bg-white px-3 py-2 text-[11px] text-ink-500 shadow-sm focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-500/10"
+        >
           {selectedSource || signal ? (
             <LockKeyhole className="h-3 w-3 shrink-0 text-emerald-600" />
           ) : (
             <Search className="h-3 w-3 shrink-0 text-ink-400" />
           )}
-          <span className="truncate">
-            {status === 'running'
-              ? '云端研究正在搜索并打开公开网页…'
-              : address || '输入产品后开始联网研究'}
-          </span>
-        </div>
-        {selectedSource || signal ? (
-          <a
-            href={selectedSource?.url ?? signal?.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="打开真实来源"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition hover:bg-white hover:text-brand-700"
-          >
-            <ArrowUpRight className="h-4 w-4" />
-          </a>
-        ) : (
-          <span className="h-8 w-8" />
-        )}
+          <input
+            value={addressInput}
+            onChange={(event) => {
+              setAddressInput(event.target.value)
+              setAddressError('')
+            }}
+            placeholder={status === 'running' ? '云端研究正在打开公开网页…' : '输入或粘贴网址，按 Enter 打开'}
+            aria-label="云端浏览器网址"
+            className="min-w-0 flex-1 bg-transparent text-[11px] text-ink-700 outline-none placeholder:text-ink-400"
+          />
+          <button type="submit" aria-label="打开网址" className="rounded p-0.5 text-ink-400 transition hover:text-brand-700">
+            <CornerDownLeft className="h-3.5 w-3.5" />
+          </button>
+        </form>
+        <button
+          type="button"
+          onClick={submitAddress}
+          aria-label="打开当前网址"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition hover:bg-white hover:text-brand-700 disabled:opacity-30"
+          disabled={!addressInput.trim()}
+        >
+          <ArrowUpRight className="h-4 w-4" />
+        </button>
       </div>
+
+      {addressError && (
+        <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-[10px] text-amber-700">
+          {addressError}
+        </div>
+      )}
 
       <div className="grid min-h-[470px] lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="border-b border-ink-200 bg-ink-50/65 p-3 lg:border-b-0 lg:border-r">
@@ -102,32 +173,55 @@ export function MarketBrowserWorkspace({
               </span>
             )}
           </div>
-          {session?.sources.length ? (
-            <div className="max-h-[430px] space-y-1 overflow-y-auto pr-1 scrollbar-thin">
-              {session.sources.map((source) => (
-                <SourceButton
-                  key={source.id}
-                  source={source}
-                  active={source.id === selectedSource?.id}
-                  onClick={() => onSelectSource(source.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {Object.values(SOURCE_META).slice(0, 5).map(({ label, icon: Icon }) => (
-                <div
-                  key={label}
-                  className="flex items-center gap-2 rounded-lg px-2 py-2 text-[11px] text-ink-400"
+          <div className="space-y-1">
+            {PRIMARY_SOURCE_TYPES.map((sourceType) => {
+              const meta = SOURCE_META[sourceType]
+              const Icon = meta.icon
+              const count = session?.sources.filter(
+                (source) => source.sourceType === sourceType,
+              ).length ?? 0
+              return (
+                <button
+                  key={sourceType}
+                  type="button"
+                  onClick={() => selectSourceType(sourceType)}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-medium transition',
+                    activeSourceType === sourceType
+                      ? 'bg-brand-50 text-brand-800 ring-1 ring-brand-100'
+                      : 'text-ink-600 hover:bg-white hover:text-ink-900',
+                  )}
                 >
-                  <Icon className="h-3.5 w-3.5" />
-                  {label}
-                </div>
-              ))}
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="flex-1">{meta.label}</span>
+                  <span className="text-[9px] text-ink-400">{count}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {session?.sources.length ? (
+            <div className="mt-4 border-t border-ink-200 pt-3">
+              <button type="button" onClick={() => selectSourceType('all')} className={cn('mb-2 w-full rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold', activeSourceType === 'all' ? 'bg-white text-brand-700' : 'text-ink-500 hover:bg-white')}>
+                全部来源 · {session.sources.length}
+              </button>
+              <div className="max-h-[255px] space-y-1 overflow-y-auto pr-1 scrollbar-thin">
+                {filteredSources.map((source) => (
+                  <SourceButton
+                    key={source.id}
+                    source={source}
+                    active={source.id === selectedSource?.id}
+                    onClick={() => {
+                      setActiveSourceType(source.sourceType)
+                      onSelectSource(source.id)
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-          )}
+          ) : null}
           <p className="mt-4 px-2 text-[10px] leading-4 text-ink-400">
-            这里只显示本次 API 实际返回的搜索、打开和引用来源。
+            点击分类查看本次 API 返回的最新来源；地址栏可输入任意公开网址。
           </p>
         </aside>
 
@@ -137,8 +231,20 @@ export function MarketBrowserWorkspace({
               title="云端研究正在浏览公开网页"
               description="模型正在检索企业官网、新闻、招聘、投资和行业来源；完成后显示实际访问记录。"
             />
+          ) : addressError && !selectedSource ? (
+            <WorkspaceEmpty
+              icon={Globe2}
+              title="网址未进入本次研究记录"
+              description={addressError}
+            />
           ) : selectedSource && session ? (
             <ResearchDocument source={selectedSource} session={session} />
+          ) : session && activeSourceType !== 'all' ? (
+            <WorkspaceEmpty
+              icon={SOURCE_META[activeSourceType].icon}
+              title={`本次没有${SOURCE_META[activeSourceType].label}结果`}
+              description="该分类没有被联网研究服务返回。可切换其他分类、重新扫描，或在上方输入网址直接打开。"
+            />
           ) : signal ? (
             <StoredSignalDocument signal={signal} />
           ) : status === 'failed' ? (
@@ -302,12 +408,15 @@ function StoredSignalDocument({ signal }: { signal: MarketSignal }) {
   )
 }
 
-function readableSource(url: string | undefined) {
-  if (!url) return ''
+function normalizeExternalAddress(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return null
   try {
-    return new URL(url).hostname.replace(/^www\./, '')
+    const url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    return url.toString()
   } catch {
-    return '真实来源'
+    return null
   }
 }
 
