@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { MarketSignalType } from '@prisma/client'
+import {
+  Industry,
+  MarketSignalType,
+  Platform,
+  Region,
+} from '@prisma/client'
 import {
   MarketWebResearchService,
   extractMarketResearchResponse,
@@ -126,6 +131,48 @@ describe('hosted research provider configuration', () => {
 })
 
 describe('hosted market web research service', () => {
+  it('uses the configured Exa search as a truthful no-model fallback', async () => {
+    const service = new MarketWebResearchService({
+      environment: { EXA_API_KEY: 'test-exa-key' },
+      now: () => new Date('2026-08-03T00:00:00.000Z'),
+      searchProvider: {
+        name: 'agent-reach',
+        async search(input) {
+          assert.match(input.keyword, /industrial automation/)
+          return [{
+            externalId: 'exa-1',
+            platform: Platform.Website,
+            sourceUrl: 'https://manufacturer.example/news/new-factory',
+            profileUrl: 'https://manufacturer.example',
+            company: 'Manufacturer',
+            customerName: 'Manufacturer',
+            country: 'Germany',
+            region: Region.Europe,
+            industry: Industry.IndustrialManufacturing,
+            rawContent: 'Manufacturer announced a new factory and production line.',
+            metadata: { title: 'Manufacturer opens new factory' },
+          }]
+        },
+      },
+      persistence: {
+        async captureSearchResult() {
+          return [{ signalType: MarketSignalType.FACTORY_EXPANSION }]
+        },
+      },
+    })
+
+    const session = await service.run('user-1', {
+      product: 'industrial automation',
+      region: Region.Europe,
+    })
+
+    assert.equal(session.provider, 'exa-web')
+    assert.equal(session.sources.length, 1)
+    assert.equal(session.sources[0]?.status, 'consulted')
+    assert.equal(session.trace[0]?.action, 'search')
+    assert.match(session.summary, /不是大模型推断/)
+  })
+
   it('calls the Responses API and persists source snippets through the market pipeline', async () => {
     const captured: Array<{ provider: string; sourceUrl: string }> = []
     const service = new MarketWebResearchService({

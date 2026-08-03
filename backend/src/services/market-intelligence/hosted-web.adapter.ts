@@ -12,7 +12,11 @@ export class HostedWebMarketSourceAdapter implements MarketSourceAdapter {
   readonly sourceType = 'hosted-web'
 
   canHandle(context: MarketSourceContext) {
-    return context.provider === 'openai-web' || context.provider === 'qwen-web'
+    return (
+      context.provider === 'openai-web' ||
+      context.provider === 'qwen-web' ||
+      context.provider === 'exa-web'
+    )
   }
 
   async fetchSignals(context: MarketSourceContext) {

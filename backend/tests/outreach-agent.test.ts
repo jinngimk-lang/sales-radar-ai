@@ -100,4 +100,27 @@ describe('AI Outreach Agent v1', () => {
     assert.match(result.email.cta, /possible pilot/i)
     assert.match(result.callScript.questions.join(' '), /customer segments/i)
   })
+
+  it('mirrors Chinese public content and applies the requested objective', async () => {
+    const result = await provider.generateOutreach(
+      context({
+        communicationStyle: {
+          language: 'zh',
+          tone: 'concise',
+          preferredPlatform: 'LinkedIn',
+          observedTopics: ['MES', '自动化'],
+          evidenceExcerpt: '正在评估 MES 与自动化集成方案。',
+        },
+        preferences: {
+          language: 'auto',
+          tone: 'mirror',
+          objective: '分享相关案例并确认是否愿意进一步交流',
+        },
+      }),
+    )
+
+    assert.match(result.email.body, /分享相关案例/)
+    assert.match(result.email.cta, /15 分钟/)
+    assert.match(result.linkedin.connectionMessage, /公开资料|方向相关/)
+  })
 })
