@@ -1,7 +1,4 @@
 import {
-  LeadEvidenceStatus,
-  LeadIdentityStatus,
-  LeadQualificationStatus,
   SearchEvidenceExtractionStatus,
   type Platform,
   type Region,
@@ -155,6 +152,7 @@ export async function processSearchTask(
       `[SearchTaskService] Provider execution completed: task=${task.id}, provider=${provider.name}, adapterResults=${providerResults.length}.`,
     )
     const productContext = readProductContext(task.parameters)
+    let displayedLeadCount = 0
     let qualifiedCount = 0
     let opportunityCount = 0
     let marketSignalCount = 0
@@ -253,30 +251,17 @@ export async function processSearchTask(
           evaluation,
         )
 
-        if (!qualifiedResult) {
-          await prisma.searchEvidence.update({
-            where: { id: evidence.id },
-            data: {
-              extractionStatus: SearchEvidenceExtractionStatus.REJECTED,
-              companyName: evaluation.identity.companyName,
-              normalizedDomain: evaluation.identity.normalizedDomain,
-              website: evaluation.identity.website,
-              identityConfidence: evaluation.identity.confidence,
-              identityReasoning: toSafeJson(
-                evaluation.identity.confidenceReasoning,
-              ),
-              identityStatus: evaluation.identity.identityStatus,
-              evidenceStatus: evaluation.evidence.status,
-              productRelevancePassed: evaluation.relevance.passed,
-              qualificationStatus: evaluation.gate.qualificationStatus,
-              qualificationVersion: evaluation.gate.qualificationVersion,
-              qualificationReasons: toSafeJson(evaluation.gate.reasons),
-            },
-          })
-          continue
-        }
-
-        const lead = leadNormalizer.normalize(qualifiedResult, provider.name)
+        // Keep every non-mock provider result linked to this search. Identity,
+        // evidence and relevance remain explicit labels instead of silently
+        // removing people who do not have a company domain.
+        const lead = leadNormalizer.normalize(
+          qualifiedResult ?? result,
+          provider.name,
+        )
+        const isQualified = Boolean(qualifiedResult)
+        const matchReason = isQualified
+          ? 'Verified by the SearchEvidence quality gate.'
+          : 'Real public source retained for review; qualification details are shown separately.'
         await prisma.$transaction(async (transaction) => {
           const duplicate = await leadDeduplication.findDuplicate(
             {
@@ -288,20 +273,20 @@ export async function processSearchTask(
             },
             transaction,
           )
-          const trustedData = {
-            company: evaluation.identity.companyName!,
-            normalizedDomain: evaluation.identity.normalizedDomain!,
-            identityStatus: LeadIdentityStatus.VERIFIED,
-            evidenceStatus: LeadEvidenceStatus.VALID,
-            productRelevancePassed: true,
-            qualificationStatus: LeadQualificationStatus.QUALIFIED,
+          const assessmentData = {
+            company: lead.company ?? evaluation.identity.companyName,
+            normalizedDomain: evaluation.identity.normalizedDomain,
+            identityStatus: evaluation.identity.identityStatus,
+            evidenceStatus: evaluation.evidence.status,
+            productRelevancePassed: evaluation.relevance.passed,
+            qualificationStatus: evaluation.gate.qualificationStatus,
             qualificationVersion: evaluation.gate.qualificationVersion,
           }
           const storedLead = duplicate
             ? await transaction.lead.update({
                 where: { id: duplicate.id },
                 data: {
-                  ...trustedData,
+                  ...assessmentData,
                   searchTaskId: task.id,
                   sourceMetadata: toSafeJson(lead.sourceMetadata),
                 },
@@ -309,7 +294,7 @@ export async function processSearchTask(
             : await transaction.lead.create({
                 data: {
                   ...lead,
-                  ...trustedData,
+                  ...assessmentData,
                   sourceMetadata: toSafeJson(lead.sourceMetadata),
                   username: sanitizeProviderString(lead.username),
                   displayName: sanitizeProviderString(lead.displayName),
@@ -336,24 +321,32 @@ export async function processSearchTask(
               searchTaskId: task.id,
               leadId: storedLead.id,
               rankScore: lead.intentScore,
-              matchReason: 'Qualified by the SearchEvidence quality gate.',
+              matchReason,
               matchEvidence: toSafeJson({
                 searchEvidenceId: evidence.id,
                 sourceUrl: lead.sourceUrl,
                 provider: lead.provider,
                 companyName: evaluation.identity.companyName,
                 normalizedDomain: evaluation.identity.normalizedDomain,
+                identityStatus: evaluation.identity.identityStatus,
+                evidenceStatus: evaluation.evidence.status,
+                qualificationStatus: evaluation.gate.qualificationStatus,
+                qualificationReasons: evaluation.gate.reasons,
               }),
             },
             update: {
               rankScore: lead.intentScore,
-              matchReason: 'Qualified by the SearchEvidence quality gate.',
+              matchReason,
               matchEvidence: toSafeJson({
                 searchEvidenceId: evidence.id,
                 sourceUrl: lead.sourceUrl,
                 provider: lead.provider,
                 companyName: evaluation.identity.companyName,
                 normalizedDomain: evaluation.identity.normalizedDomain,
+                identityStatus: evaluation.identity.identityStatus,
+                evidenceStatus: evaluation.evidence.status,
+                qualificationStatus: evaluation.gate.qualificationStatus,
+                qualificationReasons: evaluation.gate.reasons,
               }),
             },
           })
@@ -362,7 +355,9 @@ export async function processSearchTask(
             where: { id: evidence.id },
             data: {
               leadId: storedLead.id,
-              extractionStatus: SearchEvidenceExtractionStatus.PROCESSED,
+              extractionStatus: isQualified
+                ? SearchEvidenceExtractionStatus.PROCESSED
+                : SearchEvidenceExtractionStatus.REJECTED,
               companyName: evaluation.identity.companyName,
               normalizedDomain: evaluation.identity.normalizedDomain,
               website: evaluation.identity.website,
@@ -370,16 +365,17 @@ export async function processSearchTask(
               identityReasoning: toSafeJson(
                 evaluation.identity.confidenceReasoning,
               ),
-              identityStatus: LeadIdentityStatus.VERIFIED,
-              evidenceStatus: LeadEvidenceStatus.VALID,
-              productRelevancePassed: true,
-              qualificationStatus: LeadQualificationStatus.QUALIFIED,
+              identityStatus: evaluation.identity.identityStatus,
+              evidenceStatus: evaluation.evidence.status,
+              productRelevancePassed: evaluation.relevance.passed,
+              qualificationStatus: evaluation.gate.qualificationStatus,
               qualificationVersion: evaluation.gate.qualificationVersion,
-              qualificationReasons: toSafeJson([]),
+              qualificationReasons: toSafeJson(evaluation.gate.reasons),
             },
           })
         })
-        qualifiedCount += 1
+        displayedLeadCount += 1
+        if (isQualified) qualifiedCount += 1
       } catch (error) {
         await prisma.searchEvidence.update({
           where: { id: evidence.id },
@@ -400,14 +396,14 @@ export async function processSearchTask(
     }
 
     console.info(
-      `[SearchTaskService] ${provider.name} task outcome: adapterResults=${providerResults.length}, evidence=${providerResults.length}, radarAssessments=${radarAssessmentCount}, marketSignals=${marketSignalCount}, opportunities=${opportunityCount}, resultCountQualifiedLeads=${qualifiedCount}.`,
+      `[SearchTaskService] ${provider.name} task outcome: adapterResults=${providerResults.length}, evidence=${providerResults.length}, radarAssessments=${radarAssessmentCount}, marketSignals=${marketSignalCount}, opportunities=${opportunityCount}, displayedLeads=${displayedLeadCount}, qualifiedLeads=${qualifiedCount}.`,
     )
     await prisma.searchTask.update({
       where: { id: task.id },
       data: {
         status: 'COMPLETED',
         progress: 100,
-        resultCount: qualifiedCount,
+        resultCount: displayedLeadCount,
         completedAt: new Date(),
       },
     })

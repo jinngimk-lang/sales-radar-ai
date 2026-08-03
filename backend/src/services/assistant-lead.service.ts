@@ -1,26 +1,12 @@
 import {
+  CustomerType,
   LeadEvidenceStatus,
   LeadIdentityStatus,
-  LeadQualificationStatus,
   Prisma,
   SearchTaskStatus,
 } from '@prisma/client'
 import { prisma } from '../prisma/client.js'
 import { ensureDemoUser } from './demo-user.service.js'
-import { CURRENT_QUALIFICATION_VERSION } from '../contracts/qualification-version.contract.js'
-
-const blockedCompanyHosts = new Set([
-  'bit.ly',
-  'example.com',
-  'facebook.com',
-  'instagram.com',
-  'linkedin.com',
-  'made-in-china.com',
-  'reddit.com',
-  'tiktok.com',
-  'x.com',
-  'youtube.com',
-])
 
 const assistantLeadInclude = Prisma.validator<Prisma.LeadInclude>()({
   analyses: {
@@ -42,6 +28,7 @@ const assistantLeadInclude = Prisma.validator<Prisma.LeadInclude>()({
     orderBy: [{ priorityRank: 'asc' }, { confidence: 'desc' }],
     take: 12,
   },
+  channelProfile: true,
 })
 
 export type AssistantLeadCandidate = Prisma.LeadGetPayload<{
@@ -60,13 +47,6 @@ const prismaAssistantLeadRepository: AssistantLeadRepository = {
       where: {
         userId,
         provider: { not: 'mock' },
-        identityStatus: LeadIdentityStatus.VERIFIED,
-        evidenceStatus: LeadEvidenceStatus.VALID,
-        productRelevancePassed: true,
-        qualificationStatus: LeadQualificationStatus.QUALIFIED,
-        qualificationVersion: CURRENT_QUALIFICATION_VERSION,
-        normalizedDomain: { not: null },
-        company: { not: null },
         searchTaskLinks: {
           some: {
             searchTask: {
@@ -83,10 +63,9 @@ const prismaAssistantLeadRepository: AssistantLeadRepository = {
 }
 
 /**
- * Production trust boundary for AI Sales Copilot leads.
- *
- * Database predicates keep the query narrow; the in-memory checks are
- * intentional defense-in-depth against malformed or legacy records.
+ * Production visibility boundary for AI Sales Copilot candidates.
+ * Qualification is returned as a score/readiness label instead of being used
+ * as a display filter, so real people are not discarded for lacking a domain.
  */
 export class AssistantLeadService {
   constructor(
@@ -104,68 +83,28 @@ export class AssistantLeadService {
     const candidates = await this.repository.listCandidates(userId)
 
     return candidates
-      .filter((candidate) => this.isTrusted(candidate, userId))
+      .filter((candidate) => this.isVisible(candidate, userId))
       .map(({ analyses, searchTaskLinks: _links, ...lead }) => ({
         ...lead,
         analysis: analyses[0] ?? null,
         communicationProfile: deriveCommunicationProfile(lead),
+        audienceType: this.classifyAudience(lead),
+        contactReadiness: this.contactReadiness(lead),
+        assistantScores: this.scoreCandidate(lead),
       }))
   }
 
-  private isTrusted(candidate: AssistantLeadCandidate, userId: string) {
+  private isVisible(candidate: AssistantLeadCandidate, userId: string) {
     if (candidate.userId !== userId) return false
     if (candidate.provider.trim().toLowerCase() === 'mock') return false
     if (/^(mock|seed|buyer_)/i.test(candidate.externalId)) return false
-    if (!this.isKnownCompany(candidate.company)) return false
-    if (!this.isVerifiedDomain(candidate.normalizedDomain)) return false
-    if (candidate.identityStatus !== LeadIdentityStatus.VERIFIED) return false
-    if (candidate.evidenceStatus !== LeadEvidenceStatus.VALID) return false
-    if (!candidate.productRelevancePassed) return false
-    if (
-      candidate.qualificationStatus !==
-      LeadQualificationStatus.QUALIFIED
-    ) {
-      return false
-    }
-    if (candidate.qualificationVersion !== CURRENT_QUALIFICATION_VERSION) {
-      return false
-    }
     if (!this.isHttpUrl(candidate.sourceUrl)) return false
     if (!this.hasMeaningfulEvidence(candidate.postContent)) return false
 
     return candidate.searchTaskLinks.some(
       (link) =>
         link.searchTask.userId === userId &&
-        link.searchTask.status === SearchTaskStatus.COMPLETED &&
-        this.hasStructuredEvidence(link.matchEvidence),
-    )
-  }
-
-  private isKnownCompany(value: string | null) {
-    if (!value) return false
-    const normalized = value.trim().toLowerCase()
-    return (
-      normalized.length >= 2 &&
-      normalized !== 'unknown' &&
-      !/^(mock|buyer_|seed|test\b)/i.test(normalized)
-    )
-  }
-
-  private isVerifiedDomain(value: string | null) {
-    if (!value) return false
-    const normalized = value
-      .trim()
-      .toLowerCase()
-      .replace(/^https?:\/\//, '')
-      .split('/')[0]
-      .replace(/^www\./, '')
-
-    if (!/^(?=.{4,253}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(normalized)) {
-      return false
-    }
-
-    return ![...blockedCompanyHosts].some(
-      (host) => normalized === host || normalized.endsWith(`.${host}`),
+        link.searchTask.status === SearchTaskStatus.COMPLETED,
     )
   }
 
@@ -181,20 +120,100 @@ export class AssistantLeadService {
   private hasMeaningfulEvidence(value: string) {
     const normalized = value.trim()
     return (
-      normalized.length >= 30 &&
+      normalized.length > 0 &&
       !/\b(captcha|access denied|request blocked|page not found)\b/i.test(
         normalized,
       )
     )
   }
 
-  private hasStructuredEvidence(value: Prisma.JsonValue | null) {
-    return (
-      value !== null &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      Object.keys(value).length > 0
+  private classifyAudience(candidate: AssistantLeadCandidate) {
+    const metadata = this.record(candidate.sourceMetadata)
+    const leadType = this.string(metadata.leadType).toLowerCase()
+    const channelType = candidate.channelProfile?.channelType.toLowerCase() ?? ''
+    const combined = `${leadType} ${channelType}`
+
+    if (
+      candidate.customerType === CustomerType.Individual ||
+      leadType === 'person'
+    ) {
+      return 'person' as const
+    }
+    if (/supplier|vendor|manufacturer|factory/.test(combined)) {
+      return 'supplier' as const
+    }
+    if (
+      candidate.customerType === CustomerType.Agent ||
+      /agent|broker|intermediar|distributor|partner|reseller/.test(combined)
+    ) {
+      return 'intermediary' as const
+    }
+    return 'company' as const
+  }
+
+  private contactReadiness(candidate: AssistantLeadCandidate) {
+    const actionable = candidate.contacts.some((contact) =>
+      [contact.email, contact.phone, contact.profileUrl].some(
+        (value) => this.isKnownValue(value),
+      ),
     )
+    if (actionable) return 'ready' as const
+    if (
+      candidate.identityStatus === LeadIdentityStatus.REJECTED ||
+      candidate.evidenceStatus === LeadEvidenceStatus.INVALID
+    ) {
+      return 'review' as const
+    }
+    return 'research' as const
+  }
+
+  private scoreCandidate(candidate: AssistantLeadCandidate) {
+    const identity =
+      candidate.identityStatus === LeadIdentityStatus.VERIFIED
+        ? 100
+        : candidate.identityStatus === LeadIdentityStatus.UNVERIFIED
+          ? 55
+          : 20
+    const evidence =
+      candidate.evidenceStatus === LeadEvidenceStatus.VALID
+        ? 100
+        : candidate.evidenceStatus === LeadEvidenceStatus.UNKNOWN
+          ? 55
+          : 20
+    const contact = candidate.contacts.reduce(
+      (highest, item) =>
+        Math.max(highest, item.contactScore ?? item.confidence ?? 0),
+      0,
+    )
+    const intent = this.clamp(candidate.intentScore)
+    return {
+      overall: this.clamp(
+        intent * 0.45 + identity * 0.2 + evidence * 0.2 + contact * 0.15,
+      ),
+      intent,
+      identity,
+      evidence,
+      contact: this.clamp(contact),
+    }
+  }
+
+  private clamp(value: number) {
+    return Math.max(0, Math.min(100, Math.round(value)))
+  }
+
+  private isKnownValue(value: string) {
+    const normalized = value.trim().toLowerCase()
+    return Boolean(normalized && normalized !== 'unknown' && normalized !== 'n/a')
+  }
+
+  private record(value: Prisma.JsonValue | null) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {}
+  }
+
+  private string(value: unknown) {
+    return typeof value === 'string' ? value.trim() : ''
   }
 }
 

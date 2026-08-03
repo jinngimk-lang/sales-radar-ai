@@ -125,9 +125,14 @@ interface BackendLead {
   recommendedAction: RecommendedAction | null
   updatedAt: string
   sourceMetadata: Record<string, unknown> | null
+  identityStatus?: 'UNVERIFIED' | 'VERIFIED' | 'REJECTED'
+  evidenceStatus?: 'UNKNOWN' | 'VALID' | 'INVALID'
   analysis: BackendAnalysis | null
   contacts?: ContactProfile[]
   communicationProfile?: ChatSession['communicationProfile']
+  audienceType?: ChatSession['audienceType']
+  contactReadiness?: ChatSession['contactReadiness']
+  assistantScores?: ChatSession['assistantScores']
 }
 
 interface BackendSearchTask {
@@ -257,11 +262,44 @@ function toCustomer(lead: BackendLead): Customer {
       ? metadataLeadType
       : lead.platform === 'Reddit' || lead.platform === 'Facebook'
         ? 'community'
-        : lead.platform === 'YouTube'
+      : lead.platform === 'YouTube'
           ? 'content'
           : lead.customerType === 'Company'
             ? 'company'
             : 'person'
+
+  const channelHint = [
+    lead.sourceMetadata?.channelType,
+    lead.sourceMetadata?.leadCategory,
+    lead.sourceMetadata?.relationship,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase()
+  const audienceType: Customer['audienceType'] =
+    lead.customerType === 'Individual' || leadType === 'person'
+      ? 'person'
+      : /supplier|vendor|manufacturer|factory/.test(channelHint)
+        ? 'supplier'
+        : lead.customerType === 'Agent' ||
+            /agent|broker|intermediar|distributor|partner|reseller/.test(
+              channelHint,
+            )
+          ? 'intermediary'
+          : 'company'
+  const identityScore =
+    lead.identityStatus === 'VERIFIED'
+      ? 100
+      : lead.identityStatus === 'REJECTED'
+        ? 20
+        : 55
+  const evidenceScore =
+    lead.evidenceStatus === 'VALID'
+      ? 100
+      : lead.evidenceStatus === 'INVALID'
+        ? 20
+        : 55
+  const intentScore = lead.analysis?.intentScore ?? lead.intentScore
 
   return {
     id: lead.id,
@@ -272,6 +310,17 @@ function toCustomer(lead: BackendLead): Customer {
     platform: lead.platform,
     customerType: lead.customerType,
     leadType,
+    audienceType,
+    signalScores: {
+      overall: Math.round(
+        Math.max(0, Math.min(100, intentScore)) * 0.6 +
+          identityScore * 0.2 +
+          evidenceScore * 0.2,
+      ),
+      intent: Math.max(0, Math.min(100, Math.round(intentScore))),
+      identity: identityScore,
+      evidence: evidenceScore,
+    },
     postContent: lead.postContent,
     postedAt: formatRelativeTime(lead.postedAt),
     country: lead.country,
@@ -795,6 +844,18 @@ export async function getChatSessions(): Promise<ChatSession[]> {
     profileUrl: lead.profileUrl,
     postContent: lead.postContent,
     contacts: lead.contacts ?? [],
+    audienceType: lead.audienceType ??
+      (lead.customerType === 'Individual' ? 'person' :
+        lead.customerType === 'Agent' ? 'intermediary' : 'company'),
+    contactReadiness: lead.contactReadiness ??
+      ((lead.contacts ?? []).length > 0 ? 'ready' : 'research'),
+    assistantScores: lead.assistantScores ?? {
+      overall: lead.intentScore,
+      intent: lead.intentScore,
+      identity: 55,
+      evidence: 55,
+      contact: 0,
+    },
     communicationProfile: lead.communicationProfile ?? {
       language: 'unknown',
       tone: 'conversational',
@@ -811,7 +872,7 @@ export async function getChatSessions(): Promise<ChatSession[]> {
 
 /**
  * AI Sales Copilot reuses Lead Analysis and requires an explicitly selected,
- * production-qualified Lead.
+ * a user-selected real-source Lead.
  */
 export async function sendChatMessage(content: string, _sessionId?: string): Promise<ChatMessage> {
   const leadId = _sessionId?.trim()
