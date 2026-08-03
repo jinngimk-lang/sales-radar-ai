@@ -231,7 +231,9 @@ export const discoverContactsController: RequestHandler = async (
   request,
   response,
 ) => {
-  const contacts = await contactDiscovery.discover(request.params.id)
+  // POST is an explicit refresh action: re-check permitted first-party pages
+  // and upsert only values that were actually observed with source evidence.
+  const contacts = await contactDiscovery.discover(request.params.id, true)
   response.status(201).json({ data: contacts, meta: { total: contacts.length } })
 }
 

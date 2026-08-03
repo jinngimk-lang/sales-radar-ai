@@ -10,6 +10,7 @@ function lead(overrides: Partial<ChannelLead> = {}): ChannelLead {
   return {
     id: 'lead-1',
     company: 'Acme Automation',
+    normalizedDomain: null,
     industry: 'IndustrialManufacturing',
     region: 'USA',
     country: 'United States',
@@ -57,6 +58,81 @@ describe('Channel Discovery Agent v1', () => {
     )
     assert.equal(result.channelType, 'system_integrator')
     assert.match(result.cooperationStrategy, /solution-integration/i)
+  })
+
+  it('recognizes observed suppliers and intermediaries without relabeling them as buyers', () => {
+    const supplier = service.analyze(
+      lead({
+        postContent:
+          'Acme is an industrial equipment supplier serving automation plants.',
+      }),
+    )
+    const intermediary = service.analyze(
+      lead({
+        postContent:
+          'Acme is a commercial agent and sourcing intermediary for industrial equipment.',
+      }),
+    )
+
+    assert.equal(supplier.channelType, 'supplier')
+    assert.equal(intermediary.channelType, 'intermediary')
+  })
+
+  it('retains related company URLs and field-level public sources', () => {
+    const result = service.analyze(lead(), {
+      status: 'COMPLETED',
+      seedUrl: 'https://acme.example.com',
+      pagesVisited: ['https://acme.example.com/distributors'],
+      organization: {
+        name: 'Acme Automation',
+        website: 'https://acme.example.com',
+        emails: ['sales@acme.example.com'],
+        phones: [],
+        socialProfiles: [],
+        evidence: [
+          {
+            field: 'email',
+            value: 'sales@acme.example.com',
+            sourceUrl: 'https://acme.example.com/contact',
+            extractionMethod: 'mailto',
+            verificationStatus: 'OBSERVED',
+            observedAt: '2026-08-03T00:00:00.000Z',
+          },
+        ],
+      },
+      contacts: [],
+      relatedBusinesses: [
+        {
+          name: 'Northstar Industrial',
+          website: 'https://northstar.example.net',
+          relationship: 'distributor',
+          evidence: [
+            {
+              field: 'relationship',
+              value: 'distributor',
+              sourceUrl: 'https://acme.example.com/distributors',
+              extractionMethod: 'link',
+              verificationStatus: 'OBSERVED',
+              observedAt: '2026-08-03T00:00:00.000Z',
+            },
+          ],
+        },
+      ],
+      errors: [],
+    })
+
+    assert.ok(
+      result.evidence.some((item) =>
+        item.includes('sales@acme.example.com') &&
+        item.includes('https://acme.example.com/contact'),
+      ),
+    )
+    assert.ok(
+      result.evidence.some((item) =>
+        item.includes('Northstar Industrial') &&
+        item.includes('https://northstar.example.net'),
+      ),
+    )
   })
 
   it('returns Unknown fields when no commercial evidence exists', () => {

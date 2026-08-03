@@ -655,7 +655,9 @@ export function CustomerDetailPage() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Network className="h-5 w-5 text-violet-600" />
-                <h2 className="text-lg font-semibold text-ink-900">渠道分析</h2>
+                <h2 className="text-lg font-semibold text-ink-900">
+                  企业 / 供应商 / 中介发现
+                </h2>
               </div>
               <button
                 onClick={handleDiscoverChannel}
@@ -665,7 +667,7 @@ export function CustomerDetailPage() {
                 {channelLoading && (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 )}
-                {channelProfile ? '重新分析' : '分析渠道价值'}
+                {channelProfile ? '重新抓取与分析' : '抓取商业主体'}
               </button>
             </div>
             {channelProfile ? (
@@ -688,6 +690,20 @@ export function CustomerDetailPage() {
                   <span className="font-semibold text-ink-800">合作方式：</span>
                   {channelProfile.cooperationStrategy}
                 </div>
+                {channelProfile.evidence.length > 0 && (
+                  <details className="mt-3 rounded-lg bg-white p-3 ring-1 ring-ink-100">
+                    <summary className="cursor-pointer text-xs font-semibold text-ink-700">
+                      查看公开来源与相关企业（{channelProfile.evidence.length}）
+                    </summary>
+                    <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-ink-500">
+                      {channelProfile.evidence.map((item, index) => (
+                        <li key={`${index}-${item}`} className="break-all">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
                 {channelProfile.channelType !== 'unknown' && (
                   <button
                     onClick={handleGenerateChannelOutreach}
@@ -700,7 +716,7 @@ export function CustomerDetailPage() {
               </div>
             ) : (
               <p className="mt-4 rounded-xl bg-ink-50 p-3 text-sm text-ink-400">
-                尚未分析渠道价值。系统不会虚构代理身份或销售网络。
+                尚未抓取企业、供应商或中介证据。系统不会虚构代理身份或销售网络。
               </p>
             )}
           </div>
@@ -720,7 +736,7 @@ export function CustomerDetailPage() {
                   {contactsLoading && (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   )}
-                  {contacts.length > 0 ? '刷新联系人' : '发现联系人'}
+                  {contacts.length > 0 ? '刷新公开联系方式' : '抓取公开联系方式'}
                 </button>
                 {contacts.length > 0 && (
                   <button
@@ -734,12 +750,26 @@ export function CustomerDetailPage() {
               </div>
             </div>
             <p className="mt-1 text-sm text-ink-500">
-              仅展示来源中可验证的信息；选择联系人后，销售触达将匹配其职责重点。
+              抓取公开业务邮箱、电话和社交主页；每个字段保留原始来源，不猜测邮箱格式或私人号码。
             </p>
             {contacts.length > 0 ? (
               <div className="mt-4 space-y-2">
-                {contacts.map((contact) => (
-                  <label
+                {contacts.map((contact) => {
+                  const observedEvidence = contact.evidence.filter(
+                    (item) => typeof item !== 'string',
+                  )
+                  const discoveryNotes = contact.evidence.filter(
+                    (item): item is string => typeof item === 'string',
+                  )
+                  const socialProfiles = [
+                    ...new Set(
+                      observedEvidence
+                        .filter((item) => item.field === 'socialProfile')
+                        .map((item) => item.value),
+                    ),
+                  ]
+                  return (
+                  <div
                     key={contact.id}
                     className={cn(
                       'flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors',
@@ -750,6 +780,7 @@ export function CustomerDetailPage() {
                   >
                     <input
                       type="radio"
+                      aria-label={`选择联系人 ${contact.name}`}
                       name="outreach-contact"
                       className="mt-1"
                       checked={selectedContactId === contact.id}
@@ -784,14 +815,93 @@ export function CustomerDetailPage() {
                       <span className="mt-1 block truncate text-xs text-ink-400">
                         来源：{contact.source}
                       </span>
+                      <span className="mt-2 flex flex-wrap gap-2 text-xs">
+                        {contact.email !== 'Unknown' && (
+                          <a
+                            href={`mailto:${contact.email}`}
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-brand-700 ring-1 ring-ink-200 hover:ring-brand-300"
+                          >
+                            <Mail className="h-3 w-3" />
+                            {contact.email}
+                          </a>
+                        )}
+                        {contact.phone !== 'Unknown' && (
+                          <a
+                            href={`tel:${contact.phone}`}
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-ink-700 ring-1 ring-ink-200 hover:ring-brand-300"
+                          >
+                            <Phone className="h-3 w-3" />
+                            {contact.phone}
+                          </a>
+                        )}
+                        {socialProfiles.map((url) => (
+                          <a
+                            key={url}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[#0A66C2] ring-1 ring-ink-200 hover:ring-brand-300"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            {socialPlatformLabel(url)}
+                          </a>
+                        ))}
+                      </span>
+                      {observedEvidence.length > 0 && (
+                        <details
+                          className="mt-2 rounded-lg bg-white p-2 ring-1 ring-ink-100"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <summary className="cursor-pointer text-xs font-semibold text-ink-600">
+                            字段证据与验证状态（{observedEvidence.length}）
+                          </summary>
+                          <ul className="mt-2 space-y-1.5 text-xs text-ink-500">
+                            {observedEvidence.map((item, index) => (
+                              <li
+                                key={`${item.field}-${item.value}-${index}`}
+                                className="break-all"
+                              >
+                                <span className="font-semibold text-ink-700">
+                                  {item.field}
+                                </span>
+                                ：{item.value} · {item.verificationStatus} ·{' '}
+                                <a
+                                  href={item.sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-brand-700 hover:underline"
+                                >
+                                  来源原文
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                      {discoveryNotes.length > 0 && (
+                        <details className="mt-2 rounded-lg bg-white p-2 ring-1 ring-ink-100">
+                          <summary className="cursor-pointer text-xs font-semibold text-ink-600">
+                            抓取说明
+                          </summary>
+                          <ul className="mt-2 space-y-1 text-xs leading-relaxed text-ink-500">
+                            {discoveryNotes.map((note) => (
+                              <li key={note}>{note}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
                       {contact.recommendationReason && (
                         <span className="mt-1 block text-xs leading-relaxed text-ink-500">
                           推荐原因：{contact.recommendationReason}
                         </span>
                       )}
                     </span>
-                  </label>
-                ))}
+                  </div>
+                  )
+                })}
               </div>
             ) : (
               <p className="mt-4 rounded-xl bg-ink-50 p-3 text-sm text-ink-400">
@@ -919,6 +1029,21 @@ export function CustomerDetailPage() {
       </Modal>
     </div>
   )
+}
+
+function socialPlatformLabel(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '')
+    if (host.includes('linkedin')) return 'LinkedIn'
+    if (host === 'x.com' || host.includes('twitter')) return 'X'
+    if (host.includes('facebook')) return 'Facebook'
+    if (host.includes('instagram')) return 'Instagram'
+    if (host.includes('youtube') || host === 'youtu.be') return 'YouTube'
+    if (host.includes('tiktok')) return 'TikTok'
+    return host
+  } catch {
+    return '社交主页'
+  }
 }
 
 /** 侧栏 CRM 面板：收藏 / 状态 / 标签 / 备注 */

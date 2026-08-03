@@ -1,6 +1,11 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../prisma/client.js'
 import { AppError } from '../utils/app-error.js'
+import {
+  publicWebsiteDiscovery,
+  type PublicWebsiteDiscoveryInput,
+  type PublicWebsiteDiscoveryResult,
+} from './public-business-discovery.service.js'
 import { toSafeJson } from './safe-json.service.js'
 
 export type ChannelType =
@@ -8,6 +13,8 @@ export type ChannelType =
   | 'reseller'
   | 'system_integrator'
   | 'trading_company'
+  | 'supplier'
+  | 'intermediary'
   | 'partner'
   | 'unknown'
 
@@ -27,6 +34,7 @@ export interface ChannelAnalysis {
 export interface ChannelLead {
   id: string
   company: string | null
+  normalizedDomain: string | null
   industry: string
   region: string
   country: string
@@ -42,6 +50,10 @@ export interface ChannelDiscoveryRepository {
   upsertProfile(leadId: string, result: ChannelAnalysis): Promise<unknown>
 }
 
+export interface PublicChannelDiscoveryProvider {
+  discover(input: PublicWebsiteDiscoveryInput): Promise<PublicWebsiteDiscoveryResult>
+}
+
 const prismaChannelRepository: ChannelDiscoveryRepository = {
   findLead: (leadId) =>
     prisma.lead.findUnique({
@@ -49,6 +61,7 @@ const prismaChannelRepository: ChannelDiscoveryRepository = {
       select: {
         id: true,
         company: true,
+        normalizedDomain: true,
         industry: true,
         region: true,
         country: true,
@@ -81,19 +94,31 @@ export class ChannelDiscoveryService {
   constructor(
     private readonly repository: ChannelDiscoveryRepository =
       prismaChannelRepository,
+    private readonly publicDiscovery: PublicChannelDiscoveryProvider =
+      publicWebsiteDiscovery,
   ) {}
 
   async discover(leadId: string): Promise<unknown> {
     const lead = await this.repository.findLead(leadId)
     if (!lead) throw new AppError(404, 'LEAD_NOT_FOUND', 'Lead not found')
-    return this.repository.upsertProfile(leadId, this.analyze(lead))
+    const publicResult = await this.safePublicDiscovery({
+      seedUrls: this.publicSeedUrls(lead),
+      companyName: lead.company,
+    })
+    return this.repository.upsertProfile(
+      leadId,
+      this.analyze(lead, publicResult),
+    )
   }
 
   async get(leadId: string): Promise<unknown | null> {
     return this.repository.findProfile(leadId)
   }
 
-  analyze(lead: ChannelLead): ChannelAnalysis {
+  analyze(
+    lead: ChannelLead,
+    publicResult: PublicWebsiteDiscoveryResult | null = null,
+  ): ChannelAnalysis {
     const metadata = this.record(lead.sourceMetadata)
     const metadataText = this.selectedMetadataText(metadata)
     const text = `${lead.postContent} ${metadataText} ${lead.sourceUrl}`
@@ -111,6 +136,13 @@ export class ChannelDiscoveryService {
     const hasPartnerPage =
       /\/(partners?|dealers?|distributors?|resellers?|channel-program)\b/i.test(
         lead.sourceUrl,
+      ) ||
+      Boolean(
+        publicResult?.pagesVisited.some((url) =>
+          /\/(partners?|dealers?|distributors?|resellers?|suppliers?|vendors?|agents?|brokers?)\b/i.test(
+            new URL(url).pathname,
+          ),
+        ),
       ) ||
       /\b(partner program|become a partner|partner network|channel partners?)\b/i.test(
         text,
@@ -134,12 +166,14 @@ export class ChannelDiscoveryService {
     if (hasChannelExperience) {
       channelScore += 30
       evidence.push(
-        `Source explicitly describes a ${channelType.replaceAll('_', ' ')} role.`,
+        `Source ${lead.sourceUrl} explicitly describes a ${channelType.replaceAll('_', ' ')} role.`,
       )
     }
     if (sellsRelatedProducts) {
       channelScore += 25
-      evidence.push('Source describes sales or supply of relevant products.')
+      evidence.push(
+        `Source ${lead.sourceUrl} describes sales or supply of relevant products.`,
+      )
     }
     if (regionMatched) {
       channelScore += 20
@@ -149,7 +183,7 @@ export class ChannelDiscoveryService {
     }
     if (hasPartnerPage) {
       channelScore += 15
-      evidence.push('Source contains an explicit partner or channel page signal.')
+      evidence.push('An observed source contains an explicit partner, supplier, intermediary, or channel page signal.')
     }
     if (industryRelevant) {
       channelScore += 10
@@ -160,7 +194,11 @@ export class ChannelDiscoveryService {
       channelScore = Math.max(0, channelScore - 25)
     }
 
-    const website = this.website(metadata, lead.sourceUrl)
+    this.appendPublicEvidence(evidence, publicResult)
+
+    const website =
+      publicResult?.organization?.website ??
+      this.website(metadata, lead.sourceUrl)
     const confidence = Math.min(
       100,
       (hasChannelExperience ? 35 : 0) +
@@ -180,7 +218,7 @@ export class ChannelDiscoveryService {
       evidence:
         evidence.length > 0
           ? evidence
-          : ['No verified distributor, reseller, integrator, trading, or partner evidence.'],
+          : ['No verified supplier, intermediary, distributor, reseller, integrator, trading, or partner evidence.'],
       channelScore: Math.min(100, channelScore),
       confidence,
       recommendationReason: isChannel
@@ -205,6 +243,12 @@ export class ChannelDiscoveryService {
     if (/\b(trading company|import.export company|export trading)\b/i.test(text)) {
       return 'trading_company'
     }
+    if (/\b(supplier|vendor|manufacturer|equipment supplier)\b/i.test(text)) {
+      return 'supplier'
+    }
+    if (/\b(broker|commercial agent|sales agent|representative|intermediary|sourcing agent)\b/i.test(text)) {
+      return 'intermediary'
+    }
     if (/\b(channel partner|partner network|strategic partner)\b/i.test(text)) {
       return 'partner'
     }
@@ -221,6 +265,10 @@ export class ChannelDiscoveryService {
         'Explore a solution-integration partnership focused on technical compatibility, project delivery, and joint customer support.',
       trading_company:
         'Explore an export or market-access cooperation model with compliance, logistics, and customer ownership clarified.',
+      supplier:
+        'Validate product fit, capacity, certifications, commercial terms, and delivery performance before supplier outreach.',
+      intermediary:
+        'Validate mandate, territory, represented principals, fee model, and customer ownership before intermediary cooperation.',
       partner:
         'Explore a scoped industry partnership with shared target accounts and a low-risk pilot.',
       unknown: UNKNOWN,
@@ -244,6 +292,70 @@ export class ChannelDiscoveryService {
       : /^https?:\/\//i.test(sourceUrl)
         ? sourceUrl
         : UNKNOWN
+  }
+
+  private publicSeedUrls(lead: ChannelLead): string[] {
+    const metadata = this.record(lead.sourceMetadata)
+    const seeds = [
+      ...['website', 'companyWebsite', 'companyUrl', 'domain', 'companyDomain']
+        .map((key) => metadata[key])
+        .filter((value): value is string =>
+          typeof value === 'string' && Boolean(value.trim()),
+        ),
+      lead.normalizedDomain,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => (value.includes('://') ? value : `https://${value}`))
+    return [...new Set(seeds)]
+  }
+
+  private async safePublicDiscovery(
+    input: PublicWebsiteDiscoveryInput,
+  ): Promise<PublicWebsiteDiscoveryResult> {
+    try {
+      return await this.publicDiscovery.discover(input)
+    } catch (error) {
+      return {
+        status: 'BLOCKED',
+        seedUrl: input.seedUrls[0] ?? null,
+        pagesVisited: [],
+        organization: null,
+        contacts: [],
+        relatedBusinesses: [],
+        errors: [
+          {
+            url: input.seedUrls[0] ?? UNKNOWN,
+            reason: error instanceof Error ? error.message : String(error),
+          },
+        ],
+      }
+    }
+  }
+
+  private appendPublicEvidence(
+    evidence: string[],
+    result: PublicWebsiteDiscoveryResult | null,
+  ): void {
+    if (!result) return
+    const observedFields = result.organization?.evidence.filter((item) =>
+      ['email', 'phone', 'socialProfile', 'website'].includes(item.field),
+    ) ?? []
+    for (const item of observedFields) {
+      evidence.push(
+        `Observed ${item.field}: ${item.value} (source: ${item.sourceUrl}; method: ${item.extractionMethod}; status: ${item.verificationStatus}).`,
+      )
+    }
+    for (const business of result.relatedBusinesses) {
+      const sourceUrl = business.evidence[0]?.sourceUrl ?? result.seedUrl ?? UNKNOWN
+      evidence.push(
+        `Observed related ${business.relationship}: ${business.name} — ${business.website} (source: ${sourceUrl}).`,
+      )
+    }
+    if (result.status === 'BLOCKED' || result.status === 'PARTIAL') {
+      evidence.push(
+        `Public website discovery status: ${result.status}. ${result.errors.map((item) => `${item.url}: ${item.reason}`).join(' | ')}`,
+      )
+    }
   }
 
   private selectedMetadataText(metadata: Record<string, unknown>): string {
