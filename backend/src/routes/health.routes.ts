@@ -1,6 +1,9 @@
 import { Router } from 'express'
 import { readAIProviderConfig } from '../providers/ai-platform/ai-provider.factory.js'
-import { readOpenAISalesAgentConfig } from '../services/openai-sales-agent.service.js'
+import {
+  listSalesAgentModelOptions,
+  readOpenAISalesAgentConfig,
+} from '../services/openai-sales-agent.service.js'
 import { readHostedResearchConfig } from '../services/market-intelligence/market-web-research.service.js'
 
 export const healthRouter = Router()
@@ -34,7 +37,9 @@ healthRouter.get('/capabilities', (_request, response) => {
       salesAgent: {
         enabled: salesAgentEnabled,
         provider: salesAgentEnabled ? 'openai' : null,
-        model: salesAgentEnabled ? agent.model : null,
+        model: agent.model,
+        reason: salesAgentEnabled ? 'ready' : 'missing_api_key',
+        models: listSalesAgentModelOptions(agent),
       },
       publicContactDiscovery: {
         enabled: true,
