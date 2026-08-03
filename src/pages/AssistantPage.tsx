@@ -189,13 +189,18 @@ export function AssistantPage() {
           Math.max(highest, contact.contactScore ?? contact.confidence ?? 0),
         0,
       )
+      const hasActionableContact = contacts.some((contact) =>
+        [contact.email, contact.phone, contact.profileUrl].some(
+          (value) => Boolean(known(value)),
+        ),
+      )
       setSessions((current) =>
         current.map((session) =>
           session.id === activeSession.id
             ? {
                 ...session,
                 contacts,
-                contactReadiness: contacts.length > 0 ? 'ready' : 'research',
+                contactReadiness: hasActionableContact ? 'ready' : 'research',
                 assistantScores: {
                   ...sessionScore(session),
                   contact: contactScore,
