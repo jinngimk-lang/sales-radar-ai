@@ -21,6 +21,16 @@ export type Region = 'USA' | 'Europe' | 'SoutheastAsia' | 'China' | 'MiddleEast'
 /** 客户类型 */
 export type CustomerType = 'Buyer' | 'Agent' | 'Company' | 'Individual'
 export type LeadType = 'company' | 'person' | 'content' | 'community'
+export type AudienceType = 'person' | 'company' | 'supplier' | 'intermediary'
+export type ContactReadiness = 'ready' | 'research' | 'review'
+
+export interface AssistantScores {
+  overall: number
+  intent: number
+  identity: number
+  evidence: number
+  contact: number
+}
 
 /** 购买意向等级 */
 export type IntentLevel = 'high' | 'medium' | 'low'
@@ -259,6 +269,8 @@ export interface Customer {
   /** 客户类型 */
   customerType: CustomerType
   leadType?: LeadType
+  audienceType?: AudienceType
+  signalScores?: Omit<AssistantScores, 'contact'>
   /** 原始帖子内容 */
   postContent: string
   /** 帖子发布时间（相对描述） */
@@ -961,6 +973,9 @@ export interface ChatSession {
   profileUrl: string
   postContent: string
   contacts: ContactProfile[]
+  audienceType?: AudienceType
+  contactReadiness?: ContactReadiness
+  assistantScores?: AssistantScores
   communicationProfile: {
     language: 'zh' | 'en' | 'mixed' | 'unknown'
     tone: 'concise' | 'detailed' | 'technical' | 'conversational'
