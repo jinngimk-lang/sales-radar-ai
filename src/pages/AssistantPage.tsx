@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowUpRight,
   Bot,
@@ -18,6 +18,8 @@ import {
   ShieldCheck,
   Sparkles,
   UserRound,
+  RefreshCw,
+  ArrowRight,
 } from 'lucide-react'
 import type {
   ChatSession,
@@ -29,6 +31,7 @@ import {
   ApiRequestError,
   generateOutreachBundle,
   getChatSessions,
+  discoverContacts,
 } from '@/services/api'
 import { Avatar } from '@/components/ui/Avatar'
 import { PlatformIcon } from '@/components/ui/PlatformIcon'
@@ -52,6 +55,8 @@ const QUICK_OBJECTIVES = [
 ]
 
 export function AssistantPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedLeadId = searchParams.get('leadId') ?? ''
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [activeSessionId, setActiveSessionId] = useState('')
   const [query, setQuery] = useState('')
@@ -67,8 +72,11 @@ export function AssistantPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [contactLoading, setContactLoading] = useState(false)
+  const [contactError, setContactError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadSessions = useCallback(() => {
+    setSessionsLoading(true)
     getChatSessions()
       .then((items) => {
         setSessions(items)
@@ -78,11 +86,44 @@ export function AssistantPage() {
       .finally(() => setSessionsLoading(false))
   }, [])
 
+  useEffect(() => {
+    loadSessions()
+  }, [loadSessions])
+
+  useEffect(() => {
+    if (
+      requestedLeadId &&
+      sessions.some((session) => session.id === requestedLeadId)
+    ) {
+      setActiveSessionId(requestedLeadId)
+    }
+  }, [requestedLeadId, sessions])
+
+  const chooseSession = (sessionId: string) => {
+    setActiveSessionId(sessionId)
+    const next = new URLSearchParams(searchParams)
+    if (sessionId) next.set('leadId', sessionId)
+    else next.delete('leadId')
+    setSearchParams(next, { replace: true })
+  }
+
   const filteredSessions = useMemo(() => {
     const value = query.trim().toLowerCase()
     if (!value) return sessions
     return sessions.filter((session) =>
-      [session.customerName, session.displayName, session.company, session.jobTitle]
+      [
+        session.customerName,
+        session.displayName,
+        session.company,
+        session.jobTitle,
+        ...session.contacts.flatMap((contact) => [
+          contact.name,
+          contact.jobTitle,
+          contact.company,
+          contact.email,
+          contact.phone,
+        ]),
+      ]
         .filter(Boolean)
         .some((item) => item!.toLowerCase().includes(value)),
     )
@@ -99,6 +140,7 @@ export function AssistantPage() {
     setGeneration(null)
     setDraft('')
     setError(null)
+    setContactError(null)
   }, [activeSessionId])
 
   useEffect(() => {
@@ -136,11 +178,52 @@ export function AssistantPage() {
     window.setTimeout(() => setCopied(false), 1500)
   }
 
+  const refreshPublicContacts = async () => {
+    if (!activeSession || contactLoading) return
+    setContactLoading(true)
+    setContactError(null)
+    try {
+      const contacts = await discoverContacts(activeSession.id)
+      const contactScore = contacts.reduce(
+        (highest, contact) =>
+          Math.max(highest, contact.contactScore ?? contact.confidence ?? 0),
+        0,
+      )
+      setSessions((current) =>
+        current.map((session) =>
+          session.id === activeSession.id
+            ? {
+                ...session,
+                contacts,
+                contactReadiness: contacts.length > 0 ? 'ready' : 'research',
+                assistantScores: {
+                  ...sessionScore(session),
+                  contact: contactScore,
+                },
+              }
+            : session,
+        ),
+      )
+      setContactId(contacts[0]?.id ?? '')
+      if (contacts.length === 0) {
+        setContactError('没有在允许抓取的公开页面中发现邮箱、电话或社交主页。')
+      }
+    } catch (requestError) {
+      setContactError(
+        requestError instanceof ApiRequestError
+          ? requestError.message
+          : '暂时无法补充公开联系方式。',
+      )
+    } finally {
+      setContactLoading(false)
+    }
+  }
+
   return (
     <div className="flex h-full bg-white">
       <aside className="hidden w-80 shrink-0 flex-col border-r border-ink-200 bg-white md:flex">
         <div className="p-3">
-          <Link to="/app/discover" className="workspace-primary-action w-full justify-start">
+          <Link to="/app/discover?selectFor=assistant" className="workspace-primary-action w-full justify-start">
             <Plus className="h-4 w-4" />
             选择新的销售机会
           </Link>
@@ -158,7 +241,7 @@ export function AssistantPage() {
         </div>
         <div className="mt-3 flex-1 space-y-1 overflow-y-auto px-2 pb-3 scrollbar-thin">
           <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">
-            已验证的个人与企业
+            全部真实来源对象 · {sessions.length}
           </p>
           {sessionsLoading ? (
             Array.from({ length: 4 }).map((_, index) => (
@@ -171,19 +254,25 @@ export function AssistantPage() {
               </div>
             ))
           ) : sessionsError ? (
-            <p className="px-3 py-4 text-xs leading-relaxed text-rose-600">
-              暂时无法加载已验证客户，请稍后重试。
-            </p>
+            <div className="px-3 py-4 text-xs leading-relaxed text-rose-600">
+              <p>暂时无法加载联系人与企业。</p>
+              <button type="button" onClick={loadSessions} className="mt-2 inline-flex items-center gap-1 font-semibold text-brand-700">
+                <RefreshCw className="h-3 w-3" /> 重新加载
+              </button>
+            </div>
           ) : filteredSessions.length === 0 ? (
-            <p className="px-3 py-4 text-xs leading-relaxed text-ink-500">
-              没有符合条件的联系人或企业。先在销售机会中完成身份与来源验证。
-            </p>
+            <div className="px-3 py-4 text-xs leading-relaxed text-ink-500">
+              <p>{query.trim() ? '没有匹配该关键词的联系人或企业。' : '还没有可用对象。先搜索真实来源并选择联系人、企业、供应商或中介。'}</p>
+              <Link to="/app/discover?selectFor=assistant" className="mt-2 inline-flex items-center gap-1 font-semibold text-brand-700">
+                去发现销售机会 <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
           ) : (
             filteredSessions.map((session) => (
               <button
                 key={session.id}
                 type="button"
-                onClick={() => setActiveSessionId(session.id)}
+                onClick={() => chooseSession(session.id)}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors',
                   activeSessionId === session.id ? 'bg-brand-50' : 'hover:bg-ink-50',
@@ -196,9 +285,17 @@ export function AssistantPage() {
                     <PlatformIcon platform={session.platform} className="h-3 w-3" />
                   </span>
                   <span className="mt-0.5 block truncate text-xs text-ink-500">
-                    {session.contacts.length > 0
-                      ? `${session.contacts.length} 个公开联系人`
-                      : session.lastMessage}
+                    {audienceLabel(session.audienceType)} · 综合 {sessionScore(session).overall}
+                  </span>
+                  <span className={cn(
+                    'mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                    session.contactReadiness === 'ready'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : session.contactReadiness === 'review'
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'bg-brand-50 text-brand-700',
+                  )}>
+                    {readinessLabel(session.contactReadiness)}
                   </span>
                 </span>
               </button>
@@ -219,7 +316,7 @@ export function AssistantPage() {
               <p className="text-xs text-ink-500">依据公开内容习惯生成多渠道话术，发送前由你确认</p>
             </div>
           </div>
-          <Link to="/app/discover" className="btn-ghost text-xs">
+          <Link to="/app/discover?selectFor=assistant" className="btn-ghost text-xs">
             <Search className="h-3.5 w-3.5" />
             发现更多机会
           </Link>
@@ -230,16 +327,16 @@ export function AssistantPage() {
             联系对象
             <select
               value={activeSessionId}
-              onChange={(event) => setActiveSessionId(event.target.value)}
+              onChange={(event) => chooseSession(event.target.value)}
               disabled={sessionsLoading || sessionsError}
               className="mt-1.5 w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-ink-800"
             >
               <option value="">
                 {sessionsLoading
-                  ? '正在加载已验证对象…'
+                  ? '正在加载真实来源对象…'
                   : sessionsError
                     ? '暂时无法加载'
-                    : '选择已验证的个人或企业'}
+                    : '选择个人、企业、供应商或中介'}
               </option>
               {filteredSessions.map((session) => (
                 <option key={session.id} value={session.id}>
@@ -252,15 +349,11 @@ export function AssistantPage() {
 
         <div className="flex-1 overflow-y-auto px-4 py-5 scrollbar-thin sm:px-6">
           {!activeSession ? (
-            <div className="mx-auto mt-12 max-w-xl rounded-2xl border border-ink-200 bg-white px-8 py-10 text-center shadow-card">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <h2 className="mt-4 text-base font-semibold text-ink-900">选择一个已验证的个人或企业</h2>
-              <p className="mt-2 text-sm leading-relaxed text-ink-500">
-                选择后可查看其公开内容风格、真实联系方式，并生成邮件、LinkedIn、WhatsApp 或电话话术。
-              </p>
-            </div>
+            <AssistantStartState
+              sessions={filteredSessions}
+              loading={sessionsLoading}
+              onSelect={chooseSession}
+            />
           ) : (
             <div className="mx-auto max-w-6xl space-y-4">
               <AudienceHeader session={activeSession} contact={selectedContact} />
@@ -296,6 +389,21 @@ export function AssistantPage() {
 
                   <div className="workspace-panel p-5">
                     <h2 className="text-sm font-semibold text-ink-900">本次联系设置</h2>
+                    <div className="mt-3 rounded-xl border border-ink-200 bg-ink-50/60 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-ink-800">公开联系方式</p>
+                          <p className="mt-0.5 text-[10px] leading-4 text-ink-500">
+                            当前 {activeSession.contacts.length} 条；可重新检查官网及公开社交主页中的邮箱、电话和个人主页。
+                          </p>
+                        </div>
+                        <button type="button" onClick={() => void refreshPublicContacts()} disabled={contactLoading} className="btn-secondary shrink-0 px-2.5 py-1.5 text-[10px] disabled:opacity-60">
+                          <RefreshCw className={cn('h-3 w-3', contactLoading && 'animate-spin')} />
+                          {contactLoading ? '抓取中' : '补充联系人'}
+                        </button>
+                      </div>
+                      {contactError && <p className="mt-2 text-[10px] leading-4 text-amber-700">{contactError}</p>}
+                    </div>
                     <label className="mt-4 block text-xs font-medium text-ink-600">
                       联系对象
                       <select
@@ -430,7 +538,98 @@ export function AssistantPage() {
   )
 }
 
+function AssistantStartState({
+  sessions,
+  loading,
+  onSelect,
+}: {
+  sessions: ChatSession[]
+  loading: boolean
+  onSelect: (id: string) => void
+}) {
+  const steps = [
+    {
+      icon: Search,
+      number: '01',
+      title: '发现并选择对象',
+      description: '从真实公开来源选择个人、企业、供应商或中介。',
+    },
+    {
+      icon: ShieldCheck,
+      number: '02',
+      title: '核对来源与联系方式',
+      description: '确认邮箱、电话或社交主页；缺失项会明确标为待研究。',
+    },
+    {
+      icon: Sparkles,
+      number: '03',
+      title: '生成并确认话术',
+      description: 'AI 模仿公开内容习惯生成多渠道草稿，由你确认后打开对应渠道。',
+    },
+  ]
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-5">
+      <section className="rounded-3xl border border-ink-200 bg-white p-6 shadow-card sm:p-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="workspace-kicker">OUTREACH WORKFLOW</p>
+            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-ink-900">
+              从真实对象到可发送话术，三步完成
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-500">
+              左侧搜索会匹配姓名、公司、职位、邮箱和电话。选择对象后，主区域会显示来源、内容习惯、联系目标与下一步操作。
+            </p>
+          </div>
+          <Link to="/app/discover?selectFor=assistant" className="workspace-primary-action shrink-0 justify-center">
+            <Plus className="h-4 w-4" /> 选择新的销售机会
+          </Link>
+        </div>
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          {steps.map((step) => {
+            const Icon = step.icon
+            return (
+              <div key={step.number} className="rounded-2xl border border-ink-200 bg-ink-50/55 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-700"><Icon className="h-4 w-4" /></span>
+                  <span className="text-[10px] font-semibold text-ink-300">{step.number}</span>
+                </div>
+                <h3 className="mt-4 text-sm font-semibold text-ink-900">{step.title}</h3>
+                <p className="mt-1.5 text-xs leading-5 text-ink-500">{step.description}</p>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {!loading && sessions.length > 0 && (
+        <section className="rounded-3xl border border-ink-200 bg-white p-5 shadow-card sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-ink-900">选择一个对象开始</h2>
+              <p className="mt-1 text-xs text-ink-500">当前搜索匹配 {sessions.length} 个真实来源对象</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {sessions.slice(0, 6).map((session) => (
+              <button key={session.id} type="button" onClick={() => onSelect(session.id)} className="flex items-center gap-3 rounded-2xl border border-ink-200 p-3 text-left transition hover:border-brand-300 hover:bg-brand-50/35">
+                <Avatar initials={session.initials} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ink-900">{session.customerName}</span>
+                  <span className="mt-0.5 block truncate text-xs text-ink-500">{audienceLabel(session.audienceType)} · 综合 {sessionScore(session).overall}</span>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-ink-300" />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
 function AudienceHeader({ session, contact }: { session: ChatSession; contact: ContactProfile | null }) {
+  const scores = sessionScore(session)
   return (
     <section className="workspace-panel flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-4">
@@ -438,14 +637,27 @@ function AudienceHeader({ session, contact }: { session: ChatSession; contact: C
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-ink-900">{contact?.name !== 'Unknown' ? contact?.name : session.customerName}</h2>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
-              <ShieldCheck className="h-3 w-3" /> 已验证来源
+            <span className={cn(
+              'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold',
+              session.contactReadiness === 'ready'
+                ? 'bg-emerald-50 text-emerald-700'
+                : session.contactReadiness === 'review'
+                  ? 'bg-amber-50 text-amber-700'
+                  : 'bg-brand-50 text-brand-700',
+            )}>
+              <ShieldCheck className="h-3 w-3" /> {readinessLabel(session.contactReadiness)}
             </span>
           </div>
           <p className="mt-1 flex items-center gap-2 text-sm text-ink-500">
             {session.company ? <Building2 className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
             {contact?.jobTitle !== 'Unknown' ? `${contact?.jobTitle} · ` : ''}{session.company ?? session.displayName}
           </p>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-ink-500">
+            <span className="rounded-full bg-ink-100 px-2 py-1">{audienceLabel(session.audienceType)}</span>
+            <span className="rounded-full bg-ink-100 px-2 py-1">综合 {scores.overall}</span>
+            <span className="rounded-full bg-ink-100 px-2 py-1">意向 {scores.intent}</span>
+            <span className="rounded-full bg-ink-100 px-2 py-1">联系 {scores.contact}</span>
+          </div>
         </div>
       </div>
       <a href={session.profileUrl || session.sourceUrl} target="_blank" rel="noreferrer" className="workspace-secondary-action">
@@ -551,4 +763,31 @@ function languageLabel(value: ChatSession['communicationProfile']['language']) {
 
 function toneLabel(value: ChatSession['communicationProfile']['tone']) {
   return { concise: '表达简洁', detailed: '信息详细', technical: '技术导向', conversational: '自然交流' }[value]
+}
+
+function audienceLabel(value: ChatSession['audienceType']) {
+  return {
+    person: '个人联系人',
+    company: '企业客户',
+    supplier: '供应商',
+    intermediary: '中介 / 渠道',
+  }[value ?? 'company']
+}
+
+function readinessLabel(value: ChatSession['contactReadiness']) {
+  return {
+    ready: '可直接联系',
+    research: '待补充联系方式',
+    review: '需先核对来源',
+  }[value ?? 'research']
+}
+
+function sessionScore(session: ChatSession) {
+  return session.assistantScores ?? {
+    overall: 0,
+    intent: 0,
+    identity: 0,
+    evidence: 0,
+    contact: 0,
+  }
 }
