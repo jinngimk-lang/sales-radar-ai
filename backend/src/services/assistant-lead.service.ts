@@ -88,6 +88,7 @@ export class AssistantLeadService {
         const { analyses, searchTaskLinks: _links, ...lead } = candidate
         return {
           ...lead,
+          avatarUrl: this.resolveAvatarUrl(candidate),
           analysis: analyses[0] ?? null,
           communicationProfile: deriveCommunicationProfile(lead),
           audienceType: this.classifyAudience(candidate),
@@ -217,6 +218,41 @@ export class AssistantLeadService {
 
   private string(value: unknown) {
     return typeof value === 'string' ? value.trim() : ''
+  }
+
+  private resolveAvatarUrl(candidate: AssistantLeadCandidate) {
+    const metadata = this.record(candidate.sourceMetadata)
+    const author = this.recordValue(metadata.author)
+    const profile = this.recordValue(metadata.profile)
+    const candidates = [
+      candidate.avatarUrl,
+      metadata.avatarUrl,
+      metadata.avatar_url,
+      metadata.profileImageUrl,
+      metadata.profile_image_url,
+      metadata.profileImage,
+      metadata.authorAvatar,
+      metadata.author_avatar,
+      metadata.image,
+      author.avatarUrl,
+      author.avatar,
+      author.image,
+      profile.avatarUrl,
+      profile.avatar,
+      profile.image,
+    ]
+
+    for (const value of candidates) {
+      const url = this.string(value)
+      if (this.isHttpUrl(url)) return url
+    }
+    return null
+  }
+
+  private recordValue(value: unknown) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {}
   }
 }
 
