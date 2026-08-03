@@ -11,6 +11,7 @@ import {
   Briefcase,
   Hash,
   Loader2,
+  Bot,
 } from 'lucide-react'
 import { useState } from 'react'
 import type { Customer, LeadResearch } from '@/types'
@@ -44,6 +45,24 @@ export function CustomerCard({ customer, onGenerateEmail }: CustomerCardProps) {
   const actionMeta = customer.recommendedAction ? RECOMMENDED_ACTION_META[customer.recommendedAction] : null
   const typeMeta = CUSTOMER_TYPE_META[customer.customerType]
   const statusMeta = FOLLOW_UP_STATUS_META[crm.followUpStatus]
+  const audienceType = customer.audienceType ??
+    (customer.customerType === 'Individual' || customer.leadType === 'person'
+      ? 'person'
+      : customer.customerType === 'Agent'
+        ? 'intermediary'
+        : 'company')
+  const audienceLabel = {
+    person: '个人联系人',
+    company: '企业客户',
+    supplier: '供应商',
+    intermediary: '中介 / 渠道',
+  }[audienceType]
+  const signalScores = customer.signalScores ?? {
+    overall: analysis.intentScore,
+    intent: analysis.intentScore,
+    identity: 55,
+    evidence: 55,
+  }
 
   const handleCopyLink = () => {
     navigator.clipboard?.writeText(customer.sourceUrl)
@@ -125,6 +144,9 @@ export function CustomerCard({ customer, onGenerateEmail }: CustomerCardProps) {
 
       {/* ===== 2. 元信息条：客户类型 + 行业 + 跟进状态 ===== */}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <span className="chip bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+          {audienceLabel}
+        </span>
         <span className="chip bg-brand-50 text-brand-700 ring-1 ring-brand-100">
           {typeMeta.label}
         </span>
@@ -152,11 +174,16 @@ export function CustomerCard({ customer, onGenerateEmail }: CustomerCardProps) {
             AI 分析
           </div>
           <div className="text-xs text-ink-400">
-            评分 <span className="font-bold text-ink-900">{analysis.intentScore}</span>/100
+            综合 <span className="font-bold text-ink-900">{signalScores.overall}</span>/100
           </div>
         </div>
 
         <IntentScoreBar score={analysis.intentScore} className="mt-2.5" />
+        <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-ink-500">
+          <span>意向 <strong className="text-ink-800">{signalScores.intent}</strong></span>
+          <span>身份 <strong className="text-ink-800">{signalScores.identity}</strong></span>
+          <span>来源 <strong className="text-ink-800">{signalScores.evidence}</strong></span>
+        </div>
 
         {/* 需求关键词 */}
         {analysis.needKeywords && analysis.needKeywords.length > 0 && (
@@ -283,10 +310,17 @@ export function CustomerCard({ customer, onGenerateEmail }: CustomerCardProps) {
         </button>
         <button
           onClick={() => onGenerateEmail(customer, 'email')}
-          className="ml-auto btn-primary px-3 py-1.5 text-xs"
+          className="ml-auto btn-secondary px-3 py-1.5 text-xs"
         >
           <Sparkles className="h-3.5 w-3.5" />
-          生成开发信
+          快速生成
+        </button>
+        <button
+          onClick={() => navigate(`/app/assistant?leadId=${encodeURIComponent(customer.id)}`)}
+          className="btn-primary px-3 py-1.5 text-xs"
+        >
+          <Bot className="h-3.5 w-3.5" />
+          进入 AI 联络
         </button>
       </div>
 
