@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowUpRight,
   Building2,
@@ -419,18 +419,37 @@ function BrowserContent({
 function LiveWebPreview({ url, title }: { url: string; title: string }) {
   const [loadKey, setLoadKey] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const loadTimeout = useRef<number | null>(null)
+  const media = resolveVisualMedia(url)
+  const upgradedToHttps = url.startsWith('http://') && media.url.startsWith('https://')
 
   useEffect(() => {
     setLoading(true)
+    setLoadFailed(false)
+    if (loadTimeout.current !== null) window.clearTimeout(loadTimeout.current)
+    loadTimeout.current = window.setTimeout(() => {
+      setLoading(false)
+      setLoadFailed(true)
+    }, 12_000)
+    return () => {
+      if (loadTimeout.current !== null) window.clearTimeout(loadTimeout.current)
+    }
   }, [url, loadKey])
 
-  const media = resolveVisualMedia(url)
+  const finishLoading = (failed = false) => {
+    if (loadTimeout.current !== null) window.clearTimeout(loadTimeout.current)
+    loadTimeout.current = null
+    setLoading(false)
+    setLoadFailed(failed)
+  }
 
   return (
     <div className="relative min-h-[560px] flex-1 overflow-hidden bg-ink-100">
       <div className="flex items-center justify-between gap-3 border-b border-ink-200 bg-ink-50/90 px-4 py-2 text-[10px] text-ink-500">
         <span className="min-w-0 truncate">
           正在显示：<strong className="font-semibold text-ink-700">{title}</strong>
+          {upgradedToHttps && <span className="ml-2 text-emerald-700">已安全升级为 HTTPS 预览</span>}
         </span>
         <button
           type="button"
@@ -457,8 +476,8 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
             alt={title}
             referrerPolicy="no-referrer"
             className="max-h-[760px] max-w-full object-contain"
-            onLoad={() => setLoading(false)}
-            onError={() => setLoading(false)}
+            onLoad={() => finishLoading()}
+            onError={() => finishLoading(true)}
           />
         </div>
       ) : media.type === 'video' ? (
@@ -469,8 +488,8 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
             controls
             playsInline
             className="max-h-[760px] max-w-full"
-            onLoadedData={() => setLoading(false)}
-            onError={() => setLoading(false)}
+            onLoadedData={() => finishLoading()}
+            onError={() => finishLoading(true)}
           />
         </div>
       ) : (
@@ -482,8 +501,19 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation"
           allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
           referrerPolicy="no-referrer"
-          onLoad={() => setLoading(false)}
+          onLoad={() => finishLoading()}
         />
+      )}
+
+      {loadFailed && (
+        <div className="absolute inset-x-4 top-20 z-20 rounded-2xl border border-amber-200 bg-white/95 p-5 text-center shadow-card backdrop-blur">
+          <Globe2 className="mx-auto h-6 w-6 text-amber-600" />
+          <p className="mt-2 text-sm font-semibold text-ink-900">该站点没有允许在应用内显示实时画面</p>
+          <p className="mt-1 text-xs leading-5 text-ink-500">可能由登录、反爬、X-Frame-Options 或网络策略导致。来源仍然真实，使用独立窗口可查看完整图片、视频与网页交互。</p>
+          <a href={url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700">
+            打开原网页 <ArrowUpRight className="h-3.5 w-3.5" />
+          </a>
+        </div>
       )}
 
       <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-ink-200 bg-white/95 px-3 py-1.5 text-center text-[9px] text-ink-500 shadow-sm backdrop-blur">
@@ -498,12 +528,14 @@ function resolveVisualMedia(value: string): {
   url: string
 } {
   const url = new URL(value)
+  if (url.protocol === 'http:') url.protocol = 'https:'
+  const previewUrl = url.href
   const path = url.pathname.toLowerCase()
   if (/\.(?:avif|gif|jpe?g|png|svg|webp)$/i.test(path)) {
-    return { type: 'image', url: value }
+    return { type: 'image', url: previewUrl }
   }
   if (/\.(?:mp4|m4v|mov|ogv|webm)$/i.test(path)) {
-    return { type: 'video', url: value }
+    return { type: 'video', url: previewUrl }
   }
   if (url.hostname === 'youtu.be') {
     const id = url.pathname.split('/').filter(Boolean)[0]
@@ -519,7 +551,7 @@ function resolveVisualMedia(value: string): {
       return { type: 'page', url: `https://player.vimeo.com/video/${id}` }
     }
   }
-  return { type: 'page', url: value }
+  return { type: 'page', url: previewUrl }
 }
 
 function ResearchDocument({
