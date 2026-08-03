@@ -138,6 +138,14 @@ describe('Radar Intelligence Layer Phase 2C persistence', () => {
       `https://example.com/radar/end-customer-${suffix}`,
     )
     assert.equal(workspaceItem?.evidence.companyName, 'Acme Foods')
+    assert.equal(workspaceItem?.evidence.normalizedDomain, null)
+    assert.match(
+      workspaceItem?.evidence.excerpt ?? '',
+      /factory expansion in Europe/,
+    )
+    assert.equal(workspaceItem?.evidence.identityStatus, 'VERIFIED')
+    assert.equal(workspaceItem?.evidence.evidenceStatus, 'VALID')
+    assert.ok(workspaceItem?.evidence.updatedAt instanceof Date)
     assert.deepEqual(await salesEntityCounts(), before)
   })
 

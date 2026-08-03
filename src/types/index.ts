@@ -505,12 +505,17 @@ export interface RadarAssessment {
   evidence: {
     id: string
     companyName: string | null
+    normalizedDomain?: string | null
     rawUrl: string
     title: string | null
+    excerpt?: string
     provider: string
     platform: Platform
+    identityStatus?: string
+    evidenceStatus?: string
     publishedAt?: string | null
     createdAt: string
+    updatedAt?: string
   }
 }
 

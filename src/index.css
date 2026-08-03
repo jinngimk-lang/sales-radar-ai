@@ -263,6 +263,10 @@
     @apply mt-1 w-full appearance-none bg-transparent text-xs font-medium text-ink-800 outline-none placeholder:font-normal placeholder:text-ink-400;
   }
 
+  .radar-filter-control {
+    @apply min-h-10 w-full appearance-none rounded-xl border border-ink-200 bg-white px-3 text-sm font-medium text-ink-800 outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10;
+  }
+
   .market-workspace {
     @apply overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card;
   }

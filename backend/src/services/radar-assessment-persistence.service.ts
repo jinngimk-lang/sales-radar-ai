@@ -40,11 +40,16 @@ export type RadarAssessmentWorkspaceItem = Omit<
   evidence: {
     id: string
     companyName: string | null
+    normalizedDomain: string | null
     rawUrl: string
     title: string | null
+    excerpt: string
     provider: string
     platform: Platform
+    identityStatus: string
+    evidenceStatus: string
     createdAt: Date
+    updatedAt: Date
   }
 }
 
@@ -225,21 +230,38 @@ export class RadarAssessmentPersistenceService {
           select: {
             id: true,
             companyName: true,
+            normalizedDomain: true,
             rawUrl: true,
             title: true,
+            content: true,
             provider: true,
             platform: true,
+            identityStatus: true,
+            evidenceStatus: true,
             createdAt: true,
+            updatedAt: true,
           },
         },
       },
     })
 
-    return assessments.map(({ searchEvidence, ...assessment }) => ({
-      ...assessment,
-      evidence: searchEvidence,
-    }))
+    return assessments.map(({ searchEvidence, ...assessment }) => {
+      const { content, ...evidence } = searchEvidence
+      return {
+        ...assessment,
+        evidence: {
+          ...evidence,
+          excerpt: evidenceExcerpt(content),
+        },
+      }
+    })
   }
+}
+
+function evidenceExcerpt(content: string) {
+  const normalized = content.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= 360) return normalized
+  return `${normalized.slice(0, 357).trimEnd()}...`
 }
 
 function buildUserIntentSnapshot(

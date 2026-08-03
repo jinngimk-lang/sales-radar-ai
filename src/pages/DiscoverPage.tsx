@@ -5,7 +5,6 @@ import {
   Building2,
   CheckCircle2,
   ChevronDown,
-  CircleGauge,
   Crosshair,
   Factory,
   Linkedin,
@@ -225,9 +224,13 @@ export function DiscoverPage() {
 
     // 同步 URL
     if (filters.query) {
-      setSearchParams({ q: filters.query }, { replace: true })
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.set('q', filters.query)
+      setSearchParams(nextParams, { replace: true })
     } else {
-      setSearchParams({}, { replace: true })
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete('q')
+      setSearchParams(nextParams, { replace: true })
     }
 
   }, [filters.query, searchParams, setSearchParams])
@@ -288,12 +291,6 @@ export function DiscoverPage() {
     return 0 // 时间排序暂用原顺序
   })
 
-  const highMatchAssessments = radarAssessments.filter(
-    (assessment) => assessment.decision === 'OPPORTUNITY_CREATED',
-  )
-  // Radar API already returns the service-defined order. Keep that order as
-  // the default recommendation instead of adding another frontend model.
-  const recommendedAssessment = radarAssessments[0]
   const sortedOpportunities = [...opportunities].sort((a, b) => {
     if (opportunitySort === 'confidence') {
       return b.confidence - a.confidence
@@ -315,7 +312,7 @@ export function DiscoverPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-ink-50 scrollbar-thin">
-      <div className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
+      <div className="mx-auto max-w-[1640px] px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
         <header className="mb-7 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="workspace-kicker">OPPORTUNITY DISCOVERY</p>
@@ -502,6 +499,11 @@ export function DiscoverPage() {
                 strategy={searchStrategy}
               />
             )}
+
+            <div className="mt-3 flex flex-col gap-1 rounded-xl border border-dashed border-ink-200 bg-ink-50 px-3 py-2 text-[11px] text-ink-500 sm:flex-row sm:items-center sm:justify-between">
+              <span><strong className="text-ink-700">Radar Credits</strong> · 本轮不会扣除积分</span>
+              <span>结果数量由真实来源和去重结果决定；数量上限设置尚未接入搜索服务。</span>
+            </div>
           </div>
         </section>
 
@@ -518,41 +520,12 @@ export function DiscoverPage() {
               />
             ) : (
               <>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <DiscoveryMetric
-                    icon={Target}
-                    label="本次评估"
-                    value={`${radarAssessments.length} 条信息`}
-                    detail="基于当前搜索任务的真实来源"
-                  />
-                  <DiscoveryMetric
-                    icon={CircleGauge}
-                    label="高匹配机会"
-                    value={`${highMatchAssessments.length} 个`}
-                    detail="建议关注，仍需销售进一步验证"
-                  />
-                  <DiscoveryMetric
-                    icon={Sparkles}
-                    label="建议优先关注"
-                    value={
-                      recommendedAssessment?.evidence.companyName ||
-                      recommendedAssessment?.evidence.title ||
-                      '待发现'
-                    }
-                    detail={
-                      recommendedAssessment
-                        ? `${recommendedAssessment.matchScore}% 匹配度 · ${recommendedAssessment.confidenceScore}% 可信程度`
-                        : '等待真实评估结果'
-                    }
-                  />
-                </div>
-
-                <div className="mt-6 flex gap-3 overflow-x-auto pb-1">
+                <div className="flex gap-3 overflow-x-auto pb-1">
                   <ResultCategoryButton
                     active={resultCategory === 'radar'}
                     icon={Radar}
-                    title={`Radar 判断 ${radarAssessments.length}`}
-                    description="解释真实信息与当前销售目标的关系"
+                    title={`真实信息 ${radarAssessments.length}`}
+                    description="查看来源、评分、风险与待确认事项"
                     onClick={() => setResultCategory('radar')}
                   />
                   <ResultCategoryButton
@@ -571,7 +544,7 @@ export function DiscoverPage() {
                   />
                 </div>
 
-                <div className="mt-5 flex items-center justify-between border-b border-ink-200 pb-4">
+                {resultCategory !== 'radar' && <div className="mt-5 flex items-center justify-between border-b border-ink-200 pb-4">
                   <p className="text-sm text-ink-600">
                     当前显示{' '}
                     <span className="font-semibold text-ink-900">
@@ -628,16 +601,16 @@ export function DiscoverPage() {
                         最新发布
                       </button>
                     </div>
-                  ) : (
-                    <span className="text-xs text-ink-500">
-                      可按评估分类、匹配度、可信程度和风险排序
-                    </span>
-                  )}
-                </div>
+                  ) : null}
+                </div>}
 
                 {resultCategory === 'radar' ? (
                   <div className="mt-5">
-                    <RadarWorkspace assessments={radarAssessments} />
+                    <RadarWorkspace
+                      assessments={radarAssessments}
+                      confirmedLeadCount={customers.length}
+                      onShowConfirmedLeads={() => setResultCategory('leads')}
+                    />
                   </div>
                 ) : (
                   <div className="mt-5 flex gap-6">
@@ -913,31 +886,6 @@ function ScanProgress({ query }: { query: string }) {
         ))}
       </div>
     </section>
-  )
-}
-
-function DiscoveryMetric({
-  icon: Icon,
-  label,
-  value,
-  detail,
-}: {
-  icon: LucideIcon
-  label: string
-  value: string
-  detail: string
-}) {
-  return (
-    <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card">
-      <div className="flex items-center gap-2 text-xs font-semibold text-ink-500">
-        <Icon className="h-4 w-4 text-brand-600" />
-        {label}
-      </div>
-      <p className="mt-3 truncate text-lg font-semibold tracking-[-0.025em] text-ink-900">
-        {value}
-      </p>
-      <p className="mt-1 text-[11px] text-ink-500">{detail}</p>
-    </div>
   )
 }
 
