@@ -901,7 +901,7 @@ export interface MarketResearchTraceStep {
 export interface MarketResearchSession {
   id: string
   status: 'completed' | 'no_results'
-  provider: 'openai-web' | 'qwen-web'
+  provider: 'openai-web' | 'qwen-web' | 'exa-web'
   model: string
   startedAt: string
   completedAt: string

@@ -5,7 +5,11 @@ import {
   type MarketSignal,
 } from '@prisma/client'
 import { AppError } from '../../utils/app-error.js'
-import type { SearchResult } from '../../providers/search/search-provider.interface.js'
+import type {
+  SearchProvider,
+  SearchResult,
+} from '../../providers/search/search-provider.interface.js'
+import { agentReachProvider } from '../../providers/search/agent-reach.provider.js'
 import {
   marketIntelligence,
   type MarketSignalCapture,
@@ -59,7 +63,7 @@ export interface MarketResearchTraceStep {
 export interface MarketResearchSession {
   id: string
   status: 'completed' | 'no_results'
-  provider: 'openai-web' | 'qwen-web'
+  provider: 'openai-web' | 'qwen-web' | 'exa-web'
   model: string
   startedAt: string
   completedAt: string
@@ -85,6 +89,7 @@ interface MarketWebResearchOptions {
   fetcher?: typeof fetch
   now?: () => Date
   persistence?: MarketResearchPersistence
+  searchProvider?: SearchProvider
 }
 
 interface SourceDraft {
@@ -102,12 +107,14 @@ export class MarketWebResearchService {
   private readonly fetcher: typeof fetch
   private readonly now: () => Date
   private readonly persistence: MarketResearchPersistence
+  private readonly searchProvider: SearchProvider
 
   constructor(options: MarketWebResearchOptions = {}) {
     this.environment = options.environment ?? process.env
     this.fetcher = options.fetcher ?? fetch
     this.now = options.now ?? (() => new Date())
     this.persistence = options.persistence ?? marketIntelligence
+    this.searchProvider = options.searchProvider ?? agentReachProvider
   }
 
   async run(
@@ -116,6 +123,9 @@ export class MarketWebResearchService {
   ): Promise<MarketResearchSession> {
     const config = readHostedResearchConfig(this.environment)
     if (!config) {
+      if (this.environment.EXA_API_KEY?.trim()) {
+        return this.runExaResearch(userId, target)
+      }
       throw new AppError(
         503,
         'MARKET_RESEARCH_PROVIDER_UNAVAILABLE',
@@ -149,6 +159,82 @@ export class MarketWebResearchService {
       queries: extracted.queries,
       sources: extracted.sources,
       trace: extracted.trace,
+      signals,
+    }
+  }
+
+  private async runExaResearch(
+    userId: string,
+    target: MarketResearchTarget,
+  ): Promise<MarketResearchSession> {
+    const startedAt = this.now()
+    const query = buildExaResearchQuery(target)
+    let results: SearchResult[]
+    try {
+      results = await this.searchProvider.search({
+        keyword: query,
+        platforms: [Platform.Website],
+        regions: configuredRegion(target.region),
+      })
+    } catch (error) {
+      throw new AppError(
+        502,
+        'MARKET_RESEARCH_UPSTREAM_ERROR',
+        error instanceof Error ? error.message : 'Exa web research failed',
+        { provider: 'exa-web' },
+      )
+    }
+
+    const accessedAt = startedAt.toISOString()
+    const sources = results.flatMap((result, index) => {
+      const url = httpUrl(result.sourceUrl)
+      if (!url) return []
+      const title =
+        stringValue(result.metadata.title) ||
+        result.company ||
+        new URL(url).hostname.replace(/^www\./, '')
+      const summary = result.rawContent.replace(/\s+/g, ' ').trim().slice(0, 2_000)
+      return [
+        {
+          id: `source-${index + 1}`,
+          url,
+          title,
+          summary: summary || null,
+          hostname: new URL(url).hostname.replace(/^www\./, ''),
+          sourceType: classifySourceType(url, title),
+          status: 'consulted' as const,
+          accessedAt,
+        },
+      ]
+    }).slice(0, MAX_SOURCES)
+    const signals = await this.persistSources(
+      userId,
+      'exa-web',
+      target,
+      sources,
+    )
+    const completedAt = this.now()
+
+    return {
+      id: `exa-market-research-${completedAt.getTime()}`,
+      status: sources.length > 0 ? 'completed' : 'no_results',
+      provider: 'exa-web',
+      model: 'exa-web-search',
+      startedAt: accessedAt,
+      completedAt: completedAt.toISOString(),
+      summary: buildExaSourceSummary(sources),
+      queries: [query],
+      trace: [
+        {
+          id: 'trace-1',
+          action: 'search',
+          label: `搜索：${query}`,
+          query,
+          url: null,
+          status: 'completed',
+        },
+      ],
+      sources,
       signals,
     }
   }
@@ -231,7 +317,7 @@ export class MarketWebResearchService {
 
   private async persistSources(
     userId: string,
-    provider: 'openai-web' | 'qwen-web',
+    provider: 'openai-web' | 'qwen-web' | 'exa-web',
     target: MarketResearchTarget,
     sources: MarketResearchSource[],
   ): Promise<MarketSignal[]> {
@@ -251,6 +337,47 @@ export class MarketWebResearchService {
     }
     return stored
   }
+}
+
+function buildExaResearchQuery(target: MarketResearchTarget) {
+  const focus: Record<MarketResearchSignalFocus, string> = {
+    ALL: 'company expansion investment digital transformation hiring market change',
+    FACTORY_EXPANSION: 'factory expansion new plant capacity production line',
+    INVESTMENT: 'investment funding capital expenditure acquisition',
+    DIGITAL_TRANSFORMATION: 'digital transformation automation ERP MES AI upgrade',
+    HIRING_SIGNAL: 'hiring jobs recruitment expansion',
+    POLICY_CHANGE: 'policy regulation government compliance change',
+    INDUSTRY_TREND: 'industry trend market report demand growth',
+  }
+  return [
+    target.product,
+    target.industry,
+    target.region,
+    target.customerType,
+    focus[target.signalFocus || 'ALL'],
+  ].filter(Boolean).join(' ')
+}
+
+function buildExaSourceSummary(sources: MarketResearchSource[]) {
+  if (sources.length === 0) {
+    return 'Exa 已完成公开网页检索，但没有返回可验证的相关来源。'
+  }
+  const highlights = sources.slice(0, 5).map((source, index) => {
+    const excerpt = source.summary
+      ? source.summary.slice(0, 180).trimEnd()
+      : '请打开原文核验。'
+    return `${index + 1}. ${source.title}：${excerpt}`
+  })
+  return [
+    `Exa 返回 ${sources.length} 个真实公开来源。以下是来源原文摘要，不是大模型推断：`,
+    ...highlights,
+  ].join('\n')
+}
+
+function configuredRegion(value: string | undefined): Region[] {
+  return value && Object.values(Region).includes(value as Region)
+    ? [value as Region]
+    : []
 }
 
 export function readHostedResearchConfig(

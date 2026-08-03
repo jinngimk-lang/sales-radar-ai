@@ -11,6 +11,7 @@ healthRouter.get('/', (_request, response) => {
 healthRouter.get('/capabilities', (_request, response) => {
   const market = readHostedResearchConfig()
   const sales = readAIProviderConfig()
+  const exaEnabled = Boolean(process.env.EXA_API_KEY?.trim())
   const salesAIEnabled =
     sales.provider === 'qwen' &&
     Boolean(sales.apiKey && sales.baseUrl && sales.model)
@@ -18,9 +19,9 @@ healthRouter.get('/capabilities', (_request, response) => {
   response.json({
     data: {
       marketResearch: {
-        enabled: Boolean(market),
-        provider: market?.provider ?? null,
-        model: market?.model ?? null,
+        enabled: Boolean(market) || exaEnabled,
+        provider: market?.provider ?? (exaEnabled ? 'exa-web' : null),
+        model: market?.model ?? (exaEnabled ? 'exa-web-search' : null),
       },
       salesAI: {
         enabled: salesAIEnabled,
@@ -33,7 +34,7 @@ healthRouter.get('/capabilities', (_request, response) => {
         model: null,
       },
       salesDiscovery: {
-        enabled: Boolean(process.env.EXA_API_KEY?.trim()),
+        enabled: exaEnabled,
         provider: 'agent-reach/exa',
         model: null,
       },
