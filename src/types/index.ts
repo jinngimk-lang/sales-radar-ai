@@ -966,6 +966,7 @@ export interface ChatSession {
   customerName: string
   displayName: string
   company: string | null
+  avatarUrl?: string | null
   initials: string
   platform: Platform
   jobTitle: string | null
@@ -1038,10 +1039,18 @@ export interface SalesAgentRunResult {
   requiresApproval: boolean
 }
 
+export interface SalesAgentModelOption {
+  id: string
+  label: string
+  description: string
+}
+
 export interface RuntimeCapability {
   enabled: boolean
   provider: string | null
   model: string | null
+  reason?: 'ready' | 'missing_api_key'
+  models?: SalesAgentModelOption[]
 }
 
 export interface RuntimeCapabilities {
