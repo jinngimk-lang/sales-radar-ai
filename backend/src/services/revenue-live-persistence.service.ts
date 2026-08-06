@@ -120,7 +120,7 @@ export const revenueLivePersistence = {
   },
 
   async getActiveRun(userId: string): Promise<RevenueLiveRunRecord | null> {
-    await ensureRevenueLiveTables()
+    await ensureRevenueLiveTables(userId)
     const rows = await prisma.$queryRaw<RevenueLiveRunRecord[]>`
       SELECT *
       FROM "RevenueLiveRun"
@@ -132,7 +132,7 @@ export const revenueLivePersistence = {
   },
 
   async createRun(input: CreateRevenueLiveRunInput) {
-    await ensureRevenueLiveTables()
+    await ensureRevenueLiveTables(input.userId)
     const id = randomUUID()
     const rows = await prisma.$queryRaw<RevenueLiveRunRecord[]>`
       INSERT INTO "RevenueLiveRun" (
@@ -160,7 +160,7 @@ export const revenueLivePersistence = {
     id: string,
     patch: UpdateRevenueLiveRunInput,
   ) {
-    await ensureRevenueLiveTables()
+    await ensureRevenueLiveTables(userId)
     const rows = await prisma.$queryRaw<RevenueLiveRunRecord[]>`
       UPDATE "RevenueLiveRun"
       SET
@@ -193,7 +193,7 @@ export const revenueLivePersistence = {
     runId: string,
     events: CreateRevenueLiveEventInput[],
   ) {
-    await ensureRevenueLiveTables()
+    await ensureRevenueLiveTables(userId)
     for (const event of events) {
       await prisma.$executeRaw`
         INSERT INTO "RevenueLiveEvent" (
@@ -213,7 +213,7 @@ export const revenueLivePersistence = {
     userId: string,
     runId: string,
   ): Promise<RevenueLiveEventRecord[]> {
-    await ensureRevenueLiveTables()
+    await ensureRevenueLiveTables(userId)
     return prisma.$queryRaw<RevenueLiveEventRecord[]>`
       SELECT *
       FROM "RevenueLiveEvent"
@@ -228,7 +228,8 @@ async function ensureRevenueOpportunityTable(userId: string) {
   await revenuePersistence.getDashboard(userId, 'USD')
 }
 
-async function ensureRevenueLiveTables() {
+async function ensureRevenueLiveTables(userId: string) {
+  await ensureRevenueOpportunityTable(userId)
   liveTableBootstrap ??= (async () => {
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "RevenueLiveRun" (
