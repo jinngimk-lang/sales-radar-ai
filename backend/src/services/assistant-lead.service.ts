@@ -2,9 +2,11 @@ import {
   CustomerType,
   LeadEvidenceStatus,
   LeadIdentityStatus,
+  LeadQualificationStatus,
   Prisma,
   SearchTaskStatus,
 } from '@prisma/client'
+import { CURRENT_QUALIFICATION_VERSION } from '../contracts/qualification-version.contract.js'
 import { prisma } from '../prisma/client.js'
 import { ensureDemoUser } from './demo-user.service.js'
 
@@ -64,8 +66,9 @@ const prismaAssistantLeadRepository: AssistantLeadRepository = {
 
 /**
  * Production visibility boundary for AI Sales Copilot candidates.
- * Qualification is returned as a score/readiness label instead of being used
- * as a display filter, so real people are not discarded for lacking a domain.
+ * A missing domain or direct contact channel does not hide an otherwise
+ * current, verified and evidence-backed Lead; those gaps are shown as
+ * readiness scores instead.
  */
 export class AssistantLeadService {
   constructor(
@@ -102,6 +105,15 @@ export class AssistantLeadService {
     if (candidate.userId !== userId) return false
     if (candidate.provider.trim().toLowerCase() === 'mock') return false
     if (/^(mock|seed|buyer_)/i.test(candidate.externalId)) return false
+    if (candidate.identityStatus !== LeadIdentityStatus.VERIFIED) return false
+    if (candidate.evidenceStatus !== LeadEvidenceStatus.VALID) return false
+    if (!candidate.productRelevancePassed) return false
+    if (candidate.qualificationStatus !== LeadQualificationStatus.QUALIFIED) {
+      return false
+    }
+    if (candidate.qualificationVersion !== CURRENT_QUALIFICATION_VERSION) {
+      return false
+    }
     if (!this.isHttpUrl(candidate.sourceUrl)) return false
     if (!this.hasMeaningfulEvidence(candidate.postContent)) return false
 
