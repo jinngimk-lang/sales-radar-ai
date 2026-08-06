@@ -77,6 +77,7 @@ jobs:
           node --import tsx --test
           tests/agent-reach-provider.test.ts
           tests/agent-reach-runtime.test.ts
+          tests/ai-provider-config.test.ts
           tests/assistant-lead-trust.test.ts
           tests/exa-runtime-config.test.ts
           tests/openai-sales-agent.test.ts
