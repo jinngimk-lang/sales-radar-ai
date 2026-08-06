@@ -34,11 +34,12 @@ test('revenue center separates potential rewards from confirmed revenue', () => 
   assert.match(pageSource, /不计入已确认收益/)
 })
 
-test('revenue center renders the dashboard in an embedded layout after live execution', () => {
+test('revenue center uses one page heading and embeds the existing dashboard after live execution', () => {
   assert.match(operationsPageSource, /收益中心/)
   assert.match(operationsPageSource, /RevenueLiveOpsPanel/)
-  assert.match(operationsPageSource, /RevenueDashboardPage embedded/)
-  assert.match(pageSource, /embedded/)
+  assert.match(operationsPageSource, /data-revenue-dashboard-mode="embedded"/)
+  assert.match(operationsPageSource, /RevenueDashboardPage/)
+  assert.match(operationsPageSource, /\[&>div>div>header\]:hidden/)
 })
 
 test('revenue center renders a real operator-gated cloud browser panel', () => {
