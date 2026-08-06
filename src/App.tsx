@@ -26,9 +26,9 @@ const MarketIntelligenceWorkspacePage = lazy(() =>
     default: m.MarketIntelligenceWorkspacePage,
   })),
 )
-const RevenueDashboardPage = lazy(() =>
-  import('@/pages/RevenueDashboardPage').then((m) => ({
-    default: m.RevenueDashboardPage,
+const RevenueOperationsPage = lazy(() =>
+  import('@/pages/RevenueOperationsPage').then((m) => ({
+    default: m.RevenueOperationsPage,
   })),
 )
 const AccountPage = lazy(() =>
@@ -61,7 +61,7 @@ export default function App() {
         <Route path="customer/:id" element={<Suspense fallback={<PageFallback />}><CustomerDetailPage /></Suspense>} />
         <Route path="assistant" element={<Suspense fallback={<PageFallback />}><AssistantPage /></Suspense>} />
         <Route path="dashboard" element={<Suspense fallback={<PageFallback />}><MarketIntelligenceWorkspacePage /></Suspense>} />
-        <Route path="revenue" element={<Suspense fallback={<PageFallback />}><RevenueDashboardPage /></Suspense>} />
+        <Route path="revenue" element={<Suspense fallback={<PageFallback />}><RevenueOperationsPage /></Suspense>} />
         <Route path="account" element={<Suspense fallback={<PageFallback />}><AccountPage /></Suspense>} />
       </Route>
 
