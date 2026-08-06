@@ -227,7 +227,7 @@ function readString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
-function normalizeHeaders(headers: HeadersInit | undefined) {
+function normalizeHeaders(headers: RequestInit['headers']) {
   if (!headers) return {}
   return Object.fromEntries(new Headers(headers).entries())
 }
