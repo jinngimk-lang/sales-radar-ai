@@ -35,3 +35,11 @@ test('uses the active workspace and accepts no arbitrary prompt or URL', async (
   assert.match(source, /revenueLiveService\.startRun/)
   assert.match(source, /revenueLiveService\.stopRun/)
 })
+
+test('marks protected live view responses private and non-cacheable', async () => {
+  const source = await readSource('../src/controllers/revenue-live.controller.ts')
+
+  assert.match(source, /Cache-Control/)
+  assert.match(source, /private, no-store/)
+  assert.match(source, /setRevenueLiveNoStore/)
+})
