@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import {
   AIProviderFactory,
@@ -7,7 +7,7 @@ import {
 } from '../src/providers/ai-platform/ai-provider.factory.js'
 import { AITaskType } from '../src/providers/ai-platform/ai-task-type.js'
 
-const healthSource = await readFile(
+const healthSource = readFileSync(
   new URL('../src/routes/health.routes.ts', import.meta.url),
   'utf8',
 )
