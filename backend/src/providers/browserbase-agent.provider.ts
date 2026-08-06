@@ -155,10 +155,10 @@ export class BrowserbaseAgentProvider {
         ...init,
         signal: controller.signal,
         headers: {
+          ...normalizeHeaders(init.headers),
           Accept: 'application/json',
           'Content-Type': 'application/json',
           'X-BB-API-Key': this.apiKey,
-          ...normalizeHeaders(init.headers),
         },
       })
 
