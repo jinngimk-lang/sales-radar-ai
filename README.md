@@ -1,80 +1,167 @@
-# Sales Radar AI · 全球客户发现平台
+# Sales Radar AI · 销售机会发现平台
 
-> AI 驱动的全球客户发现 SaaS 产品前端。输入你的产品，自动发现潜在客户、采购需求与销售机会。
+Sales Radar AI 从公开市场信号、公司资料和可追溯证据中发现销售机会，并协助用户完成研究、联系人确认和外联准备。
+
+> 核心边界：AI 辅助研究，但不创造客户事实。只有有来源支持的信息才能进入事实层；真实发送动作必须由用户确认，并依赖已连接的发送渠道。
+
+## 当前能力
+
+- 市场联网研究：OpenAI Responses、Qwen 或 Exa 降级链路
+- 销售机会发现：从公开来源识别人、公司、供应商与中间商
+- 证据与可信度：保留来源 URL、摘录、观察时间和验证状态
+- 公司研究：公司身份、业务理解、匹配度、风险与下一步建议
+- 公开联系人发现：官网邮箱、电话、社交主页及字段级证据
+- GPT 销售执行器：搜索、研究、联系人补充和多渠道外联草稿
+- 运行能力页面：显示服务端实际启用的 Provider、模型和缺失配置
+
+真实邮件、LinkedIn 或 WhatsApp 发送不会被伪造。未连接发送账号时，系统只生成可编辑草稿并打开用户选择的渠道。
 
 ## 技术栈
 
-| 类别 | 选型 |
-|------|------|
-| 框架 | React 18 + TypeScript 5 |
-| 构建 | Vite 5（路由懒加载分包） |
-| 样式 | Tailwind CSS 3.4 + CSS Variables 主题 |
-| 路由 | React Router v6 |
-| 图表 | Recharts |
-| 图标 | lucide-react |
-| 动画 | Tailwind keyframes（fade-in / fade-in-up） |
+### 前端
 
-## 核心页面
+- React 18
+- TypeScript 5
+- Vite 5
+- React Router
+- Tailwind CSS
+- Recharts
 
-| 路由 | 页面 | 说明 |
-|------|------|------|
-| `/` | Landing 首页 | 产品介绍、Hero 搜索、行业覆盖、CTA |
-| `/app/discover` | 客户搜索 | 关键词搜索 + 多维筛选 + 卡片列表 + 一键生成开发信 |
-| `/app/customer/:id` | 客户详情 | AI 深度分析、多渠道触达话术生成 |
-| `/app/assistant` | AI 销售助手 | ChatGPT 风格对话，跟进方案/邮件/报价生成 |
-| `/app/dashboard` | 数据看板 | 趋势/行业/平台分布图表，Recharts 渲染 |
-| `/app/account` | 个人中心 | 账号、API、搜索历史、收藏、CRM 五标签 |
+### 后端
 
-## 设计系统
+- Node.js 20
+- TypeScript
+- Express
+- Prisma
+- PostgreSQL
+- Railway Docker 部署
 
-- **品牌主色**：`#2046d8`（深蓝），辅以 `#3563f0` 渐变
-- **中性色**：`ink-{50..900}` 自定义色阶，替代 Tailwind 默认 gray
-- **字体**：系统无衬线栈，标题 600/700 字重
-- **圆角**：卡片 `rounded-2xl`（16px），按钮 `rounded-xl`（12px）
-- **阴影**：自定义 `shadow-card` / `shadow-card-hover` / `shadow-glow`
+## 本地启动
 
-## 目录结构
-
-```
-src/
-├── components/
-│   ├── ui/            # 基础组件（Avatar / Modal / Logo / Badge）
-│   ├── layout/        # 布局（AppLayout / PublicHeader / PublicFooter）
-│   └── discover/      # 搜索页专用（FilterSidebar / CustomerCard）
-├── pages/             # 6 个页面
-├── services/api.ts    # API 抽象层（当前 mock，未来接入真实后端）
-├── data/              # 模拟数据（客户 / 看板 / 元信息）
-├── types/             # TypeScript 类型定义
-└── lib/utils.ts       # 工具函数 + 意向等级元数据
-```
-
-## 快速开始
+### 1. 前端
 
 ```bash
-# 安装依赖
-npm install
-
-# 启动开发服务器
+cp .env.example .env
+npm ci
 npm run dev
-
-# 生产构建
-npm run build
-
-# 预览生产构建
-npm run preview
 ```
 
-## 接入真实后端
+默认前端地址由 Vite 输出，开发 API 代理目标默认为 `http://localhost:8787`。
 
-所有数据访问统一经过 `src/services/api.ts`。当前使用 mock 数据，未来替换为真实后端只需：
+### 2. 后端
 
-1. 在 `.env` 中配置 `VITE_API_BASE_URL`
-2. 将各方法的 mock 实现替换为 `fetch` / `axios` 调用
-3. 保持返回类型不变，页面组件无需改动
+```bash
+cd backend
+cp .env.example .env
+npm ci
+npm run prisma:generate
+npm run prisma:migrate
+npm run dev
+```
 
-## 项目特点
+后端至少需要：
 
-- **路由懒加载**：首屏 bundle 仅 63KB（gzip），Dashboard 等重页面按需加载
-- **响应式**：桌面侧边栏 + 移动端抽屉适配
-- **无障碍**：模态框焦点管理、ESC 关闭、aria 标签
-- **零 TypeScript 错误**：严格模式编译通过
+- `DATABASE_URL`
+- `JWT_SECRET`
+
+联网 AI 和搜索能力按需配置：
+
+- `OPENAI_API_KEY`：GPT 销售执行器及 OpenAI 市场研究
+- `AI_API_KEY` / `AI_BASE_URL`：Qwen 或兼容 Provider
+- `EXA_API_KEY`：Exa / Agent Reach 搜索
+
+所有密钥只能配置在服务端环境，不得使用 `VITE_*` 暴露给浏览器。
+
+## 验证命令
+
+### 前端
+
+```bash
+npm run typecheck
+npm test
+npm run build
+```
+
+### 后端
+
+```bash
+cd backend
+npm run prisma:generate
+npm run prisma:validate
+npm run typecheck
+npm test
+npm run build
+```
+
+仓库的 GitHub Actions 会在 Pull Request 和 `main` 更新时自动执行前后端核心检查。
+
+## 部署
+
+### 前端
+
+生产环境设置：
+
+```text
+VITE_API_BASE_URL=/api
+```
+
+若前后端使用不同域名，将其改为后端公开 API 地址。
+
+### Railway 后端
+
+Railway 使用 `backend/Dockerfile` 构建，并在部署前执行：
+
+```text
+prisma migrate deploy
+```
+
+必须配置：
+
+- `DATABASE_URL`
+- `JWT_SECRET`
+
+建议配置：
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+- `EXA_API_KEY`
+- `AI_PROVIDER`
+- `AI_MODEL`
+- `AI_API_KEY`
+- `AI_BASE_URL`
+
+部署后检查：
+
+- `/api/health` 返回 `status: ok`
+- `/api/health/capabilities` 如实显示各能力是否启用
+- Account 页面显示与服务端一致的运行状态
+
+## 主要页面
+
+| 路由 | 功能 |
+|---|---|
+| `/app/dashboard` | 市场机会中心与联网研究 |
+| `/app/discover` | 销售机会、证据筛选与客户确认 |
+| `/app/customer/:id` | 公司研究、联系人、渠道与销售建议 |
+| `/app/assistant` | GPT 销售执行器与外联准备 |
+| `/app/account` | 工作区和运行能力状态 |
+
+## 数据真实性原则
+
+```text
+Source
+  ↓
+Evidence
+  ↓
+Fact
+  ↓
+Assessment
+  ↓
+Recommendation
+```
+
+- 不根据姓名或域名猜测邮箱和电话
+- 不把身份线索误标为“可直接联系”
+- 不把 Opportunity 自动当作已确认 Lead
+- 不把草稿或打开外部渠道描述为“已发送”
+- 不在仓库、日志或前端保存密钥和敏感用户数据
