@@ -34,8 +34,6 @@ import {
 const PREVIEW_DESKTOP_WIDTH = 1440
 const PREVIEW_DOCUMENT_HEIGHT = 1800
 
-type PreviewMode = 'iframe' | 'snapshot'
-
 const SOURCE_META: Record<
   MarketResearchSourceType,
   { label: string; icon: typeof Globe2 }
@@ -409,7 +407,7 @@ function BrowserContent({
             )}
           >
             <Globe2 className="h-3.5 w-3.5" />
-            实时网页
+            网页画面
           </button>
           <button
             type="button"
@@ -459,7 +457,7 @@ function BrowserContent({
                 </h2>
                 <p className="mt-4 text-sm leading-7 text-ink-600">
                   {summary ||
-                    '这个网址是你临时输入的实时预览，尚未经过市场研究流程。需要保存证据时，请用目标扫描让系统检索并生成带来源的研究结果。'}
+                    '这个网址是你临时输入的网页预览，尚未经过市场研究流程。需要保存证据时，请用目标扫描让系统检索并生成带来源的研究结果。'}
                 </p>
               </article>
             )}
@@ -481,9 +479,7 @@ function LiveWebPreview({
 }) {
   const [loadKey, setLoadKey] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [previewMode, setPreviewMode] = useState<PreviewMode>('iframe')
   const [previewScale, setPreviewScale] = useState(1)
-  const loadTimeout = useRef<number | null>(null)
   const previewContainerRef = useRef<HTMLDivElement | null>(null)
   const media = resolveVisualMedia(url)
   const upgradedToHttps =
@@ -509,22 +505,9 @@ function LiveWebPreview({
 
   useEffect(() => {
     setLoading(true)
-    setPreviewMode('iframe')
-    if (loadTimeout.current !== null) window.clearTimeout(loadTimeout.current)
-    if (media.type === 'page') {
-      loadTimeout.current = window.setTimeout(() => {
-        setLoading(true)
-        setPreviewMode('snapshot')
-      }, 12_000)
-    }
-    return () => {
-      if (loadTimeout.current !== null) window.clearTimeout(loadTimeout.current)
-    }
   }, [url, loadKey, media.type])
 
   const finishLoading = () => {
-    if (loadTimeout.current !== null) window.clearTimeout(loadTimeout.current)
-    loadTimeout.current = null
     setLoading(false)
   }
 
@@ -588,7 +571,7 @@ function LiveWebPreview({
               onError={fallBackSilently}
             />
           </div>
-        ) : previewMode === 'snapshot' ? (
+        ) : media.type === 'page' ? (
           <div className="min-h-full bg-white">
             <img
               key={`snapshot-${url}-${loadKey}`}
@@ -600,7 +583,7 @@ function LiveWebPreview({
               onError={fallBackSilently}
             />
           </div>
-        ) : (
+        ) : media.type === 'embed' ? (
           <div
             className="relative overflow-hidden bg-white"
             style={{
@@ -625,11 +608,11 @@ function LiveWebPreview({
               onLoad={finishLoading}
             />
           </div>
-        )}
+        ) : null}
 
         <div className="pointer-events-none sticky bottom-3 z-10 mx-auto w-fit rounded-full border border-ink-200 bg-white/95 px-3 py-1.5 text-center text-[9px] text-ink-500 shadow-sm backdrop-blur">
-          {previewMode === 'snapshot'
-            ? '网页快照已自动适配；上下滚动查看完整页面'
+          {media.type === 'page'
+            ? '网页快照已按完整桌面宽度适配；上下滚动查看页面'
             : '页面按 1440px 桌面宽度完整缩放；上下滚动查看内容，左右两端保持可见'}
         </div>
       </div>
@@ -642,7 +625,7 @@ function buildSnapshotUrl(value: string): string {
 }
 
 function resolveVisualMedia(value: string): {
-  type: 'page' | 'image' | 'video'
+  type: 'page' | 'embed' | 'image' | 'video'
   url: string
 } {
   const url = new URL(value)
@@ -657,16 +640,16 @@ function resolveVisualMedia(value: string): {
   }
   if (url.hostname === 'youtu.be') {
     const id = url.pathname.split('/').filter(Boolean)[0]
-    if (id) return { type: 'page', url: `https://www.youtube.com/embed/${id}` }
+    if (id) return { type: 'embed', url: `https://www.youtube.com/embed/${id}` }
   }
   if (/^(?:www\.)?youtube\.com$/i.test(url.hostname)) {
     const id = url.searchParams.get('v')
-    if (id) return { type: 'page', url: `https://www.youtube.com/embed/${id}` }
+    if (id) return { type: 'embed', url: `https://www.youtube.com/embed/${id}` }
   }
   if (/^(?:www\.)?vimeo\.com$/i.test(url.hostname)) {
     const id = url.pathname.split('/').filter(Boolean)[0]
     if (/^\d+$/.test(id || '')) {
-      return { type: 'page', url: `https://player.vimeo.com/video/${id}` }
+      return { type: 'embed', url: `https://player.vimeo.com/video/${id}` }
     }
   }
   return { type: 'page', url: previewUrl }
