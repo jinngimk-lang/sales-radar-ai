@@ -3,15 +3,15 @@ import {
   ArrowUpRight,
   Building2,
   CheckCircle2,
+  CornerDownLeft,
   FileSearch,
+  FileText,
   Globe2,
   LockKeyhole,
   Newspaper,
+  RefreshCw,
   Search,
   Sparkles,
-  CornerDownLeft,
-  FileText,
-  RefreshCw,
 } from 'lucide-react'
 import type {
   MarketResearchSession,
@@ -26,7 +26,12 @@ import {
   type AgentWorkspaceStatus,
 } from '@/components/ui/WorkspaceState'
 import { cn } from '@/lib/utils'
-import { SIGNAL_META } from './market-intelligence.meta'
+import {
+  MARKET_WORKSPACE_HEIGHT,
+  SIGNAL_META,
+} from './market-intelligence.meta'
+
+const PREVIEW_VIEWPORT_SCALE = 0.8
 
 const SOURCE_META: Record<
   MarketResearchSourceType,
@@ -116,12 +121,19 @@ export function MarketBrowserWorkspace({
     setCustomAddress(normalized)
     setAddressInput(normalized)
     setBrowserView('live')
-    setAddressError('该网址不属于本次研究来源；当前仅预览网页，不会把内容保存为市场信号。')
+    setAddressError(
+      '该网址不属于本次研究来源；当前仅预览网页，不会把内容保存为市场信号。',
+    )
   }
 
   return (
-    <Surface className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-ink-200 bg-ink-50/80 px-4 py-3">
+    <Surface
+      className={cn(
+        MARKET_WORKSPACE_HEIGHT,
+        'flex min-h-0 min-w-0 flex-col overflow-hidden',
+      )}
+    >
+      <div className="flex shrink-0 items-center justify-between border-b border-ink-200 bg-ink-50/80 px-4 py-3">
         <div className="flex items-center gap-1.5" aria-hidden="true">
           <span className="h-2.5 w-2.5 rounded-full bg-ink-300" />
           <span className="h-2.5 w-2.5 rounded-full bg-ink-200" />
@@ -145,11 +157,19 @@ export function MarketBrowserWorkspace({
               setAddressInput(event.target.value)
               setAddressError('')
             }}
-            placeholder={status === 'running' ? '云端研究正在打开公开网页…' : '输入或粘贴网址，按 Enter 打开'}
+            placeholder={
+              status === 'running'
+                ? '云端研究正在打开公开网页…'
+                : '输入或粘贴网址，按 Enter 打开'
+            }
             aria-label="云端浏览器网址"
             className="min-w-0 flex-1 bg-transparent text-[11px] text-ink-700 outline-none placeholder:text-ink-400"
           />
-          <button type="submit" aria-label="打开网址" className="rounded p-0.5 text-ink-400 transition hover:text-brand-700">
+          <button
+            type="submit"
+            aria-label="打开网址"
+            className="rounded p-0.5 text-ink-400 transition hover:text-brand-700"
+          >
             <CornerDownLeft className="h-3.5 w-3.5" />
           </button>
         </form>
@@ -165,13 +185,13 @@ export function MarketBrowserWorkspace({
       </div>
 
       {addressError && (
-        <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-[10px] text-amber-700">
+        <div className="shrink-0 border-b border-amber-100 bg-amber-50 px-4 py-2 text-[10px] text-amber-700">
           {addressError}
         </div>
       )}
 
-      <div className="grid min-h-[620px] lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="border-b border-ink-200 bg-ink-50/65 p-3 lg:border-b-0 lg:border-r">
+      <div className="grid min-h-0 min-w-0 flex-1 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="min-h-0 overflow-x-hidden overflow-y-auto border-b border-ink-200 bg-ink-50/65 p-3 scrollbar-thin lg:border-b-0 lg:border-r">
           <div className="flex items-center justify-between px-2 pb-2">
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-ink-400">
               真实研究来源
@@ -186,9 +206,10 @@ export function MarketBrowserWorkspace({
             {PRIMARY_SOURCE_TYPES.map((sourceType) => {
               const meta = SOURCE_META[sourceType]
               const Icon = meta.icon
-              const count = session?.sources.filter(
-                (source) => source.sourceType === sourceType,
-              ).length ?? 0
+              const count =
+                session?.sources.filter(
+                  (source) => source.sourceType === sourceType,
+                ).length ?? 0
               return (
                 <button
                   key={sourceType}
@@ -211,10 +232,19 @@ export function MarketBrowserWorkspace({
 
           {session?.sources.length ? (
             <div className="mt-4 border-t border-ink-200 pt-3">
-              <button type="button" onClick={() => selectSourceType('all')} className={cn('mb-2 w-full rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold', activeSourceType === 'all' ? 'bg-white text-brand-700' : 'text-ink-500 hover:bg-white')}>
+              <button
+                type="button"
+                onClick={() => selectSourceType('all')}
+                className={cn(
+                  'mb-2 w-full rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold',
+                  activeSourceType === 'all'
+                    ? 'bg-white text-brand-700'
+                    : 'text-ink-500 hover:bg-white',
+                )}
+              >
                 全部来源 · {session.sources.length}
               </button>
-              <div className="max-h-[255px] space-y-1 overflow-y-auto pr-1 scrollbar-thin">
+              <div className="space-y-1 pr-1">
                 {filteredSources.map((source) => (
                   <SourceButton
                     key={source.id}
@@ -235,12 +265,14 @@ export function MarketBrowserWorkspace({
           </p>
         </aside>
 
-        <main className="min-w-0 bg-white">
+        <main className="min-h-0 min-w-0 overflow-hidden bg-white">
           {status === 'running' || status === 'reviewing' ? (
-            <WorkspaceLoading
-              title="云端研究正在浏览公开网页"
-              description="模型正在检索企业官网、新闻、招聘、投资和行业来源；完成后显示实际访问记录。"
-            />
+            <div className="h-full overflow-y-auto">
+              <WorkspaceLoading
+                title="云端研究正在浏览公开网页"
+                description="模型正在检索企业官网、新闻、招聘、投资和行业来源；完成后显示实际访问记录。"
+              />
+            </div>
           ) : customAddress ? (
             <BrowserContent
               url={customAddress}
@@ -262,11 +294,13 @@ export function MarketBrowserWorkspace({
               session={session}
             />
           ) : session && activeSourceType !== 'all' ? (
-            <WorkspaceEmpty
-              icon={SOURCE_META[activeSourceType].icon}
-              title={`本次没有${SOURCE_META[activeSourceType].label}结果`}
-              description="该分类没有被联网研究服务返回。可切换其他分类、重新扫描，或在上方输入网址直接打开。"
-            />
+            <div className="h-full overflow-y-auto">
+              <WorkspaceEmpty
+                icon={SOURCE_META[activeSourceType].icon}
+                title={`本次没有${SOURCE_META[activeSourceType].label}结果`}
+                description="该分类没有被联网研究服务返回。可切换其他分类、重新扫描，或在上方输入网址直接打开。"
+              />
+            </div>
           ) : signal ? (
             <BrowserContent
               url={signal.sourceUrl}
@@ -278,18 +312,22 @@ export function MarketBrowserWorkspace({
               session={null}
               signal={signal}
             />
-          ) : status === 'failed' ? (
-            <WorkspaceEmpty
-              icon={Globe2}
-              title="本次联网研究未完成"
-              description="请检查服务端 AI 凭据或缩小研究范围后重试；系统不会用模拟网页替代失败结果。"
-            />
           ) : (
-            <WorkspaceEmpty
-              icon={Globe2}
-              title="等待云端浏览器开始研究"
-              description="输入产品或服务后开始扫描。完成前不会展示虚构来源或历史网页快照。"
-            />
+            <div className="h-full overflow-y-auto">
+              <WorkspaceEmpty
+                icon={Globe2}
+                title={
+                  status === 'failed'
+                    ? '本次联网研究未完成'
+                    : '等待云端浏览器开始研究'
+                }
+                description={
+                  status === 'failed'
+                    ? '请检查服务端 AI 凭据或缩小研究范围后重试；系统不会用模拟网页替代失败结果。'
+                    : '输入产品或服务后开始扫描。完成前不会展示虚构来源或历史网页快照。'
+                }
+              />
+            </div>
           )}
         </main>
       </div>
@@ -354,8 +392,8 @@ function BrowserContent({
   signal?: MarketSignal
 }) {
   return (
-    <div className="flex min-h-[620px] flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-200 bg-white px-4 py-2.5">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink-200 bg-white px-4 py-2.5">
         <div className="inline-flex rounded-xl border border-ink-200 bg-ink-50 p-1">
           <button
             type="button"
@@ -395,23 +433,32 @@ function BrowserContent({
         </a>
       </div>
 
-      {view === 'live' ? (
-        <LiveWebPreview url={url} title={title} />
-      ) : source && session ? (
-        <ResearchDocument source={source} session={session} />
-      ) : signal ? (
-        <StoredSignalDocument signal={signal} />
-      ) : (
-        <article className="mx-auto max-w-3xl px-6 py-9 sm:px-9">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
-            未保存来源
-          </span>
-          <h2 className="mt-6 text-2xl font-semibold tracking-[-0.035em] text-ink-900">{title}</h2>
-          <p className="mt-4 text-sm leading-7 text-ink-600">
-            {summary || '这个网址是你临时输入的实时预览，尚未经过市场研究流程。需要保存证据时，请用目标扫描让系统检索并生成带来源的研究结果。'}
-          </p>
-        </article>
-      )}
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden">
+        {view === 'live' ? (
+          <LiveWebPreview url={url} title={title} />
+        ) : (
+          <div className="h-full overflow-x-hidden overflow-y-auto scrollbar-thin">
+            {source && session ? (
+              <ResearchDocument source={source} session={session} />
+            ) : signal ? (
+              <StoredSignalDocument signal={signal} />
+            ) : (
+              <article className="mx-auto max-w-3xl px-6 py-9 sm:px-9">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
+                  未保存来源
+                </span>
+                <h2 className="mt-6 text-2xl font-semibold tracking-[-0.035em] text-ink-900">
+                  {title}
+                </h2>
+                <p className="mt-4 text-sm leading-7 text-ink-600">
+                  {summary ||
+                    '这个网址是你临时输入的实时预览，尚未经过市场研究流程。需要保存证据时，请用目标扫描让系统检索并生成带来源的研究结果。'}
+                </p>
+              </article>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -422,7 +469,8 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
   const [loadFailed, setLoadFailed] = useState(false)
   const loadTimeout = useRef<number | null>(null)
   const media = resolveVisualMedia(url)
-  const upgradedToHttps = url.startsWith('http://') && media.url.startsWith('https://')
+  const upgradedToHttps =
+    url.startsWith('http://') && media.url.startsWith('https://')
 
   useEffect(() => {
     setLoading(true)
@@ -445,11 +493,14 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
   }
 
   return (
-    <div className="relative min-h-[560px] flex-1 overflow-hidden bg-ink-100">
-      <div className="flex items-center justify-between gap-3 border-b border-ink-200 bg-ink-50/90 px-4 py-2 text-[10px] text-ink-500">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-ink-100">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-ink-200 bg-ink-50/90 px-4 py-2 text-[10px] text-ink-500">
         <span className="min-w-0 truncate">
-          正在显示：<strong className="font-semibold text-ink-700">{title}</strong>
-          {upgradedToHttps && <span className="ml-2 text-emerald-700">已安全升级为 HTTPS 预览</span>}
+          正在显示：
+          <strong className="font-semibold text-ink-700">{title}</strong>
+          {upgradedToHttps && (
+            <span className="ml-2 text-emerald-700">已安全升级为 HTTPS 预览</span>
+          )}
         </span>
         <button
           type="button"
@@ -461,63 +512,80 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
         </button>
       </div>
 
-      {loading && (
-        <div className="absolute inset-x-0 top-9 z-10 flex h-[calc(100%-36px)] items-center justify-center bg-white/90 text-xs text-ink-500">
-          <RefreshCw className="mr-2 h-4 w-4 animate-spin text-brand-600" />
-          正在载入网页实时画面…
-        </div>
-      )}
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scrollbar-thin">
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 text-xs text-ink-500">
+            <RefreshCw className="mr-2 h-4 w-4 animate-spin text-brand-600" />
+            正在载入网页实时画面…
+          </div>
+        )}
 
-      {media.type === 'image' ? (
-        <div className="flex min-h-[560px] items-center justify-center bg-ink-950 p-4">
-          <img
-            key={loadKey}
+        {media.type === 'image' ? (
+          <div className="flex min-h-full items-center justify-center bg-ink-950 p-4">
+            <img
+              key={loadKey}
+              src={media.url}
+              alt={title}
+              referrerPolicy="no-referrer"
+              className="max-w-full object-contain"
+              onLoad={() => finishLoading()}
+              onError={() => finishLoading(true)}
+            />
+          </div>
+        ) : media.type === 'video' ? (
+          <div className="flex min-h-full items-center justify-center bg-black p-4">
+            <video
+              key={loadKey}
+              src={media.url}
+              controls
+              playsInline
+              className="max-w-full"
+              onLoadedData={() => finishLoading()}
+              onError={() => finishLoading(true)}
+            />
+          </div>
+        ) : (
+          <iframe
+            key={`${url}-${loadKey}`}
             src={media.url}
-            alt={title}
+            title={`云端网页预览：${title}`}
+            className="min-h-[950px] border-0 bg-white"
+            style={{
+              width: `${100 / PREVIEW_VIEWPORT_SCALE}%`,
+              height: `${950 / PREVIEW_VIEWPORT_SCALE}px`,
+              transform: `scale(${PREVIEW_VIEWPORT_SCALE})`,
+              transformOrigin: 'top left',
+            }}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation"
+            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
             referrerPolicy="no-referrer"
-            className="max-h-[760px] max-w-full object-contain"
             onLoad={() => finishLoading()}
-            onError={() => finishLoading(true)}
           />
-        </div>
-      ) : media.type === 'video' ? (
-        <div className="flex min-h-[560px] items-center justify-center bg-black p-4">
-          <video
-            key={loadKey}
-            src={media.url}
-            controls
-            playsInline
-            className="max-h-[760px] max-w-full"
-            onLoadedData={() => finishLoading()}
-            onError={() => finishLoading(true)}
-          />
-        </div>
-      ) : (
-        <iframe
-          key={`${url}-${loadKey}`}
-          src={media.url}
-          title={`云端网页预览：${title}`}
-          className="h-[720px] w-full border-0 bg-white"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation"
-          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-          referrerPolicy="no-referrer"
-          onLoad={() => finishLoading()}
-        />
-      )}
+        )}
 
-      {loadFailed && (
-        <div className="absolute inset-x-4 top-20 z-20 rounded-2xl border border-amber-200 bg-white/95 p-5 text-center shadow-card backdrop-blur">
-          <Globe2 className="mx-auto h-6 w-6 text-amber-600" />
-          <p className="mt-2 text-sm font-semibold text-ink-900">该站点没有允许在应用内显示实时画面</p>
-          <p className="mt-1 text-xs leading-5 text-ink-500">可能由登录、反爬、X-Frame-Options 或网络策略导致。来源仍然真实，使用独立窗口可查看完整图片、视频与网页交互。</p>
-          <a href={url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700">
-            打开原网页 <ArrowUpRight className="h-3.5 w-3.5" />
-          </a>
-        </div>
-      )}
+        {loadFailed && (
+          <div className="absolute inset-x-4 top-12 z-20 rounded-2xl border border-amber-200 bg-white/95 p-5 text-center shadow-card backdrop-blur">
+            <Globe2 className="mx-auto h-6 w-6 text-amber-600" />
+            <p className="mt-2 text-sm font-semibold text-ink-900">
+              该站点没有允许在应用内显示实时画面
+            </p>
+            <p className="mt-1 text-xs leading-5 text-ink-500">
+              可能由登录、反爬、X-Frame-Options 或网络策略导致。来源仍然真实，使用独立窗口可查看完整图片、视频与网页交互。
+            </p>
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"
+            >
+              打开原网页 <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        )}
 
-      <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-ink-200 bg-white/95 px-3 py-1.5 text-center text-[9px] text-ink-500 shadow-sm backdrop-blur">
-        若目标站点禁止嵌入，使用右上角“独立窗口打开”查看完整图片、视频和交互内容
+        <div className="pointer-events-none sticky bottom-3 z-10 mx-auto w-fit rounded-full border border-ink-200 bg-white/95 px-3 py-1.5 text-center text-[9px] text-ink-500 shadow-sm backdrop-blur">
+          页面已按统一桌面宽度缩放；上下滚动查看内容，左右宽度保持固定
+        </div>
       </div>
     </div>
   )
@@ -583,7 +651,8 @@ function ResearchDocument({
         {source.title}
       </h2>
       <p className="mt-4 text-sm leading-7 text-ink-600">
-        {source.summary || '该网页已进入本次研究来源列表，但搜索服务没有返回独立页面摘要。请打开原文核验。'}
+        {source.summary ||
+          '该网页已进入本次研究来源列表，但搜索服务没有返回独立页面摘要。请打开原文核验。'}
       </p>
 
       <section className="mt-7 rounded-2xl border border-brand-100 bg-brand-50/55 p-5">
@@ -663,7 +732,9 @@ function normalizeExternalAddress(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return null
   try {
-    const url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`)
+    const url = new URL(
+      /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`,
+    )
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
     return url.toString()
   } catch {
