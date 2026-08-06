@@ -223,22 +223,6 @@ export const revenuePersistence = {
       )
     }
 
-    if (input.opportunityId) {
-      const ownedOpportunity = await prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT "id"
-        FROM "RevenueOpportunity"
-        WHERE "id" = ${input.opportunityId} AND "userId" = ${input.userId}
-        LIMIT 1
-      `
-      if (!ownedOpportunity[0]) {
-        throw new AppError(
-          404,
-          'REVENUE_OPPORTUNITY_NOT_FOUND',
-          'Revenue opportunity was not found in the active workspace',
-        )
-      }
-    }
-
     const id = randomUUID()
     const [created] = await prisma.$queryRaw<RevenueLedgerRow[]>`
       INSERT INTO "RevenueLedgerEntry" (
