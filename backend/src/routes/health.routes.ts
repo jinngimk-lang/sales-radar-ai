@@ -40,6 +40,12 @@ healthRouter.get('/capabilities', (_request, response) => {
         enabled: salesAIEnabled,
         provider: salesAIEnabled ? sales.provider : 'rule-based',
         model: salesAIEnabled ? sales.model : 'rules-v1',
+        fallback: {
+          enabled: true,
+          provider: 'rule-based',
+          model: 'rules-v1',
+          cost: 'local-zero-api-cost',
+        },
       },
       salesAgent: {
         enabled: salesAgentEnabled,
