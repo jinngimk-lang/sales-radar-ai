@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Check, Radar } from 'lucide-react'
-import type {
-  MarketResearchSession,
-  MarketSignal,
-} from '@/types'
+import { Radar } from 'lucide-react'
+import type { MarketResearchSession, MarketSignal } from '@/types'
 import {
   ApiRequestError,
   getMarketSignals,
@@ -31,18 +28,11 @@ const EMPTY_TARGET: MarketScanTargetValue = {
 
 const INITIAL_AGENT_STATE: MarketAgentWorkspaceState = {
   status: 'idle',
-  message: '设置产品和目标市场后开始联网研究。',
+  message: '设置监控目标后开始联网研究。',
   startedAt: null,
   completedAt: null,
   errorCode: null,
 }
-
-const WORKFLOW = [
-  { label: '设置目标', description: '产品与市场范围' },
-  { label: '联网研究', description: '搜索并打开网页' },
-  { label: '信号识别', description: '保存来源证据' },
-  { label: '销售判断', description: '形成下一步建议' },
-]
 
 export function MarketIntelligenceWorkspacePage() {
   const [signals, setSignals] = useState<MarketSignal[]>([])
@@ -63,7 +53,7 @@ export function MarketIntelligenceWorkspacePage() {
         setSelectedId(items[0]?.id ?? null)
       })
       .catch((error) => {
-        console.error('[MarketWorkspace] Unable to load saved signals', error)
+        console.error('[MarketRadar] Unable to load saved signals', error)
       })
       .finally(() => {
         if (!cancelled) setLoadingSignals(false)
@@ -115,7 +105,7 @@ export function MarketIntelligenceWorkspacePage() {
         errorCode: null,
       })
     } catch (error) {
-      console.error('[MarketWorkspace] Hosted research failed', error)
+      console.error('[MarketRadar] Hosted research failed', error)
       const code = error instanceof ApiRequestError ? error.code : undefined
       setAgentState({
         status: 'failed',
@@ -132,23 +122,18 @@ export function MarketIntelligenceWorkspacePage() {
     }
   }
 
-  const visualStatus = loadingSignals && agentState.status === 'idle'
-    ? 'reviewing'
-    : agentState.status
-  const activeWorkflowStep =
-    visualStatus === 'running' || visualStatus === 'reviewing'
-      ? 1
-      : visualStatus === 'completed'
-        ? 3
-        : 0
+  const visualStatus =
+    loadingSignals && agentState.status === 'idle'
+      ? 'reviewing'
+      : agentState.status
   const showTimeline = signals.length > 0
 
   return (
     <div className="workspace-page pb-12">
       <PageHeader
-        eyebrow="HOSTED MARKET RESEARCH"
-        title="市场机会中心"
-        description="让 AI 主动搜索并打开企业官网、新闻、招聘、投资和行业网页，把真实来源整理成可行动的市场信号。"
+        eyebrow="SOURCE-BACKED MARKET MONITORING"
+        title="市场雷达"
+        description="持续搜索企业官网、新闻、招聘、投资和行业网页，把公开来源整理成可追溯的市场信号、风险和下一步动作。"
         actions={<AgentStatusBadge status={visualStatus} />}
       />
 
@@ -159,38 +144,7 @@ export function MarketIntelligenceWorkspacePage() {
         onStart={() => void runMarketScan()}
       />
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
-        <div className="grid min-w-[700px] grid-cols-4 overflow-x-auto">
-          {WORKFLOW.map((step, index) => (
-            <div
-              key={step.label}
-              className="relative flex items-center gap-3 border-r border-ink-100 px-5 py-4 last:border-r-0"
-            >
-              <span
-                className={cn(
-                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold',
-                  index < activeWorkflowStep
-                    ? 'border-brand-600 bg-brand-600 text-white'
-                    : index === activeWorkflowStep
-                      ? 'border-brand-300 bg-brand-50 text-brand-700'
-                      : 'border-ink-200 bg-white text-ink-400',
-                )}
-              >
-                {index < activeWorkflowStep ? <Check className="h-3.5 w-3.5" /> : `0${index + 1}`}
-              </span>
-              <span>
-                <span className="block text-xs font-semibold text-ink-800">{step.label}</span>
-                <span className="mt-0.5 block text-[10px] text-ink-400">{step.description}</span>
-              </span>
-              {index < WORKFLOW.length - 1 && (
-                <ArrowRight className="absolute right-3 h-3.5 w-3.5 text-ink-300" />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {agentState.status !== 'idle' && (
+      {agentState.status !== 'idle' ? (
         <div
           className={cn(
             'mt-4 flex items-center gap-3 rounded-xl border px-4 py-3 text-xs',
@@ -199,15 +153,21 @@ export function MarketIntelligenceWorkspacePage() {
               : 'border-brand-100 bg-brand-50/60 text-ink-700',
           )}
         >
-          <Radar className={cn('h-4 w-4 shrink-0', agentState.status === 'running' && 'animate-spin')} />
+          <Radar
+            className={cn(
+              'h-4 w-4 shrink-0',
+              agentState.status === 'running' && 'animate-spin',
+            )}
+          />
           <span>{agentState.message}</span>
         </div>
-      )}
+      ) : null}
 
       <div
         className={cn(
           'mt-5 grid gap-5',
-          showTimeline && 'xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.75fr)]',
+          showTimeline &&
+            'xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.75fr)]',
         )}
       >
         <MarketBrowserWorkspace
@@ -224,7 +184,7 @@ export function MarketIntelligenceWorkspacePage() {
             if (matchingSignal) setSelectedId(matchingSignal.id)
           }}
         />
-        {showTimeline && (
+        {showTimeline ? (
           <SignalTimeline
             signals={signals}
             selectedId={selectedSignal?.id ?? null}
@@ -237,14 +197,14 @@ export function MarketIntelligenceWorkspacePage() {
               if (source) setSelectedSourceId(source.id)
             }}
           />
-        )}
+        ) : null}
       </div>
 
-      {selectedSignal && (
+      {selectedSignal ? (
         <div className="mt-5">
           <SignalAssessmentPanel signal={selectedSignal} />
         </div>
-      )}
+      ) : null}
     </div>
   )
 }
