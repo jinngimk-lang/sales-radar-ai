@@ -36,7 +36,6 @@ test('AI home renders one command composer, tool trace, and source-backed entity
   )
 
   assert.match(page, /runSalesAgent/)
-  assert.match(page, /getChatSessions/)
   assert.match(page, /CommandComposer/)
   assert.match(page, /AgentConversation/)
   assert.match(page, /IntelligenceResultGrid/)
@@ -48,6 +47,18 @@ test('AI home renders one command composer, tool trace, and source-backed entity
     `${resultCard}\n${sourceEvidence}`,
     /猜测邮箱|全部私人信息|自动发送/,
   )
+})
+
+test('direct global search requests deeper results, public-contact enrichment, and uses the current task results directly', async () => {
+  const page = await readSource('./AICommandCenterPage.tsx')
+  const api = await readSource('../services/api.ts')
+
+  assert.match(page, /DIRECT_SEARCH_TARGET_RESULTS = 30/)
+  assert.match(page, /includePublicContacts: true/)
+  assert.match(page, /customersToCommandSessions/)
+  assert.match(api, /maxResults/)
+  assert.match(api, /includePublicContacts/)
+  assert.match(api, /contacts: lead\.contacts \?\? \[\]/)
 })
 
 test('market page removes the decorative four-step workflow', async () => {
