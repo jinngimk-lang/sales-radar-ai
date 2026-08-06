@@ -8,9 +8,11 @@ import {
 import {
   revenueLivePersistence,
   type CreateRevenueLiveEventInput,
+  type RevenueLiveEventRecord,
   type RevenueLiveOpportunity,
   type RevenueLiveRunRecord,
   type RevenueLiveRunStatus,
+  type UpdateRevenueLiveRunInput,
 } from './revenue-live-persistence.service.js'
 import {
   buildRevenueResearchTask,
@@ -44,14 +46,14 @@ interface RevenueLivePersistencePort {
   updateRun(
     userId: string,
     id: string,
-    patch: Record<string, unknown>,
+    patch: UpdateRevenueLiveRunInput,
   ): Promise<RevenueLiveRunRecord>
   addEvents(
     userId: string,
     runId: string,
     events: CreateRevenueLiveEventInput[],
   ): Promise<void>
-  getRunEvents(userId: string, runId: string): Promise<Array<Record<string, unknown>>>
+  getRunEvents(userId: string, runId: string): Promise<RevenueLiveEventRecord[]>
 }
 
 export interface RevenueLiveServiceOptions {
