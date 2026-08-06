@@ -20,22 +20,28 @@ const livePanelSource = await readFile(
   'utf8',
 )
 
-test('revenue console is reachable from the workspace navigation', () => {
+test('revenue center is reachable from the simplified workspace navigation', () => {
   assert.match(appSource, /path="revenue"/)
   assert.match(appSource, /RevenueOperationsPage/)
   assert.match(layoutSource, /\/app\/revenue/)
-  assert.match(layoutSource, /收益控制台/)
+  assert.match(layoutSource, /收益中心/)
 })
 
-test('revenue console separates potential rewards from confirmed revenue', () => {
+test('revenue center separates potential rewards from confirmed revenue', () => {
   assert.match(pageSource, /潜在收益/)
   assert.match(pageSource, /已确认收益/)
   assert.match(pageSource, /已到账/)
   assert.match(pageSource, /不计入已确认收益/)
 })
 
-test('revenue console renders a real operator-gated cloud browser panel', () => {
+test('revenue center renders the dashboard in an embedded layout after live execution', () => {
+  assert.match(operationsPageSource, /收益中心/)
   assert.match(operationsPageSource, /RevenueLiveOpsPanel/)
+  assert.match(operationsPageSource, /RevenueDashboardPage embedded/)
+  assert.match(pageSource, /embedded/)
+})
+
+test('revenue center renders a real operator-gated cloud browser panel', () => {
   assert.match(operationsPageSource, /getRevenueDashboard/)
   assert.match(livePanelSource, /云端浏览器实时画面/)
   assert.match(livePanelSource, /sessionStorage/)
