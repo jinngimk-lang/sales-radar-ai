@@ -54,6 +54,10 @@ function createHarness(options: { enabled?: boolean; configured?: boolean } = {}
   }
 }
 
+async function flushAsyncWork() {
+  await new Promise<void>((resolve) => setImmediate(resolve))
+}
+
 test('disabled or unconfigured loops schedule nothing', () => {
   const disabled = createHarness({ enabled: false })
   const unconfigured = createHarness({ configured: false })
@@ -70,30 +74,30 @@ test('disabled or unconfigured loops schedule nothing', () => {
 test('enabled loop runs immediately and schedules future iterations', async () => {
   const harness = createHarness()
   harness.worker.start()
-  await Promise.resolve()
-  await Promise.resolve()
+  await flushAsyncWork()
 
   assert.equal(harness.runCount, 1)
   assert.equal(typeof harness.scheduled, 'function')
   harness.finishRun()
+  await flushAsyncWork()
 })
 
 test('overlapping ticks are skipped', async () => {
   const harness = createHarness()
   harness.worker.start()
-  await Promise.resolve()
-  await Promise.resolve()
+  await flushAsyncWork()
 
   harness.scheduled?.()
-  await Promise.resolve()
+  await flushAsyncWork()
   assert.equal(harness.runCount, 1)
 
   harness.finishRun()
-  await Promise.resolve()
+  await flushAsyncWork()
   harness.scheduled?.()
-  await Promise.resolve()
+  await flushAsyncWork()
   assert.equal(harness.runCount, 2)
   harness.finishRun()
+  await flushAsyncWork()
 })
 
 test('iteration failures are contained and do not crash scheduling', async () => {
@@ -116,9 +120,7 @@ test('iteration failures are contained and do not crash scheduling', async () =>
   })
 
   worker.start()
-  await Promise.resolve()
-  await Promise.resolve()
-  await Promise.resolve()
+  await flushAsyncWork()
 
   assert.equal(typeof scheduled, 'function')
   assert.equal(warnings.length, 1)
