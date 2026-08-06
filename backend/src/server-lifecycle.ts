@@ -2,6 +2,13 @@ import type { Server } from 'node:http'
 import type { Express } from 'express'
 import { app } from './app.js'
 import { env } from './config/env.js'
+import { getRevenueLiveConfig } from './config/revenue-live.config.js'
+import { ensureDemoUser } from './services/demo-user.service.js'
+import { revenueLiveService } from './services/revenue-live.service.js'
+import {
+  createRevenueLiveLoopWorker,
+  type RevenueLiveLoopWorker,
+} from './workers/revenue-live-loop.worker.js'
 import {
   findAgentReachExecutable,
   getExaCredentialStatus,
@@ -19,6 +26,7 @@ export interface StartBackendServerOptions {
   port?: number
   logger?: ServerLifecycleLogger
   runtimeDiagnostics?: () => void | Promise<void>
+  revenueLiveLoop?: RevenueLiveLoopWorker
 }
 
 export function startBackendServer(
@@ -30,14 +38,15 @@ export function startBackendServer(
   const runtimeDiagnostics =
     options.runtimeDiagnostics ??
     (() => logAgentReachRuntimeDiagnostics(logger))
+  const revenueLiveLoop =
+    options.revenueLiveLoop ?? createProductionRevenueLiveLoop(logger)
 
   const server = application.listen(port, () => {
     const listeningPort = readListeningPort(server, port)
     logger.log(`Sales Radar AI backend listening on port ${listeningPort}`)
 
-    // Provider diagnostics are deliberately outside the healthcheck-critical
-    // startup path. Search providers remain lazy and are checked again only
-    // when a SearchTask reaches its execution stage.
+    // Provider diagnostics and optional cloud-browser work deliberately remain
+    // outside the healthcheck-critical startup path.
     setImmediate(() => {
       void Promise.resolve()
         .then(runtimeDiagnostics)
@@ -46,10 +55,29 @@ export function startBackendServer(
             '[runtime] AgentReach diagnostics unavailable; backend remains healthy and the provider will be checked during search.',
           )
         })
+      revenueLiveLoop.start()
     })
   })
 
+  server.once('close', () => {
+    revenueLiveLoop.stop()
+  })
+
   return server
+}
+
+export function createProductionRevenueLiveLoop(
+  logger: ServerLifecycleLogger = console,
+): RevenueLiveLoopWorker {
+  const config = getRevenueLiveConfig()
+  return createRevenueLiveLoopWorker({
+    enabled: config.loopEnabled,
+    configured: config.providerConfigured,
+    intervalMinutes: config.loopIntervalMinutes,
+    resolveUserId: async () => (await ensureDemoUser()).id,
+    runNext: (userId) => revenueLiveService.runNextEligibleOpportunity(userId),
+    logger,
+  })
 }
 
 export function logAgentReachRuntimeDiagnostics(
