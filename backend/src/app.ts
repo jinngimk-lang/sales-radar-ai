@@ -12,6 +12,7 @@ import { assistantRouter } from './routes/assistant.routes.js'
 import { marketSignalRouter } from './routes/market-signal.routes.js'
 import { opportunityRouter } from './routes/opportunity.routes.js'
 import { radarRouter } from './routes/radar.routes.js'
+import { revenueRouter } from './routes/revenue.routes.js'
 import { attachDemoWorkspaceUser } from './middleware/demo-workspace-user.js'
 
 export const app = express()
@@ -30,6 +31,7 @@ app.use('/api/learning', learningRouter)
 app.use('/api/market-signals', attachDemoWorkspaceUser, marketSignalRouter)
 app.use('/api/opportunities', attachDemoWorkspaceUser, opportunityRouter)
 app.use('/api/radar', attachDemoWorkspaceUser, radarRouter)
+app.use('/api/revenue', attachDemoWorkspaceUser, revenueRouter)
 
 app.use(notFound)
 app.use(errorHandler)
