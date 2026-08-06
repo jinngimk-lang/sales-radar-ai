@@ -18,7 +18,7 @@ healthRouter.get('/capabilities', (_request, response) => {
   const agent = readOpenAISalesAgentConfig()
   const exaEnabled = Boolean(process.env.EXA_API_KEY?.trim())
   const salesAIEnabled =
-    ['qwen', 'openai'].includes(sales.provider) &&
+    ['qwen', 'glm', 'kimi', 'openai'].includes(sales.provider) &&
     Boolean(sales.apiKey && sales.baseUrl && sales.model)
   const salesAgentEnabled = Boolean(agent.apiKey && agent.baseUrl && agent.model)
 

@@ -1,4 +1,5 @@
 import type { AIProvider } from './ai-provider.interface.js'
+import { OpenAICompatibleAIProvider } from './openai-compatible-ai.provider.js'
 import { OpenAIResponsesProvider } from './openai-responses.provider.js'
 import { ruleBasedAIProvider } from './rule-based-ai.provider.js'
 import { QwenAIProvider } from './qwen-ai.provider.js'
@@ -13,42 +14,103 @@ export interface AIProviderConfig {
   reasoningEffort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 }
 
+interface ProviderDefaults {
+  apiKeyVariable: string
+  baseUrlVariable: string
+  modelVariable: string
+  baseUrl: string
+  model: string
+  timeoutMs: number
+}
+
+const PROVIDER_DEFAULTS: Record<string, ProviderDefaults> = {
+  qwen: {
+    apiKeyVariable: 'QWEN_API_KEY',
+    baseUrlVariable: 'QWEN_BASE_URL',
+    modelVariable: 'QWEN_MODEL',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen3.7-plus',
+    timeoutMs: 30_000,
+  },
+  glm: {
+    apiKeyVariable: 'GLM_API_KEY',
+    baseUrlVariable: 'GLM_BASE_URL',
+    modelVariable: 'GLM_MODEL',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    model: 'glm-5.2',
+    timeoutMs: 30_000,
+  },
+  kimi: {
+    apiKeyVariable: 'KIMI_API_KEY',
+    baseUrlVariable: 'KIMI_BASE_URL',
+    modelVariable: 'KIMI_MODEL',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    model: 'kimi-k2.6',
+    timeoutMs: 30_000,
+  },
+  openai: {
+    apiKeyVariable: 'OPENAI_API_KEY',
+    baseUrlVariable: 'OPENAI_BASE_URL',
+    modelVariable: 'OPENAI_MODEL',
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-5.6-sol',
+    timeoutMs: 120_000,
+  },
+}
+
 export function readAIProviderConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): AIProviderConfig {
-  const explicitProvider = environment.AI_PROVIDER?.trim().toLowerCase()
-  const provider =
-    explicitProvider ||
-    (environment.OPENAI_API_KEY?.trim() ? 'openai' : 'rule-based')
-  const isOpenAI = provider === 'openai'
-  const reasoningEffort = parseReasoningEffort(
-    environment.OPENAI_REASONING_EFFORT,
-  )
+  const provider = resolveProvider(environment)
+  if (provider === 'rule-based') {
+    return {
+      provider,
+      model: 'rules-v1',
+      timeoutMs: readPositiveInteger(environment.AI_TIMEOUT_MS) ?? 15_000,
+      reasoningEffort: parseReasoningEffort(
+        environment.OPENAI_REASONING_EFFORT,
+      ),
+    }
+  }
+
+  const defaults = PROVIDER_DEFAULTS[provider]
+  if (!defaults) {
+    return {
+      provider,
+      model: environment.AI_MODEL?.trim() || '',
+      apiKey: environment.AI_API_KEY?.trim() || undefined,
+      baseUrl: environment.AI_BASE_URL?.trim() || undefined,
+      timeoutMs:
+        readPositiveInteger(environment.AI_TIMEOUT_MS) ?? 30_000,
+      reasoningEffort: parseReasoningEffort(
+        environment.OPENAI_REASONING_EFFORT,
+      ),
+    }
+  }
+
+  const providerApiKey = environment[defaults.apiKeyVariable]?.trim()
+  const providerBaseUrl = environment[defaults.baseUrlVariable]?.trim()
+  const providerModel = environment[defaults.modelVariable]?.trim()
 
   return {
     provider,
     model:
-      environment.AI_MODEL?.trim() ||
-      (isOpenAI ? environment.OPENAI_MODEL?.trim() || 'gpt-5.6-sol' : '') ||
-      (provider === 'rule-based' ? 'rules-v1' : ''),
+      environment.AI_MODEL?.trim() || providerModel || defaults.model,
     apiKey:
-      (isOpenAI
-        ? environment.OPENAI_API_KEY?.trim() || environment.AI_API_KEY?.trim()
-        : environment.AI_API_KEY?.trim()) || undefined,
+      environment.AI_API_KEY?.trim() || providerApiKey || undefined,
     baseUrl:
-      (isOpenAI
-        ? environment.OPENAI_BASE_URL?.trim() ||
-          environment.AI_BASE_URL?.trim() ||
-          'https://api.openai.com/v1'
-        : environment.AI_BASE_URL?.trim()) || undefined,
+      environment.AI_BASE_URL?.trim() ||
+      providerBaseUrl ||
+      defaults.baseUrl,
     timeoutMs:
-      Number.parseInt(
-        (isOpenAI
-          ? environment.OPENAI_TIMEOUT_MS
-          : environment.AI_TIMEOUT_MS) ?? '',
-        10,
-      ) || (isOpenAI ? 120_000 : 15_000),
-    reasoningEffort,
+      readPositiveInteger(environment.AI_TIMEOUT_MS) ??
+      (provider === 'openai'
+        ? readPositiveInteger(environment.OPENAI_TIMEOUT_MS)
+        : undefined) ??
+      defaults.timeoutMs,
+    reasoningEffort: parseReasoningEffort(
+      environment.OPENAI_REASONING_EFFORT,
+    ),
   }
 }
 
@@ -63,8 +125,26 @@ export class AIProviderFactory {
     this.register(
       new QwenAIProvider({
         apiKey: config.provider === 'qwen' ? config.apiKey : undefined,
-        model: config.model,
-        baseUrl: config.baseUrl,
+        model: config.provider === 'qwen' ? config.model : undefined,
+        baseUrl: config.provider === 'qwen' ? config.baseUrl : undefined,
+        timeoutMs: config.timeoutMs,
+      }),
+    )
+    this.register(
+      new OpenAICompatibleAIProvider({
+        name: 'glm',
+        apiKey: config.provider === 'glm' ? config.apiKey : undefined,
+        model: config.provider === 'glm' ? config.model : undefined,
+        baseUrl: config.provider === 'glm' ? config.baseUrl : undefined,
+        timeoutMs: config.timeoutMs,
+      }),
+    )
+    this.register(
+      new OpenAICompatibleAIProvider({
+        name: 'kimi',
+        apiKey: config.provider === 'kimi' ? config.apiKey : undefined,
+        model: config.provider === 'kimi' ? config.model : undefined,
+        baseUrl: config.provider === 'kimi' ? config.baseUrl : undefined,
         timeoutMs: config.timeoutMs,
       }),
     )
@@ -103,6 +183,21 @@ export class AIProviderFactory {
   getConfig(): AIProviderConfig {
     return { ...this.config }
   }
+}
+
+function resolveProvider(environment: NodeJS.ProcessEnv): string {
+  const explicit = environment.AI_PROVIDER?.trim().toLowerCase()
+  if (explicit) return explicit
+  if (environment.OPENAI_API_KEY?.trim()) return 'openai'
+  if (environment.QWEN_API_KEY?.trim()) return 'qwen'
+  if (environment.GLM_API_KEY?.trim()) return 'glm'
+  if (environment.KIMI_API_KEY?.trim()) return 'kimi'
+  return 'rule-based'
+}
+
+function readPositiveInteger(value: string | undefined): number | undefined {
+  const parsed = Number.parseInt(value ?? '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
 }
 
 function parseReasoningEffort(
