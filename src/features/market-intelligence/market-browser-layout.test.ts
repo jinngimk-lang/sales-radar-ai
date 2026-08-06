@@ -24,8 +24,13 @@ test('market browser scrolls vertically and keeps horizontal overflow hidden', (
   assert.match(timelineSource, /overflow-y-auto/)
 })
 
-test('live iframe preview expands its viewport and scales back to fit width', () => {
-  assert.match(browserSource, /PREVIEW_VIEWPORT_SCALE/)
-  assert.match(browserSource, /transformOrigin/)
-  assert.match(browserSource, /width: `\$\{100 \/ PREVIEW_VIEWPORT_SCALE\}%`/)
+test('live iframe renders a complete 1440px desktop viewport and dynamically fits its container', () => {
+  assert.match(browserSource, /PREVIEW_DESKTOP_WIDTH = 1440/)
+  assert.match(browserSource, /ResizeObserver/)
+  assert.match(browserSource, /previewContainerRef/)
+  assert.match(browserSource, /Math\.min\(1, availableWidth \/ PREVIEW_DESKTOP_WIDTH\)/)
+  assert.match(browserSource, /width: PREVIEW_DESKTOP_WIDTH/)
+  assert.match(browserSource, /transform: `scale\(\$\{previewScale\}\)`/)
+  assert.match(browserSource, /transformOrigin: 'top left'/)
+  assert.doesNotMatch(browserSource, /PREVIEW_VIEWPORT_SCALE/)
 })

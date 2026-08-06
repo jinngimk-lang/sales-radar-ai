@@ -31,7 +31,8 @@ import {
   SIGNAL_META,
 } from './market-intelligence.meta'
 
-const PREVIEW_VIEWPORT_SCALE = 0.8
+const PREVIEW_DESKTOP_WIDTH = 1440
+const PREVIEW_DOCUMENT_HEIGHT = 1800
 
 const SOURCE_META: Record<
   MarketResearchSourceType,
@@ -467,10 +468,30 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
   const [loadKey, setLoadKey] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
+  const [previewScale, setPreviewScale] = useState(1)
   const loadTimeout = useRef<number | null>(null)
+  const previewContainerRef = useRef<HTMLDivElement | null>(null)
   const media = resolveVisualMedia(url)
   const upgradedToHttps =
     url.startsWith('http://') && media.url.startsWith('https://')
+
+  useEffect(() => {
+    const previewContainer = previewContainerRef.current
+    if (!previewContainer || typeof ResizeObserver === 'undefined') return
+
+    const updateScale = () => {
+      const availableWidth = previewContainer.clientWidth
+      if (availableWidth <= 0) return
+      setPreviewScale(
+        Math.min(1, availableWidth / PREVIEW_DESKTOP_WIDTH),
+      )
+    }
+
+    updateScale()
+    const observer = new ResizeObserver(updateScale)
+    observer.observe(previewContainer)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -512,7 +533,10 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
         </button>
       </div>
 
-      <div className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scrollbar-thin">
+      <div
+        ref={previewContainerRef}
+        className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scrollbar-thin"
+      >
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 text-xs text-ink-500">
             <RefreshCw className="mr-2 h-4 w-4 animate-spin text-brand-600" />
@@ -545,22 +569,30 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
             />
           </div>
         ) : (
-          <iframe
-            key={`${url}-${loadKey}`}
-            src={media.url}
-            title={`云端网页预览：${title}`}
-            className="min-h-[950px] border-0 bg-white"
+          <div
+            className="relative overflow-hidden bg-white"
             style={{
-              width: `${100 / PREVIEW_VIEWPORT_SCALE}%`,
-              height: `${950 / PREVIEW_VIEWPORT_SCALE}px`,
-              transform: `scale(${PREVIEW_VIEWPORT_SCALE})`,
-              transformOrigin: 'top left',
+              width: '100%',
+              height: PREVIEW_DOCUMENT_HEIGHT * previewScale,
             }}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation"
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-            referrerPolicy="no-referrer"
-            onLoad={() => finishLoading()}
-          />
+          >
+            <iframe
+              key={`${url}-${loadKey}`}
+              src={media.url}
+              title={`云端网页预览：${title}`}
+              className="absolute left-0 top-0 border-0 bg-white"
+              style={{
+                width: PREVIEW_DESKTOP_WIDTH,
+                height: PREVIEW_DOCUMENT_HEIGHT,
+                transform: `scale(${previewScale})`,
+                transformOrigin: 'top left',
+              }}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+              referrerPolicy="no-referrer"
+              onLoad={() => finishLoading()}
+            />
+          </div>
         )}
 
         {loadFailed && (
@@ -584,7 +616,7 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
         )}
 
         <div className="pointer-events-none sticky bottom-3 z-10 mx-auto w-fit rounded-full border border-ink-200 bg-white/95 px-3 py-1.5 text-center text-[9px] text-ink-500 shadow-sm backdrop-blur">
-          页面已按统一桌面宽度缩放；上下滚动查看内容，左右宽度保持固定
+          页面按 1440px 桌面宽度完整缩放；上下滚动查看内容，左右两端保持可见
         </div>
       </div>
     </div>

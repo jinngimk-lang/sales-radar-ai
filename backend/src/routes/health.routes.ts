@@ -4,18 +4,25 @@ import {
   listSalesAgentModelOptions,
   readOpenAISalesAgentConfig,
 } from '../services/openai-sales-agent.service.js'
+import { openAIRuntimeVerifier } from '../services/openai-runtime-verifier.service.js'
 import { readHostedResearchConfig } from '../services/market-intelligence/market-web-research.service.js'
 
 export const healthRouter = Router()
 
 healthRouter.get('/', (_request, response) => {
-  response.status(200).json({ status: 'ok' })
+  void openAIRuntimeVerifier.verify()
+  response.status(200).json({
+    status: 'ok',
+    openai: openAIRuntimeVerifier.getStatus(),
+  })
 })
 
 healthRouter.get('/capabilities', (_request, response) => {
+  void openAIRuntimeVerifier.verify()
   const market = readHostedResearchConfig()
   const sales = readAIProviderConfig()
   const agent = readOpenAISalesAgentConfig()
+  const openaiRuntime = openAIRuntimeVerifier.getStatus()
   const exaEnabled = Boolean(process.env.EXA_API_KEY?.trim())
   const salesAIEnabled =
     ['qwen', 'glm', 'kimi', 'openai'].includes(sales.provider) &&
@@ -40,6 +47,7 @@ healthRouter.get('/capabilities', (_request, response) => {
         model: agent.model,
         reason: salesAgentEnabled ? 'ready' : 'missing_api_key',
         models: listSalesAgentModelOptions(agent),
+        verification: openaiRuntime,
       },
       publicContactDiscovery: {
         enabled: true,
