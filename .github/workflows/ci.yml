@@ -88,6 +88,7 @@ jobs:
           tests/revenue-operator-auth.test.ts
           tests/browserbase-agent-provider.test.ts
           tests/revenue-live-service.test.ts
+          tests/revenue-live-api-contract.test.ts
 
       - name: Build
         run: npm run build
