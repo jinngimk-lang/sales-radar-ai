@@ -12,15 +12,15 @@ test('protects every revenue live route with the operator middleware', async () 
   assert.match(source, /requireRevenueOperator/)
   assert.match(
     source,
-    /revenueRouter\.get\(\s*['"]\/live\/status['"],\s*requireRevenueOperator,\s*asyncRoute\(getRevenueLiveStatus\)\s*\)/s,
+    /revenueRouter\.get\(\s*['"]\/live\/status['"],\s*requireRevenueOperator,\s*asyncRoute\(getRevenueLiveStatus\),?\s*\)/s,
   )
   assert.match(
     source,
-    /revenueRouter\.post\(\s*['"]\/live\/runs['"],\s*requireRevenueOperator,\s*asyncRoute\(startRevenueLiveRun\)\s*\)/s,
+    /revenueRouter\.post\(\s*['"]\/live\/runs['"],\s*requireRevenueOperator,\s*asyncRoute\(startRevenueLiveRun\),?\s*\)/s,
   )
   assert.match(
     source,
-    /revenueRouter\.post\(\s*['"]\/live\/runs\/:id\/stop['"],\s*requireRevenueOperator,\s*asyncRoute\(stopRevenueLiveRun\)\s*\)/s,
+    /revenueRouter\.post\(\s*['"]\/live\/runs\/:id\/stop['"],\s*requireRevenueOperator,\s*asyncRoute\(stopRevenueLiveRun\),?\s*\)/s,
   )
 })
 
