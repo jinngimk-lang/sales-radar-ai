@@ -80,6 +80,7 @@ jobs:
           tests/ai-provider-config.test.ts
           tests/assistant-lead-trust.test.ts
           tests/exa-runtime-config.test.ts
+          tests/openai-runtime-verifier.test.ts
           tests/openai-sales-agent.test.ts
 
       - name: Build
