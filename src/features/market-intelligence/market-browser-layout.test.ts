@@ -24,7 +24,7 @@ test('market browser scrolls vertically and keeps horizontal overflow hidden', (
   assert.match(timelineSource, /overflow-y-auto/)
 })
 
-test('live iframe renders a complete 1440px desktop viewport and dynamically fits its container', () => {
+test('known embeddable media keeps a complete 1440px responsive iframe viewport', () => {
   assert.match(browserSource, /PREVIEW_DESKTOP_WIDTH = 1440/)
   assert.match(browserSource, /ResizeObserver/)
   assert.match(browserSource, /previewContainerRef/)
@@ -35,12 +35,20 @@ test('live iframe renders a complete 1440px desktop viewport and dynamically fit
   assert.doesNotMatch(browserSource, /PREVIEW_VIEWPORT_SCALE/)
 })
 
-test('blocked iframe previews silently fall back to a webpage snapshot and then the research summary', () => {
-  assert.match(browserSource, /type PreviewMode = 'iframe' \| 'snapshot'/)
-  assert.match(browserSource, /buildSnapshotUrl/)
-  assert.match(browserSource, /image\.thum\.io\/get\/noanimate/)
+test('generic cross-origin pages render a snapshot first instead of trusting iframe load events', () => {
+  assert.match(browserSource, /type: 'page' \| 'embed' \| 'image' \| 'video'/)
+  assert.match(browserSource, /media\.type === 'page'/)
+  assert.match(browserSource, /buildSnapshotUrl\(media\.url\)/)
+  assert.match(browserSource, /media\.type === 'embed'/)
+  assert.doesNotMatch(browserSource, /type PreviewMode = 'iframe' \| 'snapshot'/)
+  assert.doesNotMatch(browserSource, /setPreviewMode\('iframe'\)/)
+  assert.doesNotMatch(browserSource, /setPreviewMode\('snapshot'\)/)
+})
+
+test('snapshot failure silently falls back to the evidence-backed research summary', () => {
   assert.match(browserSource, /onFallbackToSummary/)
-  assert.match(browserSource, /setPreviewMode\('snapshot'\)/)
+  assert.match(browserSource, /onError={fallBackSilently}/)
+  assert.match(browserSource, /image\.thum\.io\/get\/noanimate/)
   assert.doesNotMatch(
     browserSource,
     /该站点没有允许在应用内显示实时画面/,
