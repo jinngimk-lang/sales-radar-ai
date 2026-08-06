@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import {
   AIProviderFactory,
   readAIProviderConfig,
 } from '../src/providers/ai-platform/ai-provider.factory.js'
 import { AITaskType } from '../src/providers/ai-platform/ai-task-type.js'
+
+const healthSource = await readFile(
+  new URL('../src/routes/health.routes.ts', import.meta.url),
+  'utf8',
+)
 
 describe('AI provider configuration', () => {
   it('reads dedicated Qwen credentials and defaults', () => {
@@ -64,5 +70,18 @@ describe('AI provider configuration', () => {
     assert.equal(config.apiKey, 'generic-key')
     assert.equal(config.model, 'glm-custom')
     assert.equal(config.baseUrl, 'https://gateway.example/v1')
+  })
+
+  it('keeps the zero-cost rule engine visible as the runtime fallback', () => {
+    const factory = new AIProviderFactory(
+      readAIProviderConfig({ AI_PROVIDER: 'openai' }),
+    )
+
+    assert.equal(factory.getFallback().name, 'rule-based')
+    assert.equal(factory.getFallback().model, 'rules-v1')
+    assert.match(healthSource, /fallback:\s*\{/)
+    assert.match(healthSource, /provider: 'rule-based'/)
+    assert.match(healthSource, /model: 'rules-v1'/)
+    assert.match(healthSource, /enabled: true/)
   })
 })
