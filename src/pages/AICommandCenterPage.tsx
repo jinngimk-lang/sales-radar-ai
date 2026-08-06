@@ -10,6 +10,10 @@ import {
 } from 'lucide-react'
 import type {
   ChatSession,
+  CustomerType,
+  IntentLevel,
+  Platform,
+  Region,
   SalesAgentHistoryMessage,
   SalesAgentModelOption,
 } from '@/types'
@@ -18,6 +22,7 @@ import {
   getChatSessions,
   getRuntimeCapabilities,
   runSalesAgent,
+  searchCustomers,
 } from '@/services/api'
 import {
   AgentConversation,
@@ -45,18 +50,48 @@ const FALLBACK_MODELS: SalesAgentModelOption[] = [
   },
 ]
 
+const DIRECT_SEARCH_PLATFORMS: Platform[] = [
+  'Website',
+  'LinkedIn',
+  'X',
+  'Reddit',
+  'Facebook',
+  'Instagram',
+  'TikTok',
+  'Xiaohongshu',
+  'YouTube',
+]
+const DIRECT_SEARCH_REGIONS: Region[] = [
+  'USA',
+  'Europe',
+  'SoutheastAsia',
+  'China',
+  'MiddleEast',
+]
+const DIRECT_SEARCH_CUSTOMER_TYPES: CustomerType[] = [
+  'Buyer',
+  'Agent',
+  'Company',
+  'Individual',
+]
+const DIRECT_SEARCH_INTENT_LEVELS: IntentLevel[] = ['high', 'medium', 'low']
+
+type RunningMode = 'agent' | 'search' | null
+
 export function AICommandCenterPage() {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<CommandMessage[]>([])
   const [results, setResults] = useState<ChatSession[]>([])
-  const [running, setRunning] = useState(false)
+  const [runningMode, setRunningMode] = useState<RunningMode>(null)
   const [syncingResults, setSyncingResults] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [modelOptions, setModelOptions] =
     useState<SalesAgentModelOption[]>(FALLBACK_MODELS)
   const [selectedModel, setSelectedModel] = useState(FALLBACK_MODELS[0].id)
   const [agentConfigured, setAgentConfigured] = useState<boolean | null>(null)
+  const [searchConfigured, setSearchConfigured] = useState<boolean | null>(null)
   const [checkingCapability, setCheckingCapability] = useState(false)
+  const running = runningMode !== null
 
   const loadCapability = useCallback(async () => {
     setCheckingCapability(true)
@@ -78,8 +113,15 @@ export function AICommandCenterPage() {
         return options[0]?.id ?? FALLBACK_MODELS[0].id
       })
       setAgentConfigured(Boolean(capability?.enabled))
+      setSearchConfigured(
+        Boolean(
+          capabilities.salesDiscovery?.enabled ||
+            capabilities.publicContactDiscovery?.enabled,
+        ),
+      )
     } catch {
       setAgentConfigured(null)
+      setSearchConfigured(null)
     } finally {
       setCheckingCapability(false)
     }
@@ -119,7 +161,7 @@ export function AICommandCenterPage() {
     setMessages((current) => [...current, userMessage])
     setInput('')
     setError(null)
-    setRunning(true)
+    setRunningMode('agent')
 
     try {
       const result = await runSalesAgent({
@@ -160,7 +202,65 @@ export function AICommandCenterPage() {
       }
       setError(agentErrorMessage(requestError))
     } finally {
-      setRunning(false)
+      setRunningMode(null)
+    }
+  }
+
+  const runDirectSearch = async (preset?: string) => {
+    const content = (preset ?? input).trim()
+    if (!content || running) return
+    if (searchConfigured === false) {
+      setError('当前没有可用的搜索提供器。请在 Railway 检查 Exa、mcporter 或 Agent Reach 上游渠道。')
+      return
+    }
+
+    setMessages((current) => [
+      ...current,
+      {
+        id: createMessageId(),
+        role: 'user',
+        content: `全网联系人搜索：${content}`,
+      },
+    ])
+    setInput('')
+    setError(null)
+    setRunningMode('search')
+    setSyncingResults(true)
+
+    try {
+      const execution = await searchCustomers({
+        query: content,
+        platforms: DIRECT_SEARCH_PLATFORMS,
+        regions: DIRECT_SEARCH_REGIONS,
+        customerTypes: DIRECT_SEARCH_CUSTOMER_TYPES,
+        intentLevels: DIRECT_SEARCH_INTENT_LEVELS,
+      })
+      const resultIds = new Set(execution.customers.map((customer) => customer.id))
+      const sessions = await getChatSessions()
+      const selected = sessions.filter((session) => resultIds.has(session.id))
+      const contactCount = selected.reduce(
+        (total, session) => total + session.contacts.length,
+        0,
+      )
+
+      setResults(selected)
+      setMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: 'assistant',
+          content:
+            `全网数据搜索完成：发现 ${execution.customers.length} 个公开来源对象，` +
+            `同步 ${selected.length} 个结构化档案和 ${contactCount} 个已观察联系人。` +
+            '结果来自当前可用的 Agent Reach 上游、Exa/mcporter 与公开网页链路；缺失字段不会被推断。',
+          model: 'Direct Search Pipeline',
+        },
+      ])
+    } catch (requestError) {
+      setError(directSearchErrorMessage(requestError))
+    } finally {
+      setSyncingResults(false)
+      setRunningMode(null)
     }
   }
 
@@ -177,12 +277,21 @@ export function AICommandCenterPage() {
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink-900">AI 情报指挥中心</p>
               <p className="truncate text-[10px] text-ink-400">
-                一句话调用搜索、联系人、研究、市场与收益工具
+                Agent 回答与无 GPT 全网联系人搜索并行可用
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <StatusBadge configured={agentConfigured} label={selectedModelDetails?.label ?? selectedModel} />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <StatusBadge
+              configured={searchConfigured}
+              label="全网搜索"
+              disabledLabel="搜索未连接"
+            />
+            <StatusBadge
+              configured={agentConfigured}
+              label={selectedModelDetails?.label ?? selectedModel}
+              disabledLabel="Agent 未配置"
+            />
             <button
               type="button"
               onClick={() => void loadCapability()}
@@ -199,7 +308,9 @@ export function AICommandCenterPage() {
       <main
         className={cn(
           'mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8',
-          hasConversation ? 'pb-44 pt-7' : 'flex min-h-[calc(100vh-72px)] flex-col justify-center py-12',
+          hasConversation
+            ? 'pb-48 pt-7'
+            : 'flex min-h-[calc(100vh-72px)] flex-col justify-center py-12',
         )}
       >
         {!hasConversation ? (
@@ -208,17 +319,17 @@ export function AICommandCenterPage() {
               <Sparkles className="h-6 w-6" />
             </span>
             <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700">
-              GPT-5.6 SOL · SOURCE-BACKED AGENT
+              AGENT + DIRECT GLOBAL SEARCH
             </p>
             <h1 className="mx-auto mt-3 max-w-3xl text-3xl font-semibold tracking-[-0.045em] text-ink-950 sm:text-5xl">
-              描述目标，直接得到人、公司、联系人、证据和行动方案
+              同一个输入框，既能问 Agent，也能直接搜索全网联系人
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-ink-500 sm:text-base">
-              不再先选择模块。输入一句任务，Agent 会调用现有真实搜索与研究工具，并把所有可验证数据按对象陈列出来。
+              有 GPT API 时运行多步 Agent；没有 GPT API 时，直接使用搜索提供器和公开来源链路返回对象、联系人与字段证据。
             </p>
 
             <div className="mt-7 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <Capability icon={Globe2} title="联网搜索" detail="打开公开网页与来源" />
+              <Capability icon={Globe2} title="全网搜索" detail="Agent Reach 上游与公开网页" />
               <Capability icon={DatabaseZap} title="对象与联系人" detail="字段级证据和观察时间" />
               <Capability icon={Radar} title="市场与收益" detail="信号、机会与风险排序" />
               <Capability icon={ShieldCheck} title="来源可信" detail="未知字段不猜测" />
@@ -228,11 +339,15 @@ export function AICommandCenterPage() {
               <CommandComposer
                 value={input}
                 running={running}
+                runningMode={runningMode}
+                agentAvailable={agentConfigured}
+                searchAvailable={searchConfigured}
                 model={selectedModel}
                 modelOptions={modelOptions}
                 onValueChange={setInput}
                 onModelChange={setSelectedModel}
                 onSubmit={(message) => void submit(message)}
+                onSearch={(message) => void runDirectSearch(message)}
               />
             </div>
           </section>
@@ -256,17 +371,21 @@ export function AICommandCenterPage() {
       </main>
 
       {hasConversation ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-200/80 bg-white/92 px-4 pb-4 pt-3 backdrop-blur sm:px-6 lg:pl-[260px] lg:pr-8">
-          <div className="mx-auto max-w-[1120px]">
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 border-t border-ink-200/80 bg-white/92 px-4 pb-4 pt-3 backdrop-blur sm:px-6 lg:left-[228px] lg:right-0">
+          <div className="pointer-events-auto mx-auto max-w-[1120px]">
             <CommandComposer
               compact
               value={input}
               running={running}
+              runningMode={runningMode}
+              agentAvailable={agentConfigured}
+              searchAvailable={searchConfigured}
               model={selectedModel}
               modelOptions={modelOptions}
               onValueChange={setInput}
               onModelChange={setSelectedModel}
               onSubmit={(message) => void submit(message)}
+              onSearch={(message) => void runDirectSearch(message)}
             />
           </div>
         </div>
@@ -302,9 +421,11 @@ function Capability({
 function StatusBadge({
   configured,
   label,
+  disabledLabel,
 }: {
   configured: boolean | null
   label: string
+  disabledLabel: string
 }) {
   return (
     <span
@@ -327,7 +448,7 @@ function StatusBadge({
               : 'bg-ink-300',
         )}
       />
-      {configured === false ? '模型未配置' : label}
+      {configured === false ? disabledLabel : label}
     </span>
   )
 }
@@ -339,7 +460,7 @@ function createMessageId() {
 }
 
 function missingOpenAIKeyMessage() {
-  return '生产后端没有读取到 OPENAI_API_KEY。请在 Railway 目标 Service 的 Production Variables 中配置后重新部署；密钥不能放进 VITE_* 或浏览器变量。'
+  return '生产后端没有读取到 OPENAI_API_KEY。仍可点击“全网联系人搜索”；如需 Agent 回答，请在 Railway 服务端配置 GPT API 后重新部署。'
 }
 
 function agentErrorMessage(error: unknown) {
@@ -350,5 +471,13 @@ function agentErrorMessage(error: unknown) {
   if (error.code === 'UNSUPPORTED_OPENAI_MODEL') {
     return '所选模型没有被当前后端启用，请切换模型后重试。'
   }
+  return error.message
+}
+
+function directSearchErrorMessage(error: unknown) {
+  if (!(error instanceof ApiRequestError)) {
+    return error instanceof Error ? error.message : '全网联系人搜索暂时不可用。'
+  }
+  if (error.status === 429) return '搜索提供器当前限流，请稍后重试。'
   return error.message
 }
