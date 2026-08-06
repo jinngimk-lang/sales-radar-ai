@@ -84,6 +84,8 @@ jobs:
           tests/openai-sales-agent.test.ts
           tests/revenue-domain.test.ts
           tests/revenue-persistence-security.test.ts
+          tests/revenue-live-domain.test.ts
+          tests/revenue-operator-auth.test.ts
 
       - name: Build
         run: npm run build
