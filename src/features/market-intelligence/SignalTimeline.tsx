@@ -3,7 +3,10 @@ import type { MarketSignal } from '@/types'
 import { Surface } from '@/components/ui/Surface'
 import { WorkspaceEmpty } from '@/components/ui/WorkspaceState'
 import { cn } from '@/lib/utils'
-import { SIGNAL_META } from './market-intelligence.meta'
+import {
+  MARKET_WORKSPACE_HEIGHT,
+  SIGNAL_META,
+} from './market-intelligence.meta'
 
 export function SignalTimeline({
   signals,
@@ -22,8 +25,13 @@ export function SignalTimeline({
   )
 
   return (
-    <Surface className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
+    <Surface
+      className={cn(
+        MARKET_WORKSPACE_HEIGHT,
+        'flex min-h-0 flex-col overflow-hidden',
+      )}
+    >
+      <div className="flex shrink-0 items-center justify-between border-b border-ink-100 px-5 py-4">
         <div>
           <h2 className="text-sm font-semibold text-ink-900">市场信号时间线</h2>
           <p className="mt-1 text-xs text-ink-500">
@@ -34,7 +42,7 @@ export function SignalTimeline({
       </div>
 
       {orderedSignals.length > 0 ? (
-        <div className="max-h-[486px] overflow-y-auto p-3 scrollbar-thin">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 scrollbar-thin">
           {orderedSignals.map((signal) => {
             const meta = SIGNAL_META[signal.signalType]
             const Icon = meta.icon
@@ -84,19 +92,21 @@ export function SignalTimeline({
           })}
         </div>
       ) : (
-        <WorkspaceEmpty
-          icon={SearchX}
-          title={
-            unavailable
-              ? '暂时无法读取信号时间线'
-              : '还没有可展示的市场信号'
-          }
-          description={
-            unavailable
-              ? '当前请求未成功，系统不会展示旧数据或模拟信号。'
-              : '系统只会在真实来源通过基础验证后，才把变化加入时间线。'
-          }
-        />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <WorkspaceEmpty
+            icon={SearchX}
+            title={
+              unavailable
+                ? '暂时无法读取信号时间线'
+                : '还没有可展示的市场信号'
+            }
+            description={
+              unavailable
+                ? '当前请求未成功，系统不会展示旧数据或模拟信号。'
+                : '系统只会在真实来源通过基础验证后，才把变化加入时间线。'
+            }
+          />
+        </div>
       )}
     </Surface>
   )
