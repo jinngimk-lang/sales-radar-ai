@@ -82,6 +82,8 @@ jobs:
           tests/exa-runtime-config.test.ts
           tests/openai-runtime-verifier.test.ts
           tests/openai-sales-agent.test.ts
+          tests/revenue-domain.test.ts
+          tests/revenue-persistence-security.test.ts
 
       - name: Build
         run: npm run build

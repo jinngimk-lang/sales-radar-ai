@@ -7,6 +7,7 @@ import {
   CircleUserRound,
   Settings2,
   Sparkles,
+  WalletCards,
 } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
@@ -23,6 +24,12 @@ const WORKSPACE_ITEMS = [
     label: '销售机会',
     icon: BriefcaseBusiness,
     desc: '筛选机会与确认客户',
+  },
+  {
+    to: '/app/revenue',
+    label: '收益控制台',
+    icon: WalletCards,
+    desc: '机会排序、收益与结算证据',
   },
   {
     to: '/app/assistant',
@@ -82,10 +89,10 @@ export function AppLayout() {
             <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 text-sky-300">
               <Sparkles className="h-3.5 w-3.5" />
             </span>
-            销售工作流
+            收益工作流
           </div>
           <p className="mt-2 text-[10px] leading-5 text-white/40">
-            观察市场 → 发现机会 → 研究企业 → 形成行动
+            发现机会 → 核验证据 → 执行任务 → 确认结算
           </p>
         </div>
 
