@@ -8,7 +8,7 @@
     "dev": "vite --config vite.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json --pretty false && tsc --noEmit -p tsconfig.node.json --pretty false",
     "build": "npm run typecheck && vite build --config vite.config.ts",
-    "test": "tsx --test src/features/radar/radar-workspace.test.ts",
+    "test": "tsx --test src/features/radar/radar-workspace.test.ts src/pages/account-capabilities.test.ts",
     "preview": "vite preview --config vite.config.ts",
     "lint": "eslint ."
   },
