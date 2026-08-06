@@ -1,4 +1,10 @@
-import { ArrowRight, Loader2, Send, Sparkles } from 'lucide-react'
+import {
+  ArrowRight,
+  Bot,
+  Loader2,
+  Search,
+  Sparkles,
+} from 'lucide-react'
 import type { SalesAgentModelOption } from '@/types'
 
 const STARTERS = [
@@ -10,23 +16,31 @@ const STARTERS = [
 export interface CommandComposerProps {
   value: string
   running: boolean
+  runningMode?: 'agent' | 'search' | null
+  agentAvailable?: boolean | null
+  searchAvailable?: boolean | null
   model: string
   modelOptions: SalesAgentModelOption[]
   compact?: boolean
   onValueChange(value: string): void
   onModelChange(model: string): void
   onSubmit(message?: string): void
+  onSearch(message?: string): void
 }
 
 export function CommandComposer({
   value,
   running,
+  runningMode = null,
+  agentAvailable = null,
+  searchAvailable = null,
   model,
   modelOptions,
   compact = false,
   onValueChange,
   onModelChange,
   onSubmit,
+  onSearch,
 }: CommandComposerProps) {
   const selected = modelOptions.find((option) => option.id === model)
 
@@ -47,7 +61,7 @@ export function CommandComposer({
               </span>
               <span className="mt-2 block text-xs leading-5 text-ink-650">{starter}</span>
               <span className="mt-3 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-700">
-                直接执行 <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
+                交给 Agent <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
               </span>
             </button>
           ))}
@@ -65,9 +79,9 @@ export function CommandComposer({
             }
           }}
           rows={compact ? 2 : 3}
-          placeholder="描述你要寻找的人、企业、市场信号或收益机会；Agent 会调用真实工具并陈列来源数据。"
+          placeholder="输入目标。可让 Agent 分析编排，也可直接全网搜索公开联系人与来源证据。"
           className="min-h-[72px] w-full resize-none bg-transparent px-5 pb-3 pt-5 text-sm leading-7 text-ink-900 placeholder:text-ink-400 focus:outline-none sm:px-6"
-          aria-label="输入 AI 任务"
+          aria-label="输入 AI 或全网搜索任务"
         />
         <div className="flex flex-col gap-3 border-t border-ink-100 bg-ink-50/55 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div className="flex min-w-0 items-center gap-2">
@@ -75,8 +89,8 @@ export function CommandComposer({
             <select
               value={model}
               onChange={(event) => onModelChange(event.target.value)}
-              disabled={running}
-              className="max-w-[210px] bg-transparent text-xs font-semibold text-ink-800 focus:outline-none"
+              disabled={running || agentAvailable === false}
+              className="max-w-[210px] bg-transparent text-xs font-semibold text-ink-800 focus:outline-none disabled:text-ink-400"
               aria-label="选择 AI 模型"
             >
               {modelOptions.map((option) => (
@@ -86,22 +100,35 @@ export function CommandComposer({
               ))}
             </select>
             <span className="hidden truncate text-[10px] text-ink-400 md:block">
-              {selected?.description}
+              {agentAvailable === false ? 'GPT 未配置，仍可使用全网联系人搜索' : selected?.description}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => onSubmit()}
-            disabled={running || !value.trim()}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand-700 px-4 text-xs font-semibold text-white transition hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-ink-200 disabled:text-ink-400"
-          >
-            {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {running ? '执行中' : '交给 Agent'}
-          </button>
+          <div className="grid gap-2 sm:flex sm:items-center">
+            <button
+              type="button"
+              onClick={() => onSearch()}
+              disabled={running || !value.trim() || searchAvailable === false}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-brand-200 bg-white px-4 text-xs font-semibold text-brand-700 transition hover:border-brand-400 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-ink-200 disabled:bg-ink-100 disabled:text-ink-400"
+              title={searchAvailable === false ? '搜索提供器未连接' : '不依赖 GPT API，直接运行搜索任务'}
+            >
+              {runningMode === 'search' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              {runningMode === 'search' ? '搜索中' : '全网联系人搜索'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSubmit()}
+              disabled={running || !value.trim() || agentAvailable === false}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand-700 px-4 text-xs font-semibold text-white transition hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-ink-200 disabled:text-ink-400"
+              title={agentAvailable === false ? 'Railway 尚未配置 GPT API' : '使用模型理解目标并编排多步工具'}
+            >
+              {runningMode === 'agent' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+              {runningMode === 'agent' ? 'Agent 执行中' : 'Agent 回答'}
+            </button>
+          </div>
         </div>
       </div>
       <p className="mt-2 text-center text-[10px] leading-4 text-ink-400">
-        仅展示真实来源与当前工作区数据；外部发送、登录、付款和账户操作不会自动执行。
+        全网搜索可在没有 GPT API 时运行；仅展示公开、允许访问且带来源的业务联系人信息。
       </p>
     </div>
   )

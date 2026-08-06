@@ -34,20 +34,23 @@ test('revenue center separates potential rewards from confirmed revenue', () => 
   assert.match(pageSource, /不计入已确认收益/)
 })
 
-test('revenue center uses one page heading and embeds the existing dashboard after live execution', () => {
-  assert.match(operationsPageSource, /收益中心/)
+test('revenue supervision uses one page heading and embeds the existing dashboard after live execution', () => {
+  assert.match(operationsPageSource, /收益监督中心/)
+  assert.match(operationsPageSource, /收益监督流程/)
   assert.match(operationsPageSource, /RevenueLiveOpsPanel/)
   assert.match(operationsPageSource, /data-revenue-dashboard-mode="embedded"/)
   assert.match(operationsPageSource, /RevenueDashboardPage/)
   assert.match(operationsPageSource, /\[&>div>div>header\]:hidden/)
 })
 
-test('revenue center renders a real operator-gated cloud browser panel', () => {
+test('revenue supervision renders a real operator-gated interactive cloud browser panel', () => {
   assert.match(operationsPageSource, /getRevenueDashboard/)
-  assert.match(livePanelSource, /云端浏览器实时画面/)
+  assert.match(livePanelSource, /收益执行云端浏览器/)
   assert.match(livePanelSource, /sessionStorage/)
   assert.match(livePanelSource, /debuggerFullscreenUrl/)
   assert.match(livePanelSource, /Authorization/)
   assert.match(livePanelSource, /每 2 秒/)
+  assert.match(livePanelSource, /data-live-mode="interactive"/)
+  assert.match(livePanelSource, /独立接管/)
   assert.doesNotMatch(livePanelSource, /mock video|模拟直播/i)
 })

@@ -33,7 +33,7 @@ const WORKSPACE_ITEMS = [
 export function AppLayout() {
   return (
     <div className="flex h-screen overflow-hidden bg-white">
-      <aside className="app-sidebar hidden w-[228px] shrink-0 flex-col lg:flex">
+      <aside className="app-sidebar z-40 hidden w-[228px] shrink-0 flex-col lg:flex">
         <div className="flex h-[72px] items-center border-b border-white/10 px-5">
           <Link
             to="/app/home"
@@ -55,7 +55,7 @@ export function AppLayout() {
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    'group flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all',
+                    'group relative z-10 flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all',
                     isActive
                       ? 'bg-white/10 text-white shadow-sm'
                       : 'text-white/55 hover:bg-white/[0.055] hover:text-white',
