@@ -31,6 +31,9 @@ test('AI home renders one command composer, tool trace, and source-backed entity
   const resultCard = await readSource(
     '../features/command-center/EntityIntelligenceCard.tsx',
   )
+  const sourceEvidence = await readSource(
+    '../features/command-center/SourceEvidenceList.tsx',
+  )
 
   assert.match(page, /runSalesAgent/)
   assert.match(page, /getChatSessions/)
@@ -39,9 +42,12 @@ test('AI home renders one command composer, tool trace, and source-backed entity
   assert.match(page, /IntelligenceResultGrid/)
   assert.match(resultCard, /公开联系方式/)
   assert.match(resultCard, /来源证据/)
-  assert.match(resultCard, /observedAt/)
-  assert.match(resultCard, /verificationStatus/)
-  assert.doesNotMatch(resultCard, /猜测邮箱|全部私人信息|自动发送/)
+  assert.match(sourceEvidence, /observedAt/)
+  assert.match(sourceEvidence, /verificationStatus/)
+  assert.doesNotMatch(
+    `${resultCard}\n${sourceEvidence}`,
+    /猜测邮箱|全部私人信息|自动发送/,
+  )
 })
 
 test('market page removes the decorative four-step workflow', async () => {
