@@ -34,3 +34,16 @@ test('live iframe renders a complete 1440px desktop viewport and dynamically fit
   assert.match(browserSource, /transformOrigin: 'top left'/)
   assert.doesNotMatch(browserSource, /PREVIEW_VIEWPORT_SCALE/)
 })
+
+test('blocked iframe previews silently fall back to a webpage snapshot and then the research summary', () => {
+  assert.match(browserSource, /type PreviewMode = 'iframe' \| 'snapshot'/)
+  assert.match(browserSource, /buildSnapshotUrl/)
+  assert.match(browserSource, /image\.thum\.io\/get\/noanimate/)
+  assert.match(browserSource, /onFallbackToSummary/)
+  assert.match(browserSource, /setPreviewMode\('snapshot'\)/)
+  assert.doesNotMatch(
+    browserSource,
+    /该站点没有允许在应用内显示实时画面/,
+  )
+  assert.doesNotMatch(browserSource, /X-Frame-Options/)
+})
