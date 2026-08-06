@@ -7,12 +7,14 @@ import {
   KeyRound,
   LoaderCircle,
   LockKeyhole,
+  MousePointer2,
   Play,
   Radio,
   RefreshCw,
   ShieldCheck,
   Signal,
   UnlockKeyhole,
+  WifiOff,
 } from 'lucide-react'
 import type { RevenueOpportunity } from './revenue-api'
 import {
@@ -41,6 +43,8 @@ const STATUS_LABELS: Record<RevenueLiveRunStatus, string> = {
   TIMED_OUT: '已超时',
 }
 
+type LiveConnectionState = 'idle' | 'connecting' | 'connected' | 'disconnected'
+
 interface RevenueLiveOpsPanelProps {
   opportunities: RevenueOpportunity[]
 }
@@ -53,6 +57,8 @@ export function RevenueLiveOpsPanel({ opportunities }: RevenueLiveOpsPanelProps)
   const [loading, setLoading] = useState(Boolean(initialToken))
   const [mutating, setMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [connectionState, setConnectionState] =
+    useState<LiveConnectionState>('idle')
   const polling = useRef(false)
 
   const refresh = useCallback(
@@ -86,6 +92,17 @@ export function RevenueLiveOpsPanel({ opportunities }: RevenueLiveOpsPanelProps)
     return () => window.clearInterval(timer)
   }, [refresh, token])
 
+  useEffect(() => {
+    const handleBrowserbaseMessage = (event: MessageEvent) => {
+      if (isBrowserbaseDisconnected(event.data)) {
+        setConnectionState('disconnected')
+        setError('Browserbase Live View 已断开。可点击刷新，或使用“独立接管”重新打开实时会话。')
+      }
+    }
+    window.addEventListener('message', handleBrowserbaseMessage)
+    return () => window.removeEventListener('message', handleBrowserbaseMessage)
+  }, [])
+
   const selectedOpportunity = useMemo(
     () =>
       opportunities.find(
@@ -100,6 +117,10 @@ export function RevenueLiveOpsPanel({ opportunities }: RevenueLiveOpsPanelProps)
     ? ACTIVE_STATUSES.has(status.run.status)
     : false
   const liveUrl = status?.liveView?.debuggerFullscreenUrl ?? null
+
+  useEffect(() => {
+    setConnectionState(liveUrl ? 'connecting' : 'idle')
+  }, [liveUrl])
 
   const unlock = async () => {
     const nextToken = tokenDraft.trim()
@@ -119,6 +140,7 @@ export function RevenueLiveOpsPanel({ opportunities }: RevenueLiveOpsPanelProps)
     setTokenDraft('')
     setStatus(null)
     setError(null)
+    setConnectionState('idle')
   }
 
   const start = async () => {
@@ -147,93 +169,50 @@ export function RevenueLiveOpsPanel({ opportunities }: RevenueLiveOpsPanelProps)
     }
   }
 
-  if (!token) {
-    return (
-      <section className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 p-6 text-white shadow-xl lg:p-8">
-        <div className="grid gap-7 lg:grid-cols-[1fr_minmax(320px,0.55fr)]">
-          <div>
-            <LiveHeading />
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-white/60">
-              这里只展示由 Sales Radar AI 后端真实启动的云端浏览器会话、当前网页和已执行动作。未连接供应商时会明确显示未配置，不会伪造运行画面。
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold text-white/60">
-              <TrustItem label="真实 Live View" />
-              <TrustItem label="只读研究边界" />
-              <TrustItem label="每 2 秒刷新" />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
-            <div className="flex items-center gap-3">
-              <LockKeyhole className="h-5 w-5 text-cyan-300" />
-              <div>
-                <p className="text-sm font-bold">运营画面已锁定</p>
-                <p className="mt-1 text-xs text-white/45">直播地址和事件流不对公共访客开放</p>
-              </div>
-            </div>
-            <label className="mt-5 block text-xs font-semibold text-white/60" htmlFor="revenue-live-token">
-              运营令牌
-            </label>
-            <div className="mt-2 flex gap-2">
-              <input
-                id="revenue-live-token"
-                type="password"
-                autoComplete="off"
-                value={tokenDraft}
-                onChange={(event) => setTokenDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') void unlock()
-                }}
-                placeholder="输入 REVENUE_OPERATOR_TOKEN"
-                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-900 px-3 py-2.5 text-sm outline-none placeholder:text-white/25 focus:border-cyan-400/50"
-              />
-              <button
-                type="button"
-                onClick={() => void unlock()}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-bold text-slate-950 disabled:opacity-60"
-              >
-                {loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UnlockKeyhole className="h-4 w-4" />}
-                解锁
-              </button>
-            </div>
-            <p className="mt-3 text-[11px] leading-5 text-white/40">
-              令牌仅保存在当前标签页的 sessionStorage，并通过 Authorization 请求头发送。
-            </p>
-            {error ? <ErrorBanner message={error} /> : null}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 text-white shadow-xl">
       <header className="flex flex-col gap-4 border-b border-white/10 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <LiveHeading active={active} />
-          <p className="mt-2 text-xs text-white/45">
-            每 2 秒从受保护 API 同步状态；画面由云端供应商的真实 Live View 提供。
+          <p className="mt-2 text-xs leading-5 text-white/45">
+            与市场雷达一致：左侧监督真实网页，右侧显示动作与证据。自动任务保持只读，人工接管画面可以点击、输入和滚动。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusChip active={Boolean(status?.configured)} label={status?.configured ? 'Browserbase 已连接' : '供应商未配置'} />
-          <StatusChip active={Boolean(status?.loopEnabled)} label={status?.loopEnabled ? '自动循环已启用' : '自动循环未启用'} />
-          <button type="button" onClick={() => void refresh()} disabled={loading} className="live-secondary-button">
+          <StatusChip
+            active={Boolean(status?.configured)}
+            label={status?.configured ? 'Browserbase 已连接' : '供应商未配置'}
+          />
+          <StatusChip
+            active={connectionState === 'connected'}
+            label={connectionLabel(connectionState)}
+          />
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={loading || !token}
+            className="live-secondary-button"
+          >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> 刷新
           </button>
-          <button type="button" onClick={lock} className="live-secondary-button">
-            <KeyRound className="h-3.5 w-3.5" /> 锁定
-          </button>
+          {token ? (
+            <button type="button" onClick={lock} className="live-secondary-button">
+              <KeyRound className="h-3.5 w-3.5" /> 锁定
+            </button>
+          ) : null}
         </div>
       </header>
 
-      {error ? <div className="px-5 pt-4"><ErrorBanner message={error} /></div> : null}
+      {error ? (
+        <div className="px-5 pt-4">
+          <ErrorBanner message={error} />
+        </div>
+      ) : null}
 
-      <div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.75fr)]">
+      <div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(340px,0.75fr)]">
         <div className="space-y-4">
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+            <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="flex items-center gap-2 truncate text-xs font-semibold text-white/70">
                   <Globe2 className="h-4 w-4 shrink-0 text-cyan-300" />
@@ -243,28 +222,53 @@ export function RevenueLiveOpsPanel({ opportunities }: RevenueLiveOpsPanelProps)
                   {status?.currentPage?.url || status?.run?.targetUrl || '尚未打开网页'}
                 </p>
               </div>
-              {status?.run ? (
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(status.run.status)}`}>
-                  {STATUS_LABELS[status.run.status]}
-                </span>
-              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {liveUrl ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-bold text-cyan-100">
+                    <MousePointer2 className="h-3.5 w-3.5" /> 点击画面可接管
+                  </span>
+                ) : null}
+                {status?.run ? (
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(status.run.status)}`}>
+                    {STATUS_LABELS[status.run.status]}
+                  </span>
+                ) : null}
+              </div>
             </div>
 
-            <div className="aspect-video bg-[#050914]">
+            <div className="relative aspect-video min-h-[360px] bg-[#050914]">
               {liveUrl ? (
                 <iframe
-                  title="Browserbase revenue operations Live View"
-                  src={status?.liveView?.debuggerFullscreenUrl ?? undefined}
+                  title="Browserbase revenue supervision Live View"
+                  src={liveUrl}
+                  data-live-mode="interactive"
+                  allow="clipboard-read; clipboard-write"
                   className="h-full w-full border-0 bg-white"
                   referrerPolicy="no-referrer"
+                  tabIndex={0}
+                  onLoad={() => {
+                    setConnectionState('connected')
+                    setError(null)
+                  }}
                 />
               ) : (
                 <LiveViewEmptyState
                   configured={Boolean(status?.configured)}
                   loading={loading}
                   hasRun={Boolean(status?.run)}
+                  locked={!token}
                 />
               )}
+              {connectionState === 'disconnected' ? (
+                <div className="absolute inset-x-4 bottom-4 flex items-center justify-between gap-3 rounded-xl border border-amber-300/25 bg-slate-950/90 px-4 py-3 text-xs text-amber-100 backdrop-blur">
+                  <span className="inline-flex items-center gap-2">
+                    <WifiOff className="h-4 w-4" /> Live View 连接已断开
+                  </span>
+                  <button type="button" onClick={() => void refresh()} className="font-bold text-cyan-200">
+                    重新连接
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -275,64 +279,156 @@ export function RevenueLiveOpsPanel({ opportunities }: RevenueLiveOpsPanelProps)
               </p>
               <p className="mt-1 text-[11px] leading-5 text-white/35">
                 {active
-                  ? '只读研究正在云端执行，动作会持续进入右侧审计时间线。'
+                  ? 'Agent 正在只读研究；你可以直接点击画面监督或接管，动作会继续写入右侧时间线。'
                   : status?.configured
-                    ? '启动后仅访问收益队列中的公开来源，不登录、不提交、不交易。'
+                    ? '启动后仅访问收益队列中的公开来源；人工接管也不会自动提交、付款或交易。'
                     : '需要在 Railway 配置运营令牌和 Browserbase API Key。'}
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
               {liveUrl ? (
-                <a href={liveUrl} target="_blank" rel="noreferrer" className="live-secondary-button">
-                  独立打开 <ExternalLink className="h-3.5 w-3.5" />
+                <a
+                  href={liveUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="live-secondary-button"
+                >
+                  独立接管 <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               ) : null}
-              {active && status?.run ? (
-                <button type="button" onClick={() => void stop()} disabled={mutating} className="inline-flex items-center gap-2 rounded-xl bg-rose-400 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-60">
+              {token && active && status?.run ? (
+                <button
+                  type="button"
+                  onClick={() => void stop()}
+                  disabled={mutating}
+                  className="inline-flex items-center gap-2 rounded-xl bg-rose-400 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-60"
+                >
                   {mutating ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <CircleStop className="h-3.5 w-3.5" />}
                   停止会话
                 </button>
-              ) : (
-                <button type="button" onClick={() => void start()} disabled={mutating || !status?.configured || !selectedOpportunity} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-45">
+              ) : token ? (
+                <button
+                  type="button"
+                  onClick={() => void start()}
+                  disabled={mutating || !status?.configured || !selectedOpportunity}
+                  className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+                >
                   {mutating ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                   运行最高优先机会
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
 
-        <aside className="flex min-h-[440px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/35">Action Timeline</p>
-              <h3 className="mt-1 text-sm font-bold">实时操作与审计事件</h3>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-white/40">
-              <Signal className={`h-3.5 w-3.5 ${active ? 'text-emerald-300' : ''}`} />
-              {formatHeartbeat(status?.heartbeatAt)}
-            </span>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-            {status?.events.length ? (
-              <ol className="space-y-4">
-                {status.events.map((event) => (
-                  <EventItem key={event.id || event.providerMessageId} event={event} />
-                ))}
-              </ol>
-            ) : (
-              <div className="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
-                <Bot className="h-9 w-9 text-white/20" />
-                <p className="mt-3 text-sm font-semibold text-white/65">暂无真实操作事件</p>
-                <p className="mt-2 max-w-xs text-xs leading-6 text-white/35">
-                  会话启动后，页面访问、工具动作、状态变化和结果会按时间写入这里。
-                </p>
-              </div>
-            )}
-          </div>
-        </aside>
+        {token ? (
+          <EventTimeline status={status} active={active} />
+        ) : (
+          <UnlockPanel
+            tokenDraft={tokenDraft}
+            loading={loading}
+            onTokenChange={setTokenDraft}
+            onUnlock={() => void unlock()}
+          />
+        )}
       </div>
     </section>
+  )
+}
+
+function UnlockPanel({
+  tokenDraft,
+  loading,
+  onTokenChange,
+  onUnlock,
+}: {
+  tokenDraft: string
+  loading: boolean
+  onTokenChange(value: string): void
+  onUnlock(): void
+}) {
+  return (
+    <aside className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+      <div className="flex items-center gap-3">
+        <LockKeyhole className="h-5 w-5 text-cyan-300" />
+        <div>
+          <p className="text-sm font-bold">解锁收益监督画面</p>
+          <p className="mt-1 text-xs text-white/45">令牌只保护直播地址、操作事件和启停控制</p>
+        </div>
+      </div>
+      <label className="mt-5 block text-xs font-semibold text-white/60" htmlFor="revenue-live-token">
+        运营令牌
+      </label>
+      <input
+        id="revenue-live-token"
+        type="password"
+        autoComplete="off"
+        value={tokenDraft}
+        onChange={(event) => onTokenChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') onUnlock()
+        }}
+        placeholder="输入 REVENUE_OPERATOR_TOKEN"
+        className="mt-2 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2.5 text-sm outline-none placeholder:text-white/25 focus:border-cyan-400/50"
+      />
+      <button
+        type="button"
+        onClick={onUnlock}
+        disabled={loading}
+        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-bold text-slate-950 disabled:opacity-60"
+      >
+        {loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UnlockKeyhole className="h-4 w-4" />}
+        解锁并同步
+      </button>
+      <div className="mt-5 space-y-2 text-[11px] leading-5 text-white/45">
+        <TrustItem label="真实 Live View，不使用模拟视频" />
+        <TrustItem label="人工可交互，自动任务保持只读" />
+        <TrustItem label="每 2 秒同步状态和审计事件" />
+      </div>
+      <p className="mt-4 text-[10px] leading-5 text-white/30">
+        令牌只保存在当前标签页的 sessionStorage，并通过 Authorization 请求头发送。
+      </p>
+    </aside>
+  )
+}
+
+function EventTimeline({
+  status,
+  active,
+}: {
+  status: RevenueLiveStatus | null
+  active: boolean
+}) {
+  return (
+    <aside className="flex min-h-[520px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/35">Action Timeline</p>
+          <h3 className="mt-1 text-sm font-bold">实时操作、核验与收益证据</h3>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-white/40">
+          <Signal className={`h-3.5 w-3.5 ${active ? 'text-emerald-300' : ''}`} />
+          {formatHeartbeat(status?.heartbeatAt)}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        {status?.events.length ? (
+          <ol className="space-y-4">
+            {status.events.map((event) => (
+              <EventItem key={event.id || event.providerMessageId} event={event} />
+            ))}
+          </ol>
+        ) : (
+          <div className="flex h-full min-h-[360px] flex-col items-center justify-center text-center">
+            <Bot className="h-9 w-9 text-white/20" />
+            <p className="mt-3 text-sm font-semibold text-white/65">等待真实操作事件</p>
+            <p className="mt-2 max-w-xs text-xs leading-6 text-white/35">
+              会话启动后，网页访问、Agent 动作、核验结果、失败原因和完成状态都会按时间写入这里。
+            </p>
+          </div>
+        )}
+      </div>
+    </aside>
   )
 }
 
@@ -340,38 +436,56 @@ function LiveHeading({ active = false }: { active?: boolean }) {
   return (
     <>
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
-        <Radio className={`h-4 w-4 ${active ? 'animate-pulse' : ''}`} /> Live Operations
+        <Radio className={`h-4 w-4 ${active ? 'animate-pulse' : ''}`} /> Live Revenue Supervision
       </div>
-      <h2 className="mt-2 text-xl font-bold">云端浏览器实时画面</h2>
+      <h2 className="mt-2 text-xl font-bold">收益执行云端浏览器</h2>
     </>
   )
 }
 
 function TrustItem({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-      <ShieldCheck className="h-4 w-4 text-cyan-300" /> {label}
+    <span className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+      <ShieldCheck className="h-4 w-4 shrink-0 text-cyan-300" /> {label}
     </span>
   )
 }
 
-function LiveViewEmptyState({ configured, loading, hasRun }: { configured: boolean; loading: boolean; hasRun: boolean }) {
+function LiveViewEmptyState({
+  configured,
+  loading,
+  hasRun,
+  locked,
+}: {
+  configured: boolean
+  loading: boolean
+  hasRun: boolean
+  locked: boolean
+}) {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      {loading ? <LoaderCircle className="h-10 w-10 animate-spin text-cyan-300" /> : <LockKeyhole className="h-10 w-10 text-white/20" />}
+      {loading ? (
+        <LoaderCircle className="h-10 w-10 animate-spin text-cyan-300" />
+      ) : (
+        <LockKeyhole className="h-10 w-10 text-white/20" />
+      )}
       <p className="mt-4 text-sm font-bold text-white/75">
         {loading
           ? '正在同步云端状态'
-          : !configured
-            ? '尚未连接真实云端浏览器'
-            : hasRun
-              ? '等待供应商分配 Live View'
-              : '当前没有运行中的浏览器'}
+          : locked
+            ? '监督流程可见，真实浏览器需要运营令牌解锁'
+            : !configured
+              ? '尚未连接真实云端浏览器'
+              : hasRun
+                ? '等待供应商分配 Live View'
+                : '当前没有运行中的浏览器'}
       </p>
       <p className="mt-2 max-w-md text-xs leading-6 text-white/35">
-        {!configured
-          ? '在 Railway 设置 REVENUE_OPERATOR_TOKEN 与 BROWSERBASE_API_KEY 后才会出现真实远程浏览器画面。'
-          : '只有真实会话返回调试画面地址后才加载 iframe。'}
+        {locked
+          ? '右侧输入运营令牌后，当前网页、实时画面、操作轨迹和收益核验状态会显示在这里。'
+          : !configured
+            ? '在 Railway 设置 REVENUE_OPERATOR_TOKEN 与 BROWSERBASE_API_KEY 后才会出现真实远程浏览器画面。'
+            : '只有真实会话返回调试画面地址后才加载可交互 iframe。'}
       </p>
     </div>
   )
@@ -400,7 +514,11 @@ function StatusChip({ active, label }: { active: boolean; label: string }) {
 }
 
 function ErrorBanner({ message }: { message: string }) {
-  return <div className="mt-4 rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2.5 text-xs text-rose-100">{message}</div>
+  return (
+    <div className="rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2.5 text-xs text-rose-100">
+      {message}
+    </div>
+  )
 }
 
 function statusTone(status: RevenueLiveRunStatus) {
@@ -409,6 +527,19 @@ function statusTone(status: RevenueLiveRunStatus) {
   if (status === 'COMPLETED') return 'bg-sky-400/15 text-sky-200'
   if (status === 'FAILED' || status === 'TIMED_OUT') return 'bg-rose-400/15 text-rose-200'
   return 'bg-white/10 text-white/60'
+}
+
+function connectionLabel(state: LiveConnectionState) {
+  if (state === 'connected') return '画面可交互'
+  if (state === 'connecting') return '画面连接中'
+  if (state === 'disconnected') return '画面已断开'
+  return '等待画面'
+}
+
+function isBrowserbaseDisconnected(data: unknown) {
+  if (data === 'browserbase-disconnected') return true
+  if (!data || typeof data !== 'object') return false
+  return (data as { type?: unknown }).type === 'browserbase-disconnected'
 }
 
 function readStoredToken() {
