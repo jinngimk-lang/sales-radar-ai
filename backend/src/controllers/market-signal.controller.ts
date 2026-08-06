@@ -1,10 +1,10 @@
 import type { Request, RequestHandler } from 'express'
 import { marketIntelligence } from '../services/market-intelligence/market-intelligence.service.js'
 import {
-  marketWebResearch,
   type MarketResearchSignalFocus,
   type MarketResearchTarget,
 } from '../services/market-intelligence/market-web-research.service.js'
+import { resilientMarketWebResearch } from '../services/market-intelligence/resilient-market-web-research.service.js'
 import { ensureDemoUser } from '../services/demo-user.service.js'
 import { AppError } from '../utils/app-error.js'
 
@@ -56,8 +56,7 @@ export function createListMarketSignalsController(
       )
     }
 
-    const userId =
-      authenticatedUserId ?? (await demoUserResolver()).id
+    const userId = authenticatedUserId ?? (await demoUserResolver()).id
     const signals = await service.listForUser(userId)
     response.json({ data: signals, meta: { total: signals.length } })
   }
@@ -67,7 +66,7 @@ export const listMarketSignalsController =
   createListMarketSignalsController()
 
 export function createRunMarketResearchController(
-  service: MarketResearchRunner = marketWebResearch,
+  service: MarketResearchRunner = resilientMarketWebResearch,
   demoUserResolver = ensureDemoUser,
 ): RequestHandler {
   return async (request, response) => {

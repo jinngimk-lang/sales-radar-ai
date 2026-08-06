@@ -4,7 +4,7 @@ import { Platform, Region } from '@prisma/client'
 import {
   buildAgentReachSearchPlans,
   resolveAgentReachResultLimit,
-} from '../src/providers/search/agent-reach.provider.js'
+} from '../src/providers/search/agent-reach-search-planner.js'
 
 test('direct search supports a 30-result target without the former hard clamp at ten', () => {
   assert.equal(resolveAgentReachResultLimit(30, {}), 30)
@@ -12,7 +12,7 @@ test('direct search supports a 30-result target without the former hard clamp at
   assert.equal(resolveAgentReachResultLimit(undefined, {}), 30)
 })
 
-test('mixed website and social search creates separate upstream plans so social sources are not swallowed by general web results', () => {
+test('mixed website and social search creates separate bounded upstream plans', () => {
   const plans = buildAgentReachSearchPlans({
     keyword: 'battery procurement contacts',
     platforms: [Platform.Website, Platform.LinkedIn, Platform.X, Platform.Reddit],
@@ -20,10 +20,13 @@ test('mixed website and social search creates separate upstream plans so social 
     maxResults: 30,
   })
 
-  assert.equal(plans.length, 2)
+  assert.equal(plans.length, 3)
   assert.equal(plans.reduce((sum, plan) => sum + plan.maxResults, 0), 30)
-  assert.match(plans[0]?.query ?? '', /battery procurement contacts/)
-  assert.match(plans[1]?.query ?? '', /site:linkedin\.com/)
-  assert.match(plans[1]?.query ?? '', /site:x\.com/)
-  assert.match(plans[1]?.query ?? '', /site:reddit\.com/)
+  assert.ok(plans.every((plan) => plan.maxResults <= 10))
+  assert.deepEqual(plans[0]?.platforms, [Platform.Website])
+  const socialPlatforms = plans.slice(1).flatMap((plan) => plan.platforms)
+  assert.ok(socialPlatforms.includes(Platform.LinkedIn))
+  assert.ok(socialPlatforms.includes(Platform.X))
+  assert.ok(socialPlatforms.includes(Platform.Reddit))
+  assert.ok(plans.slice(1).every((plan) => !plan.platforms.includes(Platform.Website)))
 })

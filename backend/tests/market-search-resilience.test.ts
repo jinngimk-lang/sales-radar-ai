@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Industry, Platform, Region } from '@prisma/client'
-import { MarketWebResearchService } from '../src/services/market-intelligence/market-web-research.service.js'
+import { ResilientMarketWebResearchService } from '../src/services/market-intelligence/resilient-market-web-research.service.js'
 
 test('hosted research quota failure falls back to configured Exa and preserves the full target in the query', async () => {
   let capturedKeyword = ''
-  const service = new MarketWebResearchService({
+  const service = new ResilientMarketWebResearchService({
     environment: {
       OPENAI_API_KEY: 'quota-exhausted',
       EXA_API_KEY: 'exa-available',
