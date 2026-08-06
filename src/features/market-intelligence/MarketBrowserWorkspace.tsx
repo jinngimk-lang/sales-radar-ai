@@ -34,6 +34,8 @@ import {
 const PREVIEW_DESKTOP_WIDTH = 1440
 const PREVIEW_DOCUMENT_HEIGHT = 1800
 
+type PreviewMode = 'iframe' | 'snapshot'
+
 const SOURCE_META: Record<
   MarketResearchSourceType,
   { label: string; icon: typeof Globe2 }
@@ -436,7 +438,11 @@ function BrowserContent({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden">
         {view === 'live' ? (
-          <LiveWebPreview url={url} title={title} />
+          <LiveWebPreview
+            url={url}
+            title={title}
+            onFallbackToSummary={() => onViewChange('summary')}
+          />
         ) : (
           <div className="h-full overflow-x-hidden overflow-y-auto scrollbar-thin">
             {source && session ? (
@@ -464,10 +470,18 @@ function BrowserContent({
   )
 }
 
-function LiveWebPreview({ url, title }: { url: string; title: string }) {
+function LiveWebPreview({
+  url,
+  title,
+  onFallbackToSummary,
+}: {
+  url: string
+  title: string
+  onFallbackToSummary: () => void
+}) {
   const [loadKey, setLoadKey] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [loadFailed, setLoadFailed] = useState(false)
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('iframe')
   const [previewScale, setPreviewScale] = useState(1)
   const loadTimeout = useRef<number | null>(null)
   const previewContainerRef = useRef<HTMLDivElement | null>(null)
@@ -495,22 +509,28 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
 
   useEffect(() => {
     setLoading(true)
-    setLoadFailed(false)
+    setPreviewMode('iframe')
     if (loadTimeout.current !== null) window.clearTimeout(loadTimeout.current)
-    loadTimeout.current = window.setTimeout(() => {
-      setLoading(false)
-      setLoadFailed(true)
-    }, 12_000)
+    if (media.type === 'page') {
+      loadTimeout.current = window.setTimeout(() => {
+        setLoading(true)
+        setPreviewMode('snapshot')
+      }, 12_000)
+    }
     return () => {
       if (loadTimeout.current !== null) window.clearTimeout(loadTimeout.current)
     }
-  }, [url, loadKey])
+  }, [url, loadKey, media.type])
 
-  const finishLoading = (failed = false) => {
+  const finishLoading = () => {
     if (loadTimeout.current !== null) window.clearTimeout(loadTimeout.current)
     loadTimeout.current = null
     setLoading(false)
-    setLoadFailed(failed)
+  }
+
+  const fallBackSilently = () => {
+    finishLoading()
+    onFallbackToSummary()
   }
 
   return (
@@ -540,7 +560,7 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 text-xs text-ink-500">
             <RefreshCw className="mr-2 h-4 w-4 animate-spin text-brand-600" />
-            正在载入网页实时画面…
+            正在载入网页画面…
           </div>
         )}
 
@@ -552,8 +572,8 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
               alt={title}
               referrerPolicy="no-referrer"
               className="max-w-full object-contain"
-              onLoad={() => finishLoading()}
-              onError={() => finishLoading(true)}
+              onLoad={finishLoading}
+              onError={fallBackSilently}
             />
           </div>
         ) : media.type === 'video' ? (
@@ -564,8 +584,20 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
               controls
               playsInline
               className="max-w-full"
-              onLoadedData={() => finishLoading()}
-              onError={() => finishLoading(true)}
+              onLoadedData={finishLoading}
+              onError={fallBackSilently}
+            />
+          </div>
+        ) : previewMode === 'snapshot' ? (
+          <div className="min-h-full bg-white">
+            <img
+              key={`snapshot-${url}-${loadKey}`}
+              src={buildSnapshotUrl(media.url)}
+              alt={`${title} 网页快照`}
+              referrerPolicy="no-referrer"
+              className="block h-auto w-full bg-white object-contain object-top"
+              onLoad={finishLoading}
+              onError={fallBackSilently}
             />
           </div>
         ) : (
@@ -590,37 +622,23 @@ function LiveWebPreview({ url, title }: { url: string; title: string }) {
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation"
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
               referrerPolicy="no-referrer"
-              onLoad={() => finishLoading()}
+              onLoad={finishLoading}
             />
           </div>
         )}
 
-        {loadFailed && (
-          <div className="absolute inset-x-4 top-12 z-20 rounded-2xl border border-amber-200 bg-white/95 p-5 text-center shadow-card backdrop-blur">
-            <Globe2 className="mx-auto h-6 w-6 text-amber-600" />
-            <p className="mt-2 text-sm font-semibold text-ink-900">
-              该站点没有允许在应用内显示实时画面
-            </p>
-            <p className="mt-1 text-xs leading-5 text-ink-500">
-              可能由登录、反爬、X-Frame-Options 或网络策略导致。来源仍然真实，使用独立窗口可查看完整图片、视频与网页交互。
-            </p>
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"
-            >
-              打开原网页 <ArrowUpRight className="h-3.5 w-3.5" />
-            </a>
-          </div>
-        )}
-
         <div className="pointer-events-none sticky bottom-3 z-10 mx-auto w-fit rounded-full border border-ink-200 bg-white/95 px-3 py-1.5 text-center text-[9px] text-ink-500 shadow-sm backdrop-blur">
-          页面按 1440px 桌面宽度完整缩放；上下滚动查看内容，左右两端保持可见
+          {previewMode === 'snapshot'
+            ? '网页快照已自动适配；上下滚动查看完整页面'
+            : '页面按 1440px 桌面宽度完整缩放；上下滚动查看内容，左右两端保持可见'}
         </div>
       </div>
     </div>
   )
+}
+
+function buildSnapshotUrl(value: string): string {
+  return `https://image.thum.io/get/noanimate/maxAge/6/width/1440/crop/2400/${encodeURI(value)}`
 }
 
 function resolveVisualMedia(value: string): {
