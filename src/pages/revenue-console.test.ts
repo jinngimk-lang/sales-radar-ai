@@ -11,6 +11,10 @@ const pageSource = await readFile(
   new URL('./RevenueDashboardPage.tsx', import.meta.url),
   'utf8',
 )
+const livePanelSource = await readFile(
+  new URL('../features/revenue/RevenueLiveOpsPanel.tsx', import.meta.url),
+  'utf8',
+)
 
 test('revenue console is reachable from the workspace navigation', () => {
   assert.match(appSource, /path="revenue"/)
@@ -23,4 +27,14 @@ test('revenue console separates potential rewards from confirmed revenue', () =>
   assert.match(pageSource, /已确认收益/)
   assert.match(pageSource, /已到账/)
   assert.match(pageSource, /不计入已确认收益/)
+})
+
+test('revenue console renders a real operator-gated cloud browser panel', () => {
+  assert.match(pageSource, /RevenueLiveOpsPanel/)
+  assert.match(livePanelSource, /云端浏览器实时画面/)
+  assert.match(livePanelSource, /sessionStorage/)
+  assert.match(livePanelSource, /debuggerFullscreenUrl/)
+  assert.match(livePanelSource, /Authorization/)
+  assert.match(livePanelSource, /每 2 秒/)
+  assert.doesNotMatch(livePanelSource, /mock video|模拟直播/i)
 })
