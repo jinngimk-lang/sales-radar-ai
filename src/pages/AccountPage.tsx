@@ -66,6 +66,9 @@ export function AccountPage() {
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <CapabilityCard icon={Globe2} title="市场联网研究" capability={capabilities.marketResearch} />
               <CapabilityCard icon={Bot} title="AI 个性化话术" capability={capabilities.salesAI} />
+              {capabilities.salesAgent ? (
+                <CapabilityCard icon={Bot} title="GPT 销售执行器" capability={capabilities.salesAgent} />
+              ) : null}
               <CapabilityCard icon={Users} title="公开联系人抓取" capability={capabilities.publicContactDiscovery} />
               <CapabilityCard icon={Search} title="销售机会搜索" capability={capabilities.salesDiscovery} />
             </div>
