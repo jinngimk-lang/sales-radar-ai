@@ -86,6 +86,7 @@ jobs:
           tests/revenue-persistence-security.test.ts
           tests/revenue-live-domain.test.ts
           tests/revenue-operator-auth.test.ts
+          tests/browserbase-agent-provider.test.ts
 
       - name: Build
         run: npm run build
