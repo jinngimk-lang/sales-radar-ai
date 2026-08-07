@@ -1,0 +1,43 @@
+name: Apply market and contact implementation
+
+on:
+  push:
+    branches:
+      - fix/market-radar-and-contact-depth
+    paths:
+      - .github/scripts/apply_market_contact_fix.py
+      - .github/workflows/apply-market-contact-fix.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-market-contact-fix
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/market-radar-and-contact-depth
+          fetch-depth: 0
+
+      - name: Apply deterministic source transformation
+        run: python3 .github/scripts/apply_market_contact_fix.py
+
+      - name: Remove one-time transformation files
+        run: |
+          rm .github/scripts/apply_market_contact_fix.py
+          rm .github/workflows/apply-market-contact-fix.yml
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: complete market browser and direct contact search"
+          git push origin HEAD:fix/market-radar-and-contact-depth
