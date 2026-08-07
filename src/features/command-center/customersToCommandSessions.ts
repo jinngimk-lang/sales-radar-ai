@@ -38,6 +38,7 @@ export function customersToCommandSessions(
       preferredPlatform: customer.platform,
       observedTopics: customer.analysis.tags,
       evidenceExcerpt: customer.postContent.slice(0, 360),
+      basis: 'Public source content observed in the current direct-search task.',
     },
     lastMessage: customer.postContent,
     lastMessageAt: customer.postedAt,
