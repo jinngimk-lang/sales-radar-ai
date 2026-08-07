@@ -305,24 +305,13 @@
 @layer components {
   .app-sidebar {
     position: relative;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    background:
-      radial-gradient(circle at 0 0, rgba(37, 99, 235, 0.3), transparent 18rem),
-      linear-gradient(180deg, #09152d 0%, #07101f 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+    background: #0b1220;
     color: white;
   }
 
   .app-sidebar::after {
-    content: '';
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    opacity: 0.08;
-    background-image:
-      linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: linear-gradient(to bottom, black, transparent 62%);
+    content: none;
   }
 
   .app-sidebar > * {
@@ -331,9 +320,7 @@
   }
 
   .app-workspace-canvas {
-    background:
-      radial-gradient(circle at 90% 0, rgba(37, 99, 235, 0.055), transparent 30rem),
-      #f8fafc;
+    background: #f7f7f8;
   }
 
   .landing-hero-wrap {

@@ -175,7 +175,7 @@ export function RevenueLiveOpsPanel({ opportunities }: RevenueLiveOpsPanelProps)
         <div>
           <LiveHeading active={active} />
           <p className="mt-2 text-xs leading-5 text-white/45">
-            与市场雷达一致：左侧监督真实网页，右侧显示动作与证据。自动任务保持只读，人工接管画面可以点击、输入和滚动。
+            真实浏览器与动作时间线保持同步。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -279,9 +279,9 @@ export function RevenueLiveOpsPanel({ opportunities }: RevenueLiveOpsPanelProps)
               </p>
               <p className="mt-1 text-[11px] leading-5 text-white/35">
                 {active
-                  ? 'Agent 正在只读研究；你可以直接点击画面监督或接管，动作会继续写入右侧时间线。'
+                  ? '运行中，可直接查看或接管 Live。'
                   : status?.configured
-                    ? '启动后仅访问收益队列中的公开来源；人工接管也不会自动提交、付款或交易。'
+                    ? '准备就绪，可运行当前最高优先机会。'
                     : '需要在 Railway 配置运营令牌和 Browserbase API Key。'}
               </p>
             </div>
@@ -353,7 +353,7 @@ function UnlockPanel({
         <LockKeyhole className="h-5 w-5 text-cyan-300" />
         <div>
           <p className="text-sm font-bold">解锁收益监督画面</p>
-          <p className="mt-1 text-xs text-white/45">令牌只保护直播地址、操作事件和启停控制</p>
+          <p className="mt-1 text-xs text-white/45">输入运营令牌以查看实时执行</p>
         </div>
       </div>
       <label className="mt-5 block text-xs font-semibold text-white/60" htmlFor="revenue-live-token">
@@ -380,14 +380,6 @@ function UnlockPanel({
         {loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UnlockKeyhole className="h-4 w-4" />}
         解锁并同步
       </button>
-      <div className="mt-5 space-y-2 text-[11px] leading-5 text-white/45">
-        <TrustItem label="真实 Live View，不使用模拟视频" />
-        <TrustItem label="人工可交互，自动任务保持只读" />
-        <TrustItem label="每 2 秒同步状态和审计事件" />
-      </div>
-      <p className="mt-4 text-[10px] leading-5 text-white/30">
-        令牌只保存在当前标签页的 sessionStorage，并通过 Authorization 请求头发送。
-      </p>
     </aside>
   )
 }
