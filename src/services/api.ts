@@ -73,6 +73,7 @@ import * as crmStore from '@/lib/crmStore'
 const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL)
 const SEARCH_TASK_POLL_INTERVAL_MS = 500
 const SEARCH_TASK_MAX_POLL_ATTEMPTS = 240
+const DEFAULT_API_TIMEOUT_MS = 15_000
 
 function normalizeApiBaseUrl(value: string | undefined): string {
   const configuredBaseUrl = value?.trim() || '/api'
@@ -175,24 +176,53 @@ export class ApiRequestError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
-  })
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as ApiErrorBody
-    throw new ApiRequestError(
-      body.error?.message || `API request failed (${response.status})`,
-      response.status,
-      body.error?.code,
-    )
+  const controller = new AbortController()
+  const upstreamSignal = init?.signal
+  let timedOut = false
+  const abortFromCaller = () => controller.abort(upstreamSignal?.reason)
+  if (upstreamSignal?.aborted) {
+    abortFromCaller()
+  } else {
+    upstreamSignal?.addEventListener('abort', abortFromCaller, { once: true })
   }
+  const timeout = globalThis.setTimeout(() => {
+    timedOut = true
+    controller.abort('request-timeout')
+  }, DEFAULT_API_TIMEOUT_MS)
 
-  return response.json() as Promise<T>
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...init?.headers,
+      },
+    })
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as ApiErrorBody
+      throw new ApiRequestError(
+        body.error?.message || `API request failed (${response.status})`,
+        response.status,
+        body.error?.code,
+      )
+    }
+
+    return response.json() as Promise<T>
+  } catch (error) {
+    if (timedOut) {
+      throw new ApiRequestError(
+        '请求超时，请检查服务状态后重试。',
+        408,
+        'REQUEST_TIMEOUT',
+      )
+    }
+    throw error
+  } finally {
+    globalThis.clearTimeout(timeout)
+    upstreamSignal?.removeEventListener('abort', abortFromCaller)
+  }
 }
 
 function formatRelativeTime(value: string | null): string {
