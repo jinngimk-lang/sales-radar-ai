@@ -1,14 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Bot,
-  DatabaseZap,
-  Globe2,
-  Radar,
-  RefreshCw,
-  ShieldCheck,
-  Sparkles,
-  X,
-} from 'lucide-react'
+import { Bot, RefreshCw, X } from 'lucide-react'
 import type {
   ChatSession,
   CustomerType,
@@ -79,6 +70,21 @@ const DIRECT_SEARCH_CUSTOMER_TYPES: CustomerType[] = [
 const DIRECT_SEARCH_INTENT_LEVELS: IntentLevel[] = ['high', 'medium', 'low']
 const DIRECT_SEARCH_TARGET_RESULTS = 30
 const loadAssistantLeadSessions = getChatSessions
+
+const STARTER_PROMPTS = [
+  {
+    label: '找联系人',
+    value: '寻找目标企业的公开负责人和联系人，按潜力和证据强度排序。',
+  },
+  {
+    label: '研究市场',
+    value: '研究一个市场最近发生的真实变化，给出来源、机会和风险。',
+  },
+  {
+    label: '找收益',
+    value: '寻找规则明确、可验证结算的收益机会，并按风险调整后收益排序。',
+  },
+]
 
 type RunningMode = 'agent' | 'search' | null
 
@@ -275,24 +281,19 @@ export function AICommandCenterPage() {
     messages.length > 0 || results.length > 0 || running || syncingResults
 
   return (
-    <div className="min-h-full bg-[radial-gradient(circle_at_top,rgba(53,99,240,0.07),transparent_34rem),#f7f8fb]">
-      <header className="sticky top-0 z-20 border-b border-ink-200/80 bg-white/90 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
+    <div className="min-h-full bg-[#f7f7f8]">
+      <header className="sticky top-0 z-20 border-b border-black/[0.06] bg-white/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-700 text-white shadow-sm">
-              <Bot className="h-4.5 w-4.5" />
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ink-950 text-white">
+              <Bot className="h-4 w-4" />
             </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-ink-900">AI 情报指挥中心</p>
-              <p className="truncate text-[10px] text-ink-400">
-                Agent 按需出现 · 无 GPT 全网联系人搜索独立可用
-              </p>
-            </div>
+            <p className="truncate text-sm font-medium text-ink-900">Sales Radar AI</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <StatusBadge
               configured={searchConfigured}
-              label="全网搜索"
+              label="搜索"
               disabledLabel="搜索未连接"
             />
             <StatusBadge
@@ -304,10 +305,10 @@ export function AICommandCenterPage() {
               type="button"
               onClick={() => void loadCapability()}
               disabled={checkingCapability}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-500 transition hover:bg-ink-50 disabled:opacity-50"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition hover:bg-ink-100 disabled:opacity-50"
               aria-label="重新检测模型和后端能力"
             >
-              <RefreshCw className={cn('h-4 w-4', checkingCapability && 'animate-spin')} />
+              <RefreshCw className={cn('h-3.5 w-3.5', checkingCapability && 'animate-spin')} />
             </button>
           </div>
         </div>
@@ -318,63 +319,53 @@ export function AICommandCenterPage() {
           'mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8',
           hasWorkspaceActivity
             ? 'pb-48 pt-7'
-            : 'flex min-h-[calc(100vh-72px)] flex-col justify-center py-12',
+            : 'flex min-h-[calc(100vh-64px)] flex-col justify-center py-12',
         )}
       >
         {!hasWorkspaceActivity ? (
-          <section className="mx-auto w-full max-w-4xl text-center">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-brand-200 bg-white text-brand-700 shadow-card">
-              <Sparkles className="h-6 w-6" />
-            </span>
-            <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700">
-              AGENT + DIRECT GLOBAL SEARCH
-            </p>
-            <h1 className="mx-auto mt-3 max-w-3xl text-3xl font-semibold tracking-[-0.045em] text-ink-950 sm:text-5xl">
-              同一个输入框，既能问 Agent，也能直接搜索全网联系人
+          <section className="mx-auto w-full max-w-3xl">
+            <h1 className="mb-8 text-center text-2xl font-medium tracking-[-0.035em] text-ink-950 sm:text-[32px]">
+              今天要研究什么？
             </h1>
-            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-ink-500 sm:text-base">
-              有 GPT API 时运行多步 Agent；没有 GPT API 时，直接使用搜索提供器和公开来源链路返回对象、联系人与字段证据。
-            </p>
-
-            <div className="mt-7 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <Capability icon={Globe2} title="全网搜索" detail="Agent Reach 上游与公开网页" />
-              <Capability icon={DatabaseZap} title="对象与联系人" detail="字段级证据和观察时间" />
-              <Capability icon={Radar} title="市场与收益" detail="信号、机会与风险排序" />
-              <Capability icon={ShieldCheck} title="来源可信" detail="未知字段不猜测" />
-            </div>
-
-            <div className="mt-8">
-              <CommandComposer
-                value={input}
-                running={running}
-                runningMode={runningMode}
-                agentAvailable={agentConfigured}
-                searchAvailable={searchConfigured}
-                model={selectedModel}
-                modelOptions={modelOptions}
-                onValueChange={setInput}
-                onModelChange={setSelectedModel}
-                onSubmit={(message) => void submit(message)}
-                onSearch={(message) => void runDirectSearch(message)}
-              />
+            <CommandComposer
+              value={input}
+              running={running}
+              runningMode={runningMode}
+              agentAvailable={agentConfigured}
+              searchAvailable={searchConfigured}
+              model={selectedModel}
+              modelOptions={modelOptions}
+              onValueChange={setInput}
+              onModelChange={setSelectedModel}
+              onSubmit={(message) => void submit(message)}
+              onSearch={(message) => void runDirectSearch(message)}
+            />
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {STARTER_PROMPTS.map((starter) => (
+                <button
+                  key={starter.label}
+                  type="button"
+                  onClick={() => setInput(starter.value)}
+                  className="rounded-full border border-black/[0.08] bg-white px-3.5 py-2 text-xs text-ink-600 transition hover:bg-ink-50 hover:text-ink-900"
+                >
+                  {starter.label}
+                </button>
+              ))}
             </div>
           </section>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {agentVisible ? (
-              <section className="rounded-3xl border border-ink-200 bg-white p-4 shadow-card sm:p-5">
-                <div className="mb-4 flex items-center justify-between gap-3 border-b border-ink-100 pb-3">
-                  <div>
-                    <p className="text-xs font-semibold text-ink-900">Agent 回答与工具轨迹</p>
-                    <p className="mt-0.5 text-[10px] text-ink-400">仅在主动提问时展开；收起后不会遮挡结果区。</p>
-                  </div>
+              <section className="rounded-[24px] border border-black/[0.08] bg-white p-4 sm:p-5">
+                <div className="mb-4 flex items-center justify-between gap-3 border-b border-black/[0.06] pb-3">
+                  <p className="text-xs font-medium text-ink-900">Agent</p>
                   <button
                     type="button"
                     onClick={() => setAgentVisible(false)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-ink-600 transition hover:border-brand-200 hover:text-brand-700"
+                    className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-medium text-ink-500 transition hover:bg-ink-50 hover:text-ink-900"
                     aria-label="收起 Agent"
                   >
-                    <X className="h-3.5 w-3.5" /> 收起 Agent
+                    <X className="h-3.5 w-3.5" /> 收起
                   </button>
                 </div>
                 <AgentConversation messages={messages} running={running} />
@@ -398,8 +389,8 @@ export function AICommandCenterPage() {
       </main>
 
       {hasWorkspaceActivity ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 border-t border-ink-200/80 bg-white/92 px-4 pb-4 pt-3 backdrop-blur sm:px-6 lg:left-[228px] lg:right-0">
-          <div className="pointer-events-auto mx-auto max-w-[1120px]">
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 border-t border-black/[0.06] bg-white/94 px-4 pb-4 pt-3 backdrop-blur sm:px-6 lg:left-[208px] lg:right-0">
+          <div className="pointer-events-auto mx-auto max-w-[980px]">
             <CommandComposer
               compact
               value={input}
@@ -419,28 +410,10 @@ export function AICommandCenterPage() {
       ) : null}
 
       {!hasWorkspaceActivity && error ? (
-        <div className="fixed inset-x-4 bottom-5 z-30 mx-auto max-w-2xl rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700 shadow-card sm:inset-x-6">
+        <div className="fixed inset-x-4 bottom-5 z-30 mx-auto max-w-2xl rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700 sm:inset-x-6">
           {error}
         </div>
       ) : null}
-    </div>
-  )
-}
-
-function Capability({
-  icon: Icon,
-  title,
-  detail,
-}: {
-  icon: typeof Globe2
-  title: string
-  detail: string
-}) {
-  return (
-    <div className="rounded-2xl border border-ink-200 bg-white/80 px-4 py-3 text-left shadow-sm">
-      <Icon className="h-4 w-4 text-brand-600" />
-      <p className="mt-2 text-xs font-semibold text-ink-800">{title}</p>
-      <p className="mt-1 text-[10px] leading-4 text-ink-400">{detail}</p>
     </div>
   )
 }
@@ -457,7 +430,7 @@ function StatusBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium',
         configured === true
           ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
           : configured === false

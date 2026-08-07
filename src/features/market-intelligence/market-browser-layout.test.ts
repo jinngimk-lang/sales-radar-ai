@@ -37,9 +37,10 @@ test('source categories expose real state and do not act like useful controls wh
 test('market browser clearly separates a static snapshot from an interactive cloud session', () => {
   assert.match(browserSource, /MarketLiveBrowserPanel/)
   assert.match(browserSource, /网页快照（不可交互）/)
-  assert.match(liveBrowserSource, /启动交互浏览器/)
+  assert.match(liveBrowserSource, /启动 Live/)
   assert.match(liveBrowserSource, /REVENUE_OPERATOR_TOKEN/)
   assert.match(liveBrowserSource, /MARKET_LIVE_OPERATOR_TOKEN_KEY/)
+  assert.match(liveBrowserSource, /title="交互式云浏览器"/)
   assert.doesNotMatch(
     browserSource,
     /网页快照已按完整桌面宽度适配；上下滚动查看页面/,

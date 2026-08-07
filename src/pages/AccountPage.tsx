@@ -1,24 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  Bot,
-  CheckCircle2,
-  CircleUserRound,
-  Database,
-  ExternalLink,
-  Globe2,
-  Loader2,
-  Radar,
-  RefreshCw,
-  Search,
-  Settings2,
-  ShieldCheck,
-  Users,
-  WalletCards,
-  XCircle,
-} from 'lucide-react'
+import { CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import type { RuntimeCapabilities, RuntimeCapability } from '@/types'
 import { getRuntimeCapabilities } from '@/services/api'
+import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
 
 const UNAVAILABLE_CAPABILITY: RuntimeCapability = {
   enabled: false,
@@ -55,125 +39,60 @@ export function AccountPage() {
   }, [loadCapabilities])
 
   return (
-    <div className="workspace-page max-w-6xl pb-12">
-      <div className="workspace-heading">
-        <div>
-          <p className="workspace-kicker">SETTINGS & RUNTIME</p>
-          <h1>设置</h1>
-          <p>查看工作区、模型、数据来源和字段可见性是否已经真实接通。</p>
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-[1180px] px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
+      <WorkspaceHeader
+        title="设置"
+        description="连接、模型与运行状态。"
+        actions={
+          !loading ? (
+            <button
+              type="button"
+              onClick={() => void loadCapabilities()}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 text-xs font-medium text-ink-600 transition hover:bg-ink-50"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              重新读取服务状态
+            </button>
+          ) : null
+        }
+      />
 
-      <section className="workspace-panel flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-white">
-            <CircleUserRound className="h-6 w-6" />
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold text-ink-900">Sales Radar 工作区</h2>
-            <p className="mt-1 text-sm text-ink-500">当前为单工作区模式，研究结果和联系人字段按工作区隔离保存。</p>
-            <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-              <CheckCircle2 className="h-3 w-3" /> 工作区已连接
-            </span>
-          </div>
+      <section className="overflow-hidden rounded-[20px] border border-black/[0.08] bg-white">
+        <div className="border-b border-black/[0.06] px-4 py-3 sm:px-5">
+          <h2 className="text-sm font-medium text-ink-900">运行能力</h2>
         </div>
-        <Settings2 className="h-5 w-5 text-ink-300" />
+
+        {error ? (
+          <div className="m-4 rounded-xl border border-rose-200 bg-rose-50 p-4 sm:m-5">
+            <p className="text-sm font-medium text-rose-800">暂时无法读取运行配置</p>
+            <p className="mt-1 text-xs leading-5 text-rose-700">{error}</p>
+            <button
+              type="button"
+              onClick={() => void loadCapabilities()}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-2 text-xs font-medium text-white transition hover:bg-rose-800"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              重新读取服务状态
+            </button>
+          </div>
+        ) : loading ? (
+          <div className="flex items-center gap-2 px-5 py-10 text-sm text-ink-500">
+            <Loader2 className="h-4 w-4 animate-spin" /> 正在读取服务状态…
+          </div>
+        ) : capabilities ? (
+          <div className="divide-y divide-black/[0.06]">
+            <CapabilityRow title="市场联网研究" capability={capabilities.marketResearch} />
+            <CapabilityRow title="AI 个性化话术" capability={capabilities.salesAI} />
+            <CapabilityRow title="GPT 销售执行器" capability={capabilities.salesAgent} />
+            <CapabilityRow title="公开联系人抓取" capability={capabilities.publicContactDiscovery} />
+            <CapabilityRow title="销售机会搜索" capability={capabilities.salesDiscovery} />
+          </div>
+        ) : null}
       </section>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
-        <section className="workspace-panel p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-base font-semibold text-ink-900">运行能力</h2>
-              <p className="mt-1 text-sm text-ink-500">只展示服务端实际配置状态，不读取或显示密钥内容。</p>
-            </div>
-            {!loading ? (
-              <button
-                type="button"
-                onClick={() => void loadCapabilities()}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-2 text-xs font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-700"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                重新读取服务状态
-              </button>
-            ) : null}
-          </div>
-
-          {error ? (
-            <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4">
-              <p className="text-sm font-semibold text-rose-800">暂时无法读取运行配置</p>
-              <p className="mt-1 text-xs leading-5 text-rose-700">{error}</p>
-              <button
-                type="button"
-                onClick={() => void loadCapabilities()}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-800"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                重新读取服务状态
-              </button>
-            </div>
-          ) : loading ? (
-            <div className="mt-8 flex items-center gap-2 text-sm text-ink-500">
-              <Loader2 className="h-4 w-4 animate-spin" /> 正在读取服务状态…
-            </div>
-          ) : capabilities ? (
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <CapabilityCard icon={Globe2} title="市场联网研究" capability={capabilities.marketResearch} />
-              <CapabilityCard icon={Bot} title="AI 个性化话术" capability={capabilities.salesAI} />
-              <CapabilityCard icon={Bot} title="GPT 销售执行器" capability={capabilities.salesAgent} />
-              <CapabilityCard icon={Users} title="公开联系人抓取" capability={capabilities.publicContactDiscovery} />
-              <CapabilityCard icon={Search} title="销售机会搜索" capability={capabilities.salesDiscovery} />
-            </div>
-          ) : null}
-        </section>
-
-        <section className="workspace-panel p-6">
-          <h2 className="text-base font-semibold text-ink-900">工作区入口</h2>
-          <p className="mt-1 text-sm text-ink-500">一级页面只保留真正承担任务的四个工作区。</p>
-          <div className="mt-5 space-y-2">
-            <WorkflowLink to="/app/home" icon={Bot} title="AI 首页" description="对话、工具轨迹和结构化结果" />
-            <WorkflowLink to="/app/market" icon={Radar} title="市场雷达" description="联网研究与市场信号" />
-            <WorkflowLink to="/app/revenue" icon={WalletCards} title="收益中心" description="实时执行、机会与结算" />
-          </div>
-        </section>
-      </div>
-
-      <section className="mt-6 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-card">
-        <div className="flex items-start gap-3 border-b border-ink-100 bg-ink-50/70 p-5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
-            <Database className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="text-base font-semibold text-ink-900">数据可见性</h2>
-            <p className="mt-1 text-sm leading-6 text-ink-500">
-              AI 首页展示的是公开来源或已连接数据源中实际观察到的业务信息，而不是完整私人档案。
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-4 p-5 md:grid-cols-3">
-          <VisibilityRule
-            icon={Globe2}
-            title="可以展示"
-            text="公开姓名、职位、公司、邮箱、电话、社交主页、公开内容和商业信号。"
-          />
-          <VisibilityRule
-            icon={ShieldCheck}
-            title="视为已验证"
-            text="字段必须保留来源 URL、提取方式、观察时间和 OBSERVED 验证状态。"
-          />
-          <VisibilityRule
-            icon={XCircle}
-            title="不会推断"
-            text="不会根据姓名、域名或相似对象猜测邮箱、电话、身份、关系或私人资料。"
-          />
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-2xl border border-ink-200 bg-ink-50/80 p-5">
-        <p className="text-xs leading-6 text-ink-500">
-          API 密钥只在 Railway 等服务端环境配置。前端不会读取或展示密钥；修改模型、搜索供应商或云浏览器配置时，应在部署平台更新对应环境变量。
-        </p>
-      </section>
+      <p className="mt-4 px-1 text-xs leading-5 text-ink-400">
+        数据原则：只展示公开来源或已连接数据源中实际观察到的信息，并保留观察时间；未知字段不会推断。密钥只在服务端配置。
+      </p>
     </div>
   )
 }
@@ -191,54 +110,33 @@ export function normalizeRuntimeCapabilities(
   }
 }
 
-function CapabilityCard({
-  icon: Icon,
+function CapabilityRow({
   title,
   capability,
 }: {
-  icon: typeof Bot
   title: string
   capability?: RuntimeCapability
 }) {
   const reported = capability ?? UNAVAILABLE_CAPABILITY
   return (
-    <div className="rounded-2xl border border-ink-200 bg-ink-50/55 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-brand-700 ring-1 ring-ink-100">
-          <Icon className="h-4 w-4" />
-        </span>
-        <span className={reported.enabled ? 'text-emerald-600' : 'text-amber-600'}>
-          {reported.enabled ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-        </span>
+    <div className="flex items-center justify-between gap-4 px-4 py-3.5 sm:px-5">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-ink-900">{title}</p>
+        <p className="mt-0.5 truncate text-xs text-ink-400">
+          {!capability
+            ? '尚未报告运行状态'
+            : reported.enabled
+              ? `${reported.provider ?? '已连接'}${reported.model ? ` · ${reported.model}` : ''}`
+              : '尚未配置服务端凭据'}
+        </p>
       </div>
-      <h3 className="mt-3 text-sm font-semibold text-ink-900">{title}</h3>
-      <p className="mt-1 text-xs text-ink-500">
-        {!capability
-          ? '尚未报告运行状态'
-          : reported.enabled
-            ? `${reported.provider ?? '已连接'}${reported.model ? ` · ${reported.model}` : ''}`
-            : '尚未配置服务端凭据'}
-      </p>
-    </div>
-  )
-}
-
-function WorkflowLink({ to, icon: Icon, title, description }: { to: string; icon: typeof Bot; title: string; description: string }) {
-  return (
-    <Link to={to} className="flex items-center gap-3 rounded-xl border border-ink-200 bg-white p-3 transition hover:border-brand-300 hover:shadow-sm">
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><Icon className="h-4 w-4" /></span>
-      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink-900">{title}</span><span className="mt-0.5 block text-xs text-ink-500">{description}</span></span>
-      <ExternalLink className="h-3.5 w-3.5 text-ink-300" />
-    </Link>
-  )
-}
-
-function VisibilityRule({ icon: Icon, title, text }: { icon: typeof Bot; title: string; text: string }) {
-  return (
-    <div className="rounded-2xl border border-ink-100 bg-ink-50/55 p-4">
-      <Icon className="h-4 w-4 text-brand-700" />
-      <h3 className="mt-3 text-sm font-semibold text-ink-900">{title}</h3>
-      <p className="mt-2 text-xs leading-6 text-ink-500">{text}</p>
+      <span className={reported.enabled ? 'text-emerald-600' : 'text-amber-500'}>
+        {reported.enabled ? (
+          <CheckCircle2 className="h-4 w-4" />
+        ) : (
+          <XCircle className="h-4 w-4" />
+        )}
+      </span>
     </div>
   )
 }

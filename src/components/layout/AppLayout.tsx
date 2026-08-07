@@ -1,40 +1,20 @@
-import { Bot, Radar, Settings2, ShieldCheck, WalletCards } from 'lucide-react'
+import { Bot, Radar, Settings2, WalletCards } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 
 const WORKSPACE_ITEMS = [
-  {
-    to: '/app/home',
-    label: 'AI 首页',
-    icon: Bot,
-    desc: '对话、工具轨迹与结构化结果',
-  },
-  {
-    to: '/app/market',
-    label: '市场雷达',
-    icon: Radar,
-    desc: '公开来源、市场信号与持续研究',
-  },
-  {
-    to: '/app/revenue',
-    label: '收益中心',
-    icon: WalletCards,
-    desc: '机会、执行画面、结算与证据',
-  },
-  {
-    to: '/app/account',
-    label: '设置',
-    icon: Settings2,
-    desc: '模型、数据源与运行状态',
-  },
+  { to: '/app/home', label: 'AI 首页', icon: Bot },
+  { to: '/app/market', label: '市场雷达', icon: Radar },
+  { to: '/app/revenue', label: '收益中心', icon: WalletCards },
+  { to: '/app/account', label: '设置', icon: Settings2 },
 ]
 
 export function AppLayout() {
   return (
     <div className="flex h-screen overflow-hidden bg-white">
-      <aside className="app-sidebar z-40 hidden w-[228px] shrink-0 flex-col lg:flex">
-        <div className="flex h-[72px] items-center border-b border-white/10 px-5">
+      <aside className="app-sidebar z-40 hidden w-[208px] shrink-0 flex-col lg:flex">
+        <div className="flex h-[64px] items-center px-5">
           <Link
             to="/app/home"
             aria-label="返回 Sales Radar AI 的 AI 首页"
@@ -44,10 +24,7 @@ export function AppLayout() {
           </Link>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-5 scrollbar-thin">
-          <p className="px-3 pb-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/25">
-            Intelligence Workspace
-          </p>
+        <nav className="flex-1 overflow-y-auto px-3 py-3 scrollbar-thin">
           <div className="space-y-1">
             {WORKSPACE_ITEMS.map((item) => (
               <NavLink
@@ -55,37 +32,25 @@ export function AppLayout() {
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    'group relative z-10 flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all',
+                    'group relative z-10 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all',
                     isActive
-                      ? 'bg-white/10 text-white shadow-sm'
+                      ? 'bg-white/10 text-white'
                       : 'text-white/55 hover:bg-white/[0.055] hover:text-white',
                   )
                 }
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.055] text-white/45 transition-colors group-hover:text-sky-300">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/45 transition-colors group-hover:text-sky-300">
                   <item.icon className="h-4 w-4" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block font-semibold">{item.label}</span>
-                  <span className="mt-0.5 block truncate text-[9px] font-normal text-white/35">
-                    {item.desc}
-                  </span>
-                </span>
+                <span className="font-medium">{item.label}</span>
               </NavLink>
             ))}
           </div>
         </nav>
 
-        <div className="m-3 rounded-2xl border border-white/10 bg-white/[0.055] p-3.5">
-          <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-300">
-              <ShieldCheck className="h-3.5 w-3.5" />
-            </span>
-            真实来源模式
-          </div>
-          <p className="mt-2 text-[9px] leading-4 text-white/35">
-            GPT-5.6 Sol · 未观察到的身份和联系方式不会被推断。
-          </p>
+        <div className="px-5 pb-5 text-[10px] text-white/25">
+          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" />
+          Source-backed
         </div>
       </aside>
 
