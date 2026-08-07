@@ -4,6 +4,8 @@ import {
   KeyRound,
   LoaderCircle,
   LockKeyhole,
+  Maximize2,
+  Minimize2,
   MonitorUp,
   RefreshCw,
 } from 'lucide-react'
@@ -27,6 +29,7 @@ export function MarketLiveBrowserPanel({
   const [result, setResult] = useState<MarketLiveBrowserResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const runId = result?.run.runId ?? result?.run.id ?? null
   const liveViewUrl =
     result?.liveView?.debuggerFullscreenUrl ??
@@ -56,6 +59,20 @@ export function MarketLiveBrowserPanel({
     return () => window.clearInterval(timer)
   }, [liveViewUrl, runId, running, token])
 
+  useEffect(() => {
+    if (!isFullscreen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsFullscreen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isFullscreen])
+
   const unlockOperator = () => {
     const nextToken = tokenDraft.trim()
     if (!nextToken) {
@@ -72,6 +89,7 @@ export function MarketLiveBrowserPanel({
     setToken('')
     setTokenDraft('')
     setResult(null)
+    setIsFullscreen(false)
   }
 
   const start = async () => {
@@ -93,8 +111,14 @@ export function MarketLiveBrowserPanel({
   }
 
   return (
-    <section className="shrink-0 border-b border-ink-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+    <section
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-[80] flex flex-col bg-white'
+          : 'shrink-0 border-b border-ink-200 bg-white'
+      }
+    >
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink-100 px-3 py-2.5">
         <div className="flex items-center gap-2 text-xs font-medium text-ink-700">
           <MonitorUp className="h-3.5 w-3.5 text-brand-600" />
           Live
@@ -106,15 +130,30 @@ export function MarketLiveBrowserPanel({
         {token ? (
           <div className="flex items-center gap-1.5">
             {liveViewUrl ? (
-              <a
-                href={liveViewUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[10px] font-medium text-ink-600 transition hover:bg-ink-50"
-              >
-                打开
-                <ExternalLink className="h-3 w-3" />
-              </a>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreen((value) => !value)}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[10px] font-medium text-ink-600 transition hover:bg-ink-50"
+                  aria-label={isFullscreen ? '退出全屏云浏览器' : '全屏查看云浏览器'}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                  {isFullscreen ? '退出全屏' : '全屏查看'}
+                </button>
+                <a
+                  href={liveViewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[10px] font-medium text-ink-600 transition hover:bg-ink-50"
+                >
+                  独立打开
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </>
             ) : null}
             <button
               type="button"
@@ -166,7 +205,7 @@ export function MarketLiveBrowserPanel({
       </div>
 
       {error ? (
-        <p className="border-t border-rose-100 bg-rose-50 px-3 py-2 text-[10px] text-rose-700">
+        <p className="shrink-0 border-t border-rose-100 bg-rose-50 px-3 py-2 text-[10px] text-rose-700">
           {error}
         </p>
       ) : null}
@@ -176,7 +215,11 @@ export function MarketLiveBrowserPanel({
           title="交互式云浏览器"
           src={liveViewUrl}
           referrerPolicy="no-referrer"
-          className="h-[360px] w-full border-0 bg-white"
+          className={
+            isFullscreen
+              ? 'min-h-0 flex-1 w-full border-0 bg-white'
+              : 'h-[68vh] min-h-[560px] max-h-[760px] w-full border-0 bg-white'
+          }
           allow="clipboard-read; clipboard-write"
         />
       ) : runId && running ? (
