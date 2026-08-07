@@ -279,7 +279,7 @@ export function AICommandCenterPage() {
         unreadCount: 0,
         intentScore: lead.analysis.intentScore,
         tags: lead.analysis.tags,
-      }) as ChatSession)
+      }) as unknown as ChatSession)
       const contactCount = selected.reduce(
         (total, session) => total + session.contacts.length,
         0,

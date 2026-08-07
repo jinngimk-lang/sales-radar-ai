@@ -441,7 +441,7 @@ function BrowserContent({
         {view === 'live' ? (
           <div className="flex h-full min-h-0 flex-col">
             <MarketLiveBrowserPanel
-              query={session?.target.product ?? title}
+              query={title}
               sourceUrl={url}
             />
             <div className="shrink-0 border-b border-ink-200 bg-amber-50 px-4 py-1.5 text-[9px] font-medium text-amber-700">
