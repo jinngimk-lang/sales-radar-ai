@@ -38,6 +38,7 @@ test('revenue workspace removes oversized supervision marketing copy', () => {
   assert.doesNotMatch(revenuePage, /Revenue Supervision/)
   assert.doesNotMatch(revenuePage, /Supervision Pipeline/)
   assert.doesNotMatch(revenueLive, /自动任务保持只读，人工接管画面可以点击/)
+  assert.doesNotMatch(revenueLive, /function TrustItem/)
 })
 
 test('settings and navigation are concise and do not duplicate explanatory surfaces', () => {
