@@ -7,7 +7,7 @@ import type {
 const UNKNOWN = 'Unknown'
 
 export class RuleBasedOutreachProvider implements AIProvider {
-  readonly name = 'rule-based-v1'
+  readonly name = 'rule-based-v2-human'
 
   async generateOutreach(
     context: OutreachContext,
@@ -22,7 +22,7 @@ export class RuleBasedOutreachProvider implements AIProvider {
 
     if (context.priority === 'C') {
       const advice =
-        'Direct sales outreach is not recommended. Monitor this lead until a verified company, responsible role, project, or buying requirement appears.'
+        'Direct outreach is not recommended yet. Wait for a verified company, responsible role, project, or buying requirement before contacting this account.'
       return {
         email: {
           subjectOptions: [],
@@ -45,54 +45,55 @@ export class RuleBasedOutreachProvider implements AIProvider {
 
     const company =
       context.company === UNKNOWN ? 'your organization' : context.company
-    const signal = context.buyingSignals[0]
-    const evidence = signal?.evidence ?? context.evidence[0]
-    const hook = evidence
-      ? `I noticed ${evidence.replace(/[.!]+$/, '')}.`
-      : `I noticed ${company}'s work in ${context.industry}.`
+    const observation = this.observation(context)
+    const opening = observation
+      ? this.sentence(observation)
+      : `${company}'s work in ${context.industry} raises one practical question.`
     const roleFocus =
       context.role === 'procurement'
         ? 'cost, delivery reliability, and supply stability'
         : context.role === 'engineering'
           ? 'technical fit, efficiency, and system compatibility'
           : context.role === 'owner'
-            ? 'growth, return on investment, and strategic impact'
+            ? 'return on investment and execution risk'
             : 'the current operational priority and the right owner'
     const angleValue = {
-      reduce_cost: 'identify practical cost-reduction opportunities',
+      reduce_cost: 'reduce avoidable cost',
       improve_efficiency: 'improve throughput and operating efficiency',
-      technical_upgrade: 'reduce risk in the next technical upgrade',
-      case_reference: 'compare the situation with a relevant industry example',
+      technical_upgrade: 'de-risk the next technical upgrade',
+      case_reference: 'compare the situation with one relevant industry example',
       reduce_risk: 'reduce delivery, compliance, and implementation risk',
     }[context.angle]
-    const cta =
-      'Would it be useful to compare requirements in a brief 15-minute conversation?'
-    const body = `${hook} Based on the available evidence, a useful first step may be to ${angleValue}. I would focus the discussion on ${roleFocus}, and first confirm whether this is an active priority.`
+    const value = this.known(context.valueProposition)
+      ? this.lowerSentence(context.valueProposition)
+      : angleValue
+    const body = `That could put ${roleFocus} under pressure. The only reason I am reaching out is to see whether ${value} is useful for the current priority.`
+    const cta = 'Is this something you are actively evaluating, or should I leave it for later?'
 
     return {
       email: {
         subjectOptions: [
-          `${company} — a practical ${context.industry} discussion`,
-          `Is ${context.painPoint === UNKNOWN ? 'this operational priority' : context.painPoint.toLowerCase()} relevant at ${company}?`,
+          `${company} — ${this.subjectFragment(context.painPoint, 'current priority')}`,
+          `A quick question about ${company}`,
           `${company}: ${angleValue}`,
         ],
-        opening: hook,
+        opening,
         body,
         cta,
       },
       linkedin: {
-        connectionMessage: `${hook} I work with industrial B2B teams on ${angleValue}. Glad to connect if this is relevant.`,
-        firstMessage: `${hook} I can share one concise, relevant example and first validate whether it fits your current priorities. ${cta}`,
+        connectionMessage: `${opening} I work on ${angleValue}. Happy to connect if that is relevant.`,
+        firstMessage: `${body} Would a short example be useful?`,
       },
       whatsapp: {
-        message: `${hook} I can share one concise example related to ${angleValue}. No assumption that a project is active — would it be useful to check fit?`,
+        message: `${opening} ${body} Worth sending one short example?`,
       },
       callScript: {
-        opening: `${hook} I am calling to understand whether this is a current business priority before suggesting any solution.`,
+        opening: `${opening} I wanted to check whether this is actually a priority before taking more of your time.`,
         questions: [
-          'What outcome matters most for this initiative?',
-          `Who owns ${roleFocus} internally?`,
-          'What technical or commercial constraints should be validated first?',
+          'What outcome matters most if this moves forward?',
+          `Which part of ${roleFocus} is hardest right now?`,
+          'What would make this not worth pursuing?',
         ],
       },
     }
@@ -113,7 +114,7 @@ export class RuleBasedOutreachProvider implements AIProvider {
     }
     if (context.priority === 'C') {
       const advice =
-        '目前不建议直接销售联络。请先等待可验证的企业主体、负责人、项目或采购需求出现。'
+        '目前不建议直接联络。先等到可验证的企业主体、负责人、项目或采购需求出现，再决定是否触达。'
       return {
         email: {
           subjectOptions: [],
@@ -129,68 +130,60 @@ export class RuleBasedOutreachProvider implements AIProvider {
     }
 
     const company = context.company === UNKNOWN ? '贵司' : context.company
-    const signal = context.buyingSignals[0]
-    const evidence = signal?.evidence ?? context.evidence[0]
+    const observation = this.observation(context)
     const topics = context.communicationStyle?.observedTopics
       .filter(Boolean)
       .slice(0, 2)
       .join('、')
-    const hook = evidence
-      ? `看到公开资料中提到：${evidence.replace(/[。.!！]+$/, '')}。`
+    const opening = observation
+      ? this.chineseSentence(observation)
       : topics
-        ? `想就贵司公开关注的${topics}方向做一次简短交流。`
-        : `想就${company}在${context.industry}领域的工作做一次简短交流。`
+        ? `想确认一下${company}在${topics}这块目前是不是有实际项目。`
+        : `想确认一个和${company}当前${context.industry}业务有关的问题。`
     const roleFocus = {
-      procurement: '成本、交付可靠性与供应稳定性',
-      engineering: '技术适配、效率与系统兼容性',
-      owner: '增长、投资回报与战略影响',
-      content_user: '当前关注方向与真实业务负责人',
-      contact: '当前业务重点与合适的内部负责人',
+      procurement: '成本、交付可靠性和供应稳定性',
+      engineering: '技术适配、效率和系统兼容性',
+      owner: '投入产出和执行风险',
+      content_user: '当前关注方向和真实业务负责人',
+      contact: '当前业务重点和合适的内部负责人',
     }[context.role]
     const angleValue = {
-      reduce_cost: '核验是否存在可落地的降本机会',
-      improve_efficiency: '提升产能与运营效率',
-      technical_upgrade: '降低下一次技术升级的实施风险',
-      case_reference: '对照一个相关行业案例判断适配度',
-      reduce_risk: '降低交付、合规与实施风险',
+      reduce_cost: '降本是否还有实际空间',
+      improve_efficiency: '效率提升是否值得现在推进',
+      technical_upgrade: '下一次技术升级怎样少走弯路',
+      case_reference: '一个同类案例是否有参考价值',
+      reduce_risk: '交付、合规和实施风险能否再降一些',
     }[context.angle]
     const objective = context.preferences?.objective?.trim()
-    const purpose = objective
-      ? `本次希望先${objective.replace(/[。.!！]+$/, '')}。`
-      : ''
-    const concise =
-      context.preferences?.tone === 'concise' ||
-      (context.preferences?.tone === 'mirror' &&
-        context.communicationStyle?.tone === 'concise')
-    const body = concise
-      ? `${hook}${purpose}如果方向相关，我可以先发一页简要信息供判断。`
-      : `${hook}${purpose}基于现有证据，一个低压力的起点是先${angleValue}，重点确认${roleFocus}，并先判断这是否属于当前优先事项。`
-    const cta = '如果方向相关，是否方便用 15 分钟确认一下需求和适配度？'
+    const body = objective
+      ? `这件事通常会直接影响${roleFocus}。我这次只想先${objective.replace(/[。.!！]+$/, '')}，看看是否值得继续。`
+      : `这件事通常会直接影响${roleFocus}。我想先确认${angleValue}，再判断有没有继续沟通的必要。`
+    const cta = '这件事现在值得聊，还是我晚一点再联系？'
 
     return {
       email: {
         subjectOptions: [
-          `${company} · 关于${angleValue}的简短交流`,
-          `${company}目前是否关注${context.painPoint === UNKNOWN ? '这项业务重点' : context.painPoint}？`,
-          `先确认一个${context.industry}方向的适配度`,
+          `${company} / ${this.subjectFragment(context.painPoint, '当前重点')}`,
+          `想确认 ${company} 的一个实际问题`,
+          `${company}：先判断是否值得继续`,
         ],
-        opening: hook,
+        opening,
         body,
         cta,
       },
       linkedin: {
-        connectionMessage: `${hook}如果这个方向相关，很高兴先连接交流。`,
-        firstMessage: `${body}${cta}`,
+        connectionMessage: `${opening}如果正好相关，可以先连接。`,
+        firstMessage: `${body} 如果你愿意，我可以先发一个很短的参考案例。`,
       },
       whatsapp: {
-        message: `${hook}${purpose}不预设项目已经启动；如果相关，我可以先发一个简短案例供参考。`,
+        message: `${opening}${body} 需要的话我先发一页信息，你看是否有用？`,
       },
       callScript: {
-        opening: `${hook}来电是想先确认这是否属于当前业务重点，再判断是否值得进一步介绍方案。`,
+        opening: `${opening}我先确认这是不是你们现在真正关心的事，避免占用太多时间。`,
         questions: [
-          '这项工作目前最重要的结果是什么？',
-          `内部由谁负责${roleFocus}？`,
-          '最先需要核验的技术或商务约束是什么？',
+          '这件事如果推进，最重要的结果是什么？',
+          `${roleFocus}里现在最难的是哪一项？`,
+          '什么情况会让你觉得这件事暂时不值得推进？',
         ],
       },
     }
@@ -217,33 +210,33 @@ export class RuleBasedOutreachProvider implements AIProvider {
       }
     }
     const company = context.company === UNKNOWN ? '贵司' : context.company
-    const hook = `公开资料显示${company}具备${channel.channelType.replaceAll('_', ' ')}相关业务。`
-    const body = `${hook}希望先确认我们的产品是否能补充贵司现有产品组合和客户覆盖，而不是预设合作成立。${channel.cooperationStrategy}`
-    const cta = '是否方便简短交流市场适配、双方责任以及小范围试点的可能性？'
+    const opening = `${company}公开资料里有${channel.channelType.replaceAll('_', ' ')}相关业务。`
+    const body = `我联系的原因很简单：想看看我们的产品是否正好补上贵司现有产品组合或客户覆盖中的一个空位。${channel.cooperationStrategy}`
+    const cta = '要不要先拿一个真实客户场景对一下，再决定有没有必要谈商务合作？'
     return {
       email: {
         subjectOptions: [
-          `${company} · 渠道合作适配沟通`,
-          `与${company}探讨互补产品机会`,
-          `${context.industry}领域的小范围合作验证`,
+          `${company} / 一个渠道适配问题`,
+          `先对一个客户场景`,
+          `${context.industry}渠道合作是否有实际互补`,
         ],
-        opening: hook,
+        opening,
         body,
         cta,
       },
       linkedin: {
-        connectionMessage: `${hook}希望先连接并确认是否存在互补空间。`,
+        connectionMessage: `${opening}想先确认有没有互补空间。`,
         firstMessage: `${body}${cta}`,
       },
       whatsapp: {
-        message: `${hook}希望先确认合作适配度，不预设排他或采购量。${cta}`,
+        message: `${opening}${body}${cta}`,
       },
       callScript: {
-        opening: `${hook}来电是想先确认渠道合作是否相关，再讨论具体商务结构。`,
+        opening: `${opening}我先确认渠道方向是否相关，不预设合作一定成立。`,
         questions: [
-          '目前覆盖哪些客户类型和产品类别？',
-          '技术、服务与区域责任需要如何界定？',
-          '是否适合通过小范围试点验证市场适配？',
+          '目前主要覆盖哪些客户类型和产品类别？',
+          '技术、服务和区域责任最需要先说清楚哪一项？',
+          '有没有一个小场景适合先验证市场适配？',
         ],
       },
     }
@@ -271,38 +264,76 @@ export class RuleBasedOutreachProvider implements AIProvider {
     const company =
       context.company === UNKNOWN ? 'your organization' : context.company
     const channelLabel = channel.channelType.replaceAll('_', ' ')
-    const hook = `I noticed evidence that ${company} operates as a ${channelLabel} in ${context.industry}.`
-    const body = `${hook} Rather than assuming a fit, I would like to explore whether our offering could complement your current portfolio and customer coverage. ${channel.cooperationStrategy}`
+    const opening = `${company} appears to work as a ${channelLabel} in ${context.industry}.`
+    const body = `The reason I am reaching out is simple: I want to see whether our offering fills a real gap in your current portfolio or customer coverage. ${channel.cooperationStrategy}`
     const cta =
-      'Would a brief conversation to compare market fit, responsibilities, and a possible pilot be useful?'
+      'Would it be worth comparing one customer use case before discussing anything commercial?'
 
     return {
       email: {
         subjectOptions: [
-          `${company}: potential ${channelLabel} cooperation`,
-          `Exploring a complementary channel fit with ${company}`,
-          `A scoped partnership discussion for ${context.industry}`,
+          `${company} / one channel-fit question`,
+          `One customer use case to compare`,
+          `${context.industry}: is there a real portfolio gap?`,
         ],
-        opening: hook,
+        opening,
         body,
         cta,
       },
       linkedin: {
-        connectionMessage: `${hook} I would be glad to connect and first validate whether there is a complementary fit.`,
+        connectionMessage: `${opening} I would like to check whether there is a genuine complementary fit.`,
         firstMessage: `${body} ${cta}`,
       },
       whatsapp: {
-        message: `${hook} I would like to validate a possible cooperation fit without assuming exclusivity or volume. ${cta}`,
+        message: `${opening} ${body} ${cta}`,
       },
       callScript: {
-        opening: `${hook} I am calling to validate whether a channel discussion is relevant before proposing any commercial structure.`,
+        opening: `${opening} I want to check whether a channel conversation is relevant before proposing any commercial structure.`,
         questions: [
-          'Which customer segments and product categories are currently in scope?',
-          'What technical, service, or territory responsibilities would need to be clear?',
-          'Would a limited pilot be a useful way to validate market fit?',
+          'Which customer segments and product categories matter most today?',
+          'Which technical, service, or territory responsibility needs clarity first?',
+          'Is there one small customer use case we can use to test fit?',
         ],
       },
     }
+  }
+
+  private observation(context: OutreachContext) {
+    const candidates = [
+      context.buyingSignals[0]?.evidence,
+      ...context.evidence,
+      context.communicationStyle?.evidenceExcerpt,
+    ]
+    return candidates
+      .map((value) => value?.trim())
+      .find(
+        (value): value is string =>
+          Boolean(value) && !/^company field\s*:/i.test(value!),
+      )
+  }
+
+  private sentence(value: string) {
+    const clean = value.replace(/[.!]+$/, '').trim()
+    return `${clean}.`
+  }
+
+  private chineseSentence(value: string) {
+    const clean = value.replace(/[。.!！]+$/, '').trim()
+    return `${clean}。`
+  }
+
+  private known(value: string) {
+    return Boolean(value?.trim()) && value.trim().toLowerCase() !== 'unknown'
+  }
+
+  private lowerSentence(value: string) {
+    const clean = value.replace(/[.!]+$/, '').trim()
+    if (!clean) return clean
+    return `${clean[0].toLowerCase()}${clean.slice(1)}`
+  }
+
+  private subjectFragment(value: string, fallback: string) {
+    return this.known(value) ? value.replace(/[。.!！?？]+$/, '').trim() : fallback
   }
 }
 

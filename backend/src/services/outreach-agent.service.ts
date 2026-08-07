@@ -146,15 +146,19 @@ export class OutreachAgentService {
     const template = await this.promptService
       .getByTaskType(AITaskType.OUTREACH_GENERATION)
       .catch(() => null)
-    const prompt =
+    const prompt = [
       template?.template ??
-      [
-        'Generate structured B2B outreach using only verified context.',
-        'Mirror the observed language, tone, platform norms and content habits when communicationStyle is available.',
-        'Use the requested objective, language and tone preferences, but never invent facts, relationships, private data or prior conversations.',
-        'Keep messages specific, respectful and easy to decline. Do not claim that the recipient was monitored.',
-        'Return JSON matching the requested outreach schema.',
-      ].join(' ')
+        'Generate structured B2B outreach using only verified context and return JSON matching the requested outreach schema.',
+      'Write like a competent human operator, not a marketing template.',
+      'Use exactly one verified observation as the opening hook. If there is no meaningful verified observation, give research advice instead of forcing a pitch.',
+      'The email body must not repeat or paraphrase the opening. Add one concrete relevance bridge from that observation to the recipient role or current priority.',
+      'End with one easy-to-answer question or low-pressure question. Do not default to asking for a 15-minute meeting.',
+      'Keep email body concise, and make LinkedIn and WhatsApp shorter than email.',
+      'Mirror the observed language, tone, platform norms and content habits when communicationStyle is available.',
+      'Use the requested objective, language and tone preferences, but never invent facts, relationships, private data or prior conversations.',
+      'Do not claim that the recipient was monitored. Do not create urgency, exclusivity, guaranteed outcomes or fake familiarity.',
+      'Never use stock phrases such as "I noticed recently", "I noticed", "comprehensive solution", "leading solution", "unlock value", "synergy", "we specialize in", or "looking forward to cooperation". Also avoid 赋能、领先解决方案、全方位解决方案、一站式解决方案、携手共赢、期待合作、我们专注于、我司专注于.',
+    ].join(' ')
     const request = {
       taskType: AITaskType.OUTREACH_GENERATION,
       prompt,
@@ -168,6 +172,7 @@ export class OutreachAgentService {
       (value): value is OutreachContent => this.isOutreachContent(value),
       this.safeOutreachFallback(),
     )
+    this.assertSafeContent(fallback)
 
     if (this.provider === this.fallbackProvider) {
       return { content: fallback, provider: fallbackResult.provider }
@@ -180,6 +185,7 @@ export class OutreachAgentService {
         (value): value is OutreachContent => this.isOutreachContent(value),
         fallback,
       )
+      if (!parsed.usedFallback) this.assertSafeContent(parsed.value)
       return {
         content: parsed.value,
         provider: parsed.usedFallback
@@ -308,11 +314,45 @@ export class OutreachAgentService {
 
   private assertSafeContent(content: OutreachContent): void {
     const serialized = JSON.stringify(content)
-    if (/dear sir|hope this email finds you well/i.test(serialized)) {
+    const roboticPattern =
+      /dear sir|hope this email finds you well|\bi noticed recently\b|\bi noticed\b|comprehensive solution|leading solution|unlock value|\bsynergy\b|we specialize in|looking forward to cooperation|赋能|领先解决方案|全方位解决方案|一站式解决方案|携手共赢|期待合作|我们专注于|我司专注于/i
+    if (roboticPattern.test(serialized)) {
       throw new AppError(
         500,
         'UNSAFE_OUTREACH_CONTENT',
-        'Outreach provider returned a prohibited template phrase',
+        'Outreach provider returned robotic or prohibited template language',
+      )
+    }
+
+    const opening = this.normalizeMessage(content.email.opening)
+    const body = this.normalizeMessage(content.email.body)
+    if (
+      opening &&
+      opening !== 'unknown' &&
+      opening.length >= 18 &&
+      body.includes(opening)
+    ) {
+      throw new AppError(
+        500,
+        'UNSAFE_OUTREACH_CONTENT',
+        'Outreach provider repeated the opening observation in the email body',
+      )
+    }
+
+    const questionCount = (content.email.cta.match(/[?？]/g) ?? []).length
+    if (questionCount > 1) {
+      throw new AppError(
+        500,
+        'UNSAFE_OUTREACH_CONTENT',
+        'Outreach provider returned a multi-question CTA',
+      )
+    }
+
+    if (this.wordCount(content.email.body) > 120) {
+      throw new AppError(
+        500,
+        'UNSAFE_OUTREACH_CONTENT',
+        'Outreach provider returned an overlong email body',
       )
     }
   }
@@ -387,6 +427,19 @@ export class OutreachAgentService {
             typeof item === 'string' && Boolean(item.trim()),
         )
       : []
+  }
+
+  private normalizeMessage(value: string) {
+    return value.replace(/\s+/g, ' ').trim().toLowerCase()
+  }
+
+  private wordCount(value: string) {
+    const normalized = value.trim()
+    if (!normalized) return 0
+    if (/[\u3400-\u9fff]/.test(normalized)) {
+      return Math.ceil(normalized.replace(/\s+/g, '').length / 2)
+    }
+    return normalized.split(/\s+/).length
   }
 }
 

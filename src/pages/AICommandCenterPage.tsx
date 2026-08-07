@@ -7,6 +7,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  X,
 } from 'lucide-react'
 import type {
   ChatSession,
@@ -94,6 +95,7 @@ export function AICommandCenterPage() {
   const [agentConfigured, setAgentConfigured] = useState<boolean | null>(null)
   const [searchConfigured, setSearchConfigured] = useState<boolean | null>(null)
   const [checkingCapability, setCheckingCapability] = useState(false)
+  const [agentVisible, setAgentVisible] = useState(false)
   const running = runningMode !== null
 
   const loadCapability = useCallback(async () => {
@@ -161,6 +163,7 @@ export function AICommandCenterPage() {
       }),
     )
 
+    setAgentVisible(true)
     setMessages((current) => [...current, userMessage])
     setInput('')
     setError(null)
@@ -217,6 +220,7 @@ export function AICommandCenterPage() {
       return
     }
 
+    setAgentVisible(false)
     setMessages((current) => [
       ...current,
       {
@@ -267,7 +271,8 @@ export function AICommandCenterPage() {
     }
   }
 
-  const hasConversation = messages.length > 0
+  const hasWorkspaceActivity =
+    messages.length > 0 || results.length > 0 || running || syncingResults
 
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top,rgba(53,99,240,0.07),transparent_34rem),#f7f8fb]">
@@ -280,7 +285,7 @@ export function AICommandCenterPage() {
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink-900">AI 情报指挥中心</p>
               <p className="truncate text-[10px] text-ink-400">
-                Agent 回答与无 GPT 全网联系人搜索并行可用
+                Agent 按需出现 · 无 GPT 全网联系人搜索独立可用
               </p>
             </div>
           </div>
@@ -311,12 +316,12 @@ export function AICommandCenterPage() {
       <main
         className={cn(
           'mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8',
-          hasConversation
+          hasWorkspaceActivity
             ? 'pb-48 pt-7'
             : 'flex min-h-[calc(100vh-72px)] flex-col justify-center py-12',
         )}
       >
-        {!hasConversation ? (
+        {!hasWorkspaceActivity ? (
           <section className="mx-auto w-full max-w-4xl text-center">
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-brand-200 bg-white text-brand-700 shadow-card">
               <Sparkles className="h-6 w-6" />
@@ -356,7 +361,25 @@ export function AICommandCenterPage() {
           </section>
         ) : (
           <div className="space-y-8">
-            <AgentConversation messages={messages} running={running} />
+            {agentVisible ? (
+              <section className="rounded-3xl border border-ink-200 bg-white p-4 shadow-card sm:p-5">
+                <div className="mb-4 flex items-center justify-between gap-3 border-b border-ink-100 pb-3">
+                  <div>
+                    <p className="text-xs font-semibold text-ink-900">Agent 回答与工具轨迹</p>
+                    <p className="mt-0.5 text-[10px] text-ink-400">仅在主动提问时展开；收起后不会遮挡结果区。</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAgentVisible(false)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-ink-600 transition hover:border-brand-200 hover:text-brand-700"
+                    aria-label="收起 Agent"
+                  >
+                    <X className="h-3.5 w-3.5" /> 收起 Agent
+                  </button>
+                </div>
+                <AgentConversation messages={messages} running={running} />
+              </section>
+            ) : null}
 
             {error ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
@@ -368,12 +391,13 @@ export function AICommandCenterPage() {
               sessions={results}
               loading={syncingResults}
               hasRun={messages.some((message) => message.role === 'assistant')}
+              onAskAgent={(session) => void submit(buildDeepDivePrompt(session))}
             />
           </div>
         )}
       </main>
 
-      {hasConversation ? (
+      {hasWorkspaceActivity ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 border-t border-ink-200/80 bg-white/92 px-4 pb-4 pt-3 backdrop-blur sm:px-6 lg:left-[228px] lg:right-0">
           <div className="pointer-events-auto mx-auto max-w-[1120px]">
             <CommandComposer
@@ -394,7 +418,7 @@ export function AICommandCenterPage() {
         </div>
       ) : null}
 
-      {!hasConversation && error ? (
+      {!hasWorkspaceActivity && error ? (
         <div className="fixed inset-x-4 bottom-5 z-30 mx-auto max-w-2xl rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700 shadow-card sm:inset-x-6">
           {error}
         </div>
@@ -460,6 +484,19 @@ function createMessageId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `message-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function buildDeepDivePrompt(session: ChatSession) {
+  const identity = [session.jobTitle, session.company]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+    .join(' · ')
+  return [
+    `请深挖当前选中的公开来源对象：${session.customerName}${identity ? `（${identity}）` : ''}。`,
+    '只使用当前工作区已验证证据和你能通过现有工具继续核验的公开来源。',
+    '先判断真实商业信号、身份与联系人缺口，再给风险和下一步动作。',
+    '如果证据足够，再给一版自然、低压力、像真人写的联络建议；证据不足就明确还缺什么，不要猜测。',
+  ].join(' ')
 }
 
 function missingOpenAIKeyMessage() {

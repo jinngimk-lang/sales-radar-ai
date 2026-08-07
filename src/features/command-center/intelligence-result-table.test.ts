@@ -30,6 +30,9 @@ test('selecting one row narrows into a single removable detail inspector', () =>
   assert.match(source, /aria-selected/)
   assert.match(source, /selectedSession/)
   assert.match(source, /关闭详情/)
-  assert.match(source, /<EntityIntelligenceCard session={selectedSession}/)
+  assert.match(
+    source,
+    /<EntityIntelligenceCard[\s\S]*?session={selectedSession}[\s\S]*?onAskAgent={onAskAgent}[\s\S]*?\/>/,
+  )
   assert.match(source, /lg:grid-cols/)
 })
