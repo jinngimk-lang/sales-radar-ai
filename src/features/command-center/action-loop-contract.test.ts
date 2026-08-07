@@ -14,6 +14,7 @@ test('advanced result drill-down stays in the focused inspector and has a determ
   assert.match(card, /深度分析/)
   assert.match(card, /收起深度分析|关闭深度分析/)
   assert.match(card, /\/app\/customer\/\$\{session\.id\}/)
+  assert.match(card, /onAskAgent/)
 })
 
 test('result focus loop supports select, close, and select again without route navigation', async () => {
@@ -31,17 +32,17 @@ test('Agent conversation is an invoked tool rather than persistent workspace chr
   assert.match(page, /agentVisible/)
   assert.match(page, /setAgentVisible\(true\)/)
   assert.match(page, /setAgentVisible\(false\)/)
-  assert.match(page, /agentVisible\s*\?/)
-  assert.doesNotMatch(
+  assert.match(
     page,
-    /<AgentConversation messages=\{messages\} running=\{running\} \/>/,
+    /\{agentVisible \? \([\s\S]*?<AgentConversation messages=\{messages\} running=\{running\} \/>/,
   )
+  assert.match(page, /收起 Agent/)
 })
 
 test('direct global search can populate results without forcing the Agent panel open', async () => {
   const page = await readSource('../../pages/AICommandCenterPage.tsx')
   const start = page.indexOf('const runDirectSearch')
-  const end = page.indexOf('const hasConversation')
+  const end = page.indexOf('const hasWorkspaceActivity')
   assert.ok(start >= 0 && end > start)
   const directSearch = page.slice(start, end)
 
