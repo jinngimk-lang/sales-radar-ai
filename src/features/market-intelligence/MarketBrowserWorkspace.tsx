@@ -219,6 +219,7 @@ export function MarketBrowserWorkspace({
                   onClick={() => selectSourceType(sourceType)}
                   disabled={count === 0}
                   aria-pressed={activeSourceType === sourceType}
+                  title={count === 0 ? '本次扫描没有该类来源' : `筛选 ${meta.label}`}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-medium transition',
                     activeSourceType === sourceType
@@ -445,7 +446,7 @@ function BrowserContent({
               sourceUrl={url}
             />
             <div className="shrink-0 border-b border-ink-200 bg-amber-50 px-4 py-1.5 text-[9px] font-medium text-amber-700">
-              historical snapshot · 静态网页快照，仅用于实时会话不可用时核对来源
+              网页快照（不可交互）· 仅用于交互式云浏览器不可用时核对来源
             </div>
             <div className="min-h-0 flex-1">
               <LiveWebPreview

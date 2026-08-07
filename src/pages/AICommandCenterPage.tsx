@@ -30,6 +30,7 @@ import {
 } from '@/features/command-center/AgentConversation'
 import { CommandComposer } from '@/features/command-center/CommandComposer'
 import { IntelligenceResultGrid } from '@/features/command-center/IntelligenceResultGrid'
+import { customersToCommandSessions } from '@/features/command-center/customersToCommandSessions'
 import { cn } from '@/lib/utils'
 
 const FALLBACK_MODELS: SalesAgentModelOption[] = [
@@ -239,47 +240,7 @@ export function AICommandCenterPage() {
         includePublicContacts: true,
         maxResults: DIRECT_SEARCH_TARGET_RESULTS,
       })
-      const taskResults = execution.customers
-      const selected = taskResults.map((lead) => ({
-        id: lead.id,
-        customerName: lead.company ?? lead.displayName,
-        displayName: lead.displayName,
-        company: lead.company ?? null,
-        avatarUrl: lead.avatarUrl ?? null,
-        initials: lead.initials,
-        platform: lead.platform,
-        jobTitle: lead.jobTitle ?? null,
-        sourceUrl: lead.sourceUrl,
-        profileUrl: lead.profileUrl,
-        postContent: lead.postContent,
-        contacts: lead.contacts ?? [],
-        audienceType: lead.audienceType ??
-          (lead.customerType === 'Individual'
-            ? 'person'
-            : lead.customerType === 'Agent'
-              ? 'intermediary'
-              : 'company'),
-        contactReadiness: (lead.contacts ?? []).length > 0 ? 'ready' : 'research',
-        assistantScores: {
-          overall: lead.signalScores?.overall ?? lead.analysis.intentScore,
-          intent: lead.signalScores?.intent ?? lead.analysis.intentScore,
-          identity: lead.signalScores?.identity ?? 55,
-          evidence: lead.signalScores?.evidence ?? 55,
-          contact: Math.min(100, (lead.contacts ?? []).length * 25),
-        },
-        communicationProfile: {
-          language: 'unknown',
-          tone: 'conversational',
-          preferredPlatform: lead.platform,
-          observedTopics: lead.analysis.tags,
-          evidenceExcerpt: lead.postContent.slice(0, 360),
-        },
-        lastMessage: lead.postContent,
-        lastMessageAt: lead.postedAt,
-        unreadCount: 0,
-        intentScore: lead.analysis.intentScore,
-        tags: lead.analysis.tags,
-      }) as unknown as ChatSession)
+      const selected = customersToCommandSessions(execution.customers)
       const contactCount = selected.reduce(
         (total, session) => total + session.contacts.length,
         0,
