@@ -9,9 +9,10 @@ This change is complete only when the pull-request CI verifies all of the follow
 - Market sources expose an operator-authorized, read-only Browserbase Live View and retain a clearly labeled non-interactive snapshot fallback.
 - Both market Live View routes require the existing revenue operator middleware.
 - Empty source categories are disabled and active source filters expose accessible pressed state.
+- The production runtime-loading hotfix from main remains present in the pull-request merge result.
 - Frontend typecheck, tests, and build pass.
 - Backend Prisma validation, typecheck, tests, and build pass.
 
 The PR must not merge while any required check is missing, action-required, cancelled, or failing.
 
-Final verification covers feature head `e8111bdae54863b7e401db9bfdd3a510f1c29427` plus this documentation-only trigger commit.
+Final integrated verification covers feature head `3458244e0a25f9d8ba7af8ff67a97063013348bf` plus this documentation-only trigger commit against the current main branch.
