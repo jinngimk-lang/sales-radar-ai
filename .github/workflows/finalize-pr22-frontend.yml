@@ -1,0 +1,32 @@
+name: Finalize PR 22 frontend
+
+on:
+  push:
+    branches:
+      - fix/market-radar-and-contact-depth
+    paths:
+      - .github/scripts/finalize_pr22_frontend.py
+      - .github/workflows/finalize-pr22-frontend.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/market-radar-and-contact-depth
+          fetch-depth: 0
+      - run: python3 .github/scripts/finalize_pr22_frontend.py
+      - run: |
+          rm .github/scripts/finalize_pr22_frontend.py
+          rm .github/workflows/finalize-pr22-frontend.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: finalize direct search and market browser UI"
+          git push origin HEAD:fix/market-radar-and-contact-depth
