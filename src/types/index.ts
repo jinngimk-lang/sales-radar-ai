@@ -290,6 +290,8 @@ export interface Customer {
   sourceUrl: string
   /** 主页链接 */
   profileUrl: string
+  /** 当前搜索任务实际发现的公开联系人 */
+  contacts?: ContactProfile[]
 }
 
 /** 筛选条件 */
@@ -388,6 +390,10 @@ export interface SearchFilters {
   followUpStatuses?: FollowUpStatus[]
   /** 仅看收藏 */
   favoritesOnly?: boolean
+  /** 在任务完成前运行公开联系人发现 */
+  includePublicContacts?: boolean
+  /** 当前搜索任务希望返回的真实结果数量 */
+  maxResults?: number
 }
 
 /** Phase 1.1 contract reserved for the future ProductContextSnapshot. */

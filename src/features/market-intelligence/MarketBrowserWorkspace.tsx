@@ -26,6 +26,7 @@ import {
   type AgentWorkspaceStatus,
 } from '@/components/ui/WorkspaceState'
 import { cn } from '@/lib/utils'
+import { MarketLiveBrowserPanel } from './MarketLiveBrowserPanel'
 import {
   MARKET_WORKSPACE_HEIGHT,
   SIGNAL_META,
@@ -216,6 +217,8 @@ export function MarketBrowserWorkspace({
                   key={sourceType}
                   type="button"
                   onClick={() => selectSourceType(sourceType)}
+                  disabled={count === 0}
+                  aria-pressed={activeSourceType === sourceType}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-medium transition',
                     activeSourceType === sourceType
@@ -436,11 +439,22 @@ function BrowserContent({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden">
         {view === 'live' ? (
-          <LiveWebPreview
-            url={url}
-            title={title}
-            onFallbackToSummary={() => onViewChange('summary')}
-          />
+          <div className="flex h-full min-h-0 flex-col">
+            <MarketLiveBrowserPanel
+              query={session?.target.product ?? title}
+              sourceUrl={url}
+            />
+            <div className="shrink-0 border-b border-ink-200 bg-amber-50 px-4 py-1.5 text-[9px] font-medium text-amber-700">
+              historical snapshot · 静态网页快照，仅用于实时会话不可用时核对来源
+            </div>
+            <div className="min-h-0 flex-1">
+              <LiveWebPreview
+                url={url}
+                title={title}
+                onFallbackToSummary={() => onViewChange('summary')}
+              />
+            </div>
+          </div>
         ) : (
           <div className="h-full overflow-x-hidden overflow-y-auto scrollbar-thin">
             {source && session ? (

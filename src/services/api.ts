@@ -334,6 +334,7 @@ function toCustomer(lead: BackendLead): Customer {
     recommendedAction: lead.recommendedAction ?? undefined,
     sourceUrl: lead.sourceUrl,
     profileUrl: lead.profileUrl,
+    contacts: lead.contacts ?? [],
   }
 }
 
@@ -354,6 +355,8 @@ async function createSearchTaskAndWait(
       regions: filters.regions,
       productContext,
       productProfileId: productProfileId || undefined,
+      includePublicContacts: filters.includePublicContacts === true,
+      maxResults: filters.maxResults,
     }),
   })
   const preparation = {

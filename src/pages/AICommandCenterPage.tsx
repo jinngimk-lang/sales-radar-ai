@@ -75,6 +75,8 @@ const DIRECT_SEARCH_CUSTOMER_TYPES: CustomerType[] = [
   'Individual',
 ]
 const DIRECT_SEARCH_INTENT_LEVELS: IntentLevel[] = ['high', 'medium', 'low']
+const DIRECT_SEARCH_TARGET_RESULTS = 30
+const loadAssistantLeadSessions = getChatSessions
 
 type RunningMode = 'agent' | 'search' | null
 
@@ -182,7 +184,7 @@ export function AICommandCenterPage() {
 
       setSyncingResults(true)
       try {
-        const sessions = await getChatSessions()
+        const sessions = await loadAssistantLeadSessions()
         const sessionsById = new Map(
           sessions.map((session) => [session.id, session]),
         )
@@ -234,10 +236,50 @@ export function AICommandCenterPage() {
         regions: DIRECT_SEARCH_REGIONS,
         customerTypes: DIRECT_SEARCH_CUSTOMER_TYPES,
         intentLevels: DIRECT_SEARCH_INTENT_LEVELS,
+        includePublicContacts: true,
+        maxResults: DIRECT_SEARCH_TARGET_RESULTS,
       })
-      const resultIds = new Set(execution.customers.map((customer) => customer.id))
-      const sessions = await getChatSessions()
-      const selected = sessions.filter((session) => resultIds.has(session.id))
+      const taskResults = execution.customers
+      const selected = taskResults.map((lead) => ({
+        id: lead.id,
+        customerName: lead.company ?? lead.displayName,
+        displayName: lead.displayName,
+        company: lead.company ?? null,
+        avatarUrl: lead.avatarUrl ?? null,
+        initials: lead.initials,
+        platform: lead.platform,
+        jobTitle: lead.jobTitle ?? null,
+        sourceUrl: lead.sourceUrl,
+        profileUrl: lead.profileUrl,
+        postContent: lead.postContent,
+        contacts: lead.contacts ?? [],
+        audienceType: lead.audienceType ??
+          (lead.customerType === 'Individual'
+            ? 'person'
+            : lead.customerType === 'Agent'
+              ? 'intermediary'
+              : 'company'),
+        contactReadiness: (lead.contacts ?? []).length > 0 ? 'ready' : 'research',
+        assistantScores: {
+          overall: lead.signalScores?.overall ?? lead.analysis.intentScore,
+          intent: lead.signalScores?.intent ?? lead.analysis.intentScore,
+          identity: lead.signalScores?.identity ?? 55,
+          evidence: lead.signalScores?.evidence ?? 55,
+          contact: Math.min(100, (lead.contacts ?? []).length * 25),
+        },
+        communicationProfile: {
+          language: 'unknown',
+          tone: 'conversational',
+          preferredPlatform: lead.platform,
+          observedTopics: lead.analysis.tags,
+          evidenceExcerpt: lead.postContent.slice(0, 360),
+        },
+        lastMessage: lead.postContent,
+        lastMessageAt: lead.postedAt,
+        unreadCount: 0,
+        intentScore: lead.analysis.intentScore,
+        tags: lead.analysis.tags,
+      }) as ChatSession)
       const contactCount = selected.reduce(
         (total, session) => total + session.contacts.length,
         0,

@@ -7,6 +7,7 @@ import {
 import { resilientMarketWebResearch } from '../services/market-intelligence/resilient-market-web-research.service.js'
 import { ensureDemoUser } from '../services/demo-user.service.js'
 import { AppError } from '../utils/app-error.js'
+import { marketLiveBrowserService } from '../services/market-live-browser.service.js'
 
 interface MarketSignalReader {
   listForUser(userId: string): Promise<unknown[]>
@@ -116,4 +117,32 @@ function readText(value: unknown, maxLength: number) {
   return typeof value === 'string' && value.trim()
     ? value.trim().slice(0, maxLength)
     : undefined
+}
+
+
+export const startMarketLiveBrowserController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const query = readText(request.body?.query, 240)
+  const sourceUrl = readText(request.body?.sourceUrl, 2_000)
+  if (!query || !sourceUrl) {
+    throw new AppError(
+      400,
+      'MARKET_LIVE_INPUT_REQUIRED',
+      'query and sourceUrl are required',
+    )
+  }
+  const result = await marketLiveBrowserService.start({ query, sourceUrl })
+  response.set('Cache-Control', 'private, no-store')
+  response.status(201).json({ data: result })
+}
+
+export const getMarketLiveBrowserController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const result = await marketLiveBrowserService.get(request.params.runId ?? '')
+  response.set('Cache-Control', 'private, no-store')
+  response.json({ data: result })
 }
