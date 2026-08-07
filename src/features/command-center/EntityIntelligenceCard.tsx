@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import {
   ArrowUpRight,
   AtSign,
   Building2,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   Globe2,
   Mail,
@@ -17,9 +20,14 @@ import { SourceEvidenceList } from './SourceEvidenceList'
 
 interface EntityIntelligenceCardProps {
   session: ChatSession
+  onAskAgent?: (session: ChatSession) => void
 }
 
-export function EntityIntelligenceCard({ session }: EntityIntelligenceCardProps) {
+export function EntityIntelligenceCard({
+  session,
+  onAskAgent,
+}: EntityIntelligenceCardProps) {
+  const [deepAnalysisOpen, setDeepAnalysisOpen] = useState(false)
   const scores = session.assistantScores
   const contacts = session.contacts
 
@@ -139,16 +147,128 @@ export function EntityIntelligenceCard({ session }: EntityIntelligenceCardProps)
           <p className="mt-2 text-sm leading-6 text-ink-700">{known(session.lastMessage)}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link to={`/app/customer/${session.id}`} className="workspace-primary-action px-3 py-2 text-xs">
-              查看完整情报 <ArrowUpRight className="h-3.5 w-3.5" />
+              打开完整档案 <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
-            <Link to={`/app/discover?leadId=${encodeURIComponent(session.id)}`} className="workspace-secondary-action px-3 py-2 text-xs">
-              进入高级结果
-            </Link>
+            <button
+              type="button"
+              onClick={() => setDeepAnalysisOpen((current) => !current)}
+              className="workspace-secondary-action px-3 py-2 text-xs"
+              aria-expanded={deepAnalysisOpen}
+              aria-controls={`deep-analysis-${session.id}`}
+            >
+              {deepAnalysisOpen ? '收起深度分析' : '深度分析'}
+              {deepAnalysisOpen ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </button>
           </div>
         </section>
+
+        {deepAnalysisOpen ? (
+          <DeepAnalysisPanel
+            session={session}
+            onAskAgent={onAskAgent}
+          />
+        ) : null}
       </div>
     </article>
   )
+}
+
+function DeepAnalysisPanel({
+  session,
+  onAskAgent,
+}: {
+  session: ChatSession
+  onAskAgent?: (session: ChatSession) => void
+}) {
+  const scores = session.assistantScores
+  const risks = riskNotes(session)
+
+  return (
+    <section
+      id={`deep-analysis-${session.id}`}
+      className="rounded-2xl border border-ink-200 bg-white p-4 shadow-sm"
+      aria-label="当前对象深度分析"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-700">
+            Deep Analysis
+          </p>
+          <h4 className="mt-1 text-sm font-semibold text-ink-900">原地深挖，不离开当前观察点</h4>
+          <p className="mt-1 text-[10px] leading-5 text-ink-500">
+            只整理当前已经观察到的评分、联系人和公开证据；未知项继续保持未知。
+          </p>
+        </div>
+        <span className="rounded-full border border-ink-200 bg-ink-50 px-2.5 py-1 text-[10px] font-semibold text-ink-500">
+          {session.contacts.length} 个公开联系人
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl bg-ink-50/80 p-3">
+          <p className="text-[10px] font-semibold text-ink-500">评分判断</p>
+          <p className="mt-1 text-xs leading-5 text-ink-700">
+            {scores
+              ? `综合 ${Math.round(scores.overall)} · 意向 ${Math.round(scores.intent)} · 身份 ${Math.round(scores.identity)} · 证据 ${Math.round(scores.evidence)} · 联系人 ${Math.round(scores.contact)}`
+              : '当前对象没有可用评分，不能据此判断优先级。'}
+          </p>
+        </div>
+        <div className="rounded-xl bg-ink-50/80 p-3">
+          <p className="text-[10px] font-semibold text-ink-500">当前建议</p>
+          <p className="mt-1 text-xs leading-5 text-ink-700">{known(session.lastMessage)}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+        <p className="text-[10px] font-semibold text-amber-800">仍需核验</p>
+        <ul className="mt-2 space-y-1 text-[11px] leading-5 text-amber-900/80">
+          {risks.map((risk) => (
+            <li key={risk}>• {risk}</li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-100 bg-brand-50/45 p-3">
+        <p className="max-w-md text-[10px] leading-5 text-ink-500">
+          需要进一步判断或生成更自然的话术时再调用 Agent；Agent 不会常驻占用观察区。
+        </p>
+        {onAskAgent ? (
+          <button
+            type="button"
+            onClick={() => onAskAgent(session)}
+            className="workspace-primary-action px-3 py-2 text-xs"
+          >
+            问 Agent 深挖
+          </button>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
+function riskNotes(session: ChatSession) {
+  const notes: string[] = []
+  const scores = session.assistantScores
+
+  if (!scores) {
+    notes.push('尚无评分结果，优先级需要继续核验。')
+  } else {
+    if (scores.identity < 50) notes.push('身份匹配评分偏低，先确认角色和公司归属。')
+    if (scores.evidence < 50) notes.push('证据评分偏低，不应直接把当前信号当成采购需求。')
+    if (scores.intent < 50) notes.push('意向评分偏低，适合继续观察而不是强推联络。')
+  }
+
+  if (session.contacts.length === 0) {
+    notes.push('尚未观察到可验证联系人，不能推断邮箱或电话。')
+  }
+
+  return notes.length
+    ? notes
+    : ['当前没有明显缺失项；实际联络前仍应复核来源时效和负责人是否变化。']
 }
 
 function ContactBlock({ contact }: { contact: ContactProfile }) {
