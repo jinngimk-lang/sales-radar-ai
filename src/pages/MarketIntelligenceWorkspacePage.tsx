@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Radar } from 'lucide-react'
 import type { MarketResearchSession, MarketSignal } from '@/types'
 import {
@@ -43,6 +43,7 @@ export function MarketIntelligenceWorkspacePage() {
   const [agentState, setAgentState] =
     useState<MarketAgentWorkspaceState>(INITIAL_AGENT_STATE)
   const [loadingSignals, setLoadingSignals] = useState(true)
+  const assessmentRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -120,6 +121,15 @@ export function MarketIntelligenceWorkspacePage() {
         errorCode: code ?? 'MARKET_SCAN_UNAVAILABLE',
       })
     }
+  }
+
+  const focusAssessment = () => {
+    window.requestAnimationFrame(() => {
+      assessmentRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
   }
 
   const visualStatus =
@@ -200,8 +210,15 @@ export function MarketIntelligenceWorkspacePage() {
       </div>
 
       {selectedSignal ? (
-        <div className="mt-4">
-          <SignalAssessmentPanel signal={selectedSignal} />
+        <div
+          id="sales-opportunity-assessment"
+          ref={assessmentRef}
+          className="mt-4 scroll-mt-20"
+        >
+          <SignalAssessmentPanel
+            signal={selectedSignal}
+            onFocusAssessment={focusAssessment}
+          />
         </div>
       ) : null}
     </div>
