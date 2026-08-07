@@ -17,12 +17,14 @@ interface IntelligenceResultGridProps {
   sessions: ChatSession[]
   loading: boolean
   hasRun: boolean
+  onAskAgent?: (session: ChatSession) => void
 }
 
 export function IntelligenceResultGrid({
   sessions,
   loading,
   hasRun,
+  onAskAgent,
 }: IntelligenceResultGridProps) {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const sortedSessions = useMemo(() => sortCommandSessions(sessions), [sessions])
@@ -221,7 +223,10 @@ export function IntelligenceResultGrid({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <EntityIntelligenceCard session={selectedSession} />
+            <EntityIntelligenceCard
+              session={selectedSession}
+              onAskAgent={onAskAgent}
+            />
           </aside>
         ) : null}
       </div>
