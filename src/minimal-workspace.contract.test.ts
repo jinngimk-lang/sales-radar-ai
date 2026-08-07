@@ -17,7 +17,8 @@ const [home, composer, marketPage, marketTarget, livePanel, revenuePage, revenue
 ])
 
 test('AI home is input-first and removes marketing-style authenticated hero content', () => {
-  assert.match(home, /今天要研究什么/)
+  assert.match(home, /准备好赚钱了吗/)
+  assert.doesNotMatch(home, /今天要研究什么/)
   assert.doesNotMatch(home, /AGENT \+ DIRECT GLOBAL SEARCH/)
   assert.doesNotMatch(home, /同一个输入框，既能问 Agent/)
   assert.doesNotMatch(home, /<Capability/)
