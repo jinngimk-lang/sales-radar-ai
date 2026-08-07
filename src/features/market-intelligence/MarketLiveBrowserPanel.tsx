@@ -93,28 +93,26 @@ export function MarketLiveBrowserPanel({
   }
 
   return (
-    <section className="shrink-0 border-b border-ink-200 bg-slate-950 text-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <div>
-          <p className="flex items-center gap-2 text-xs font-semibold">
-            <MonitorUp className="h-4 w-4 text-sky-300" />
-            交互式云浏览器
-          </p>
-          <p className="mt-1 text-[10px] text-slate-400">
-            Browserbase 只读研究会话；Live View 内可以点击、滚动和检查公开证据，但自动任务不会登录或提交表单。
-          </p>
+    <section className="shrink-0 border-b border-ink-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+        <div className="flex items-center gap-2 text-xs font-medium text-ink-700">
+          <MonitorUp className="h-3.5 w-3.5 text-brand-600" />
+          Live
+          {token ? (
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label="Live 已解锁" />
+          ) : null}
         </div>
 
         {token ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {liveViewUrl ? (
               <a
                 href={liveViewUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-900"
+                className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[10px] font-medium text-ink-600 transition hover:bg-ink-50"
               >
-                独立接管
+                打开
                 <ExternalLink className="h-3 w-3" />
               </a>
             ) : null}
@@ -122,28 +120,28 @@ export function MarketLiveBrowserPanel({
               type="button"
               onClick={() => void start()}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3 py-1.5 text-[10px] font-semibold text-slate-950 transition hover:bg-sky-400 disabled:opacity-60"
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 text-[10px] font-medium text-ink-700 transition hover:bg-ink-50 disabled:opacity-60"
             >
               {loading ? (
                 <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" />
               )}
-              {runId ? '重新启动交互浏览器' : '启动交互浏览器'}
+              {runId ? '重启' : '启动 Live'}
             </button>
             <button
               type="button"
               onClick={lockOperator}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1.5 text-[10px] text-slate-300 hover:bg-slate-900"
+              className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[10px] text-ink-500 transition hover:bg-ink-50 hover:text-ink-800"
             >
               <LockKeyhole className="h-3 w-3" />
               锁定
             </button>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <label className="relative">
-              <KeyRound className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+              <KeyRound className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-400" />
               <input
                 type="password"
                 value={tokenDraft}
@@ -151,24 +149,24 @@ export function MarketLiveBrowserPanel({
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') unlockOperator()
                 }}
-                placeholder="REVENUE_OPERATOR_TOKEN"
+                placeholder="运营令牌"
                 autoComplete="off"
-                className="h-8 w-52 rounded-lg border border-slate-700 bg-slate-900 pl-8 pr-3 text-[10px] text-white outline-none placeholder:text-slate-600 focus:border-sky-500"
+                className="h-8 w-40 rounded-lg border border-ink-200 bg-white pl-8 pr-3 text-[10px] text-ink-900 outline-none placeholder:text-ink-400 focus:border-ink-300"
               />
             </label>
             <button
               type="button"
               onClick={unlockOperator}
-              className="rounded-lg bg-sky-500 px-3 py-2 text-[10px] font-semibold text-slate-950 hover:bg-sky-400"
+              className="h-8 rounded-lg bg-ink-950 px-3 text-[10px] font-medium text-white hover:bg-ink-800"
             >
-              解锁浏览器
+              解锁 Live
             </button>
           </div>
         )}
       </div>
 
       {error ? (
-        <p className="border-t border-rose-900/60 bg-rose-950/50 px-4 py-2 text-[10px] text-rose-200">
+        <p className="border-t border-rose-100 bg-rose-50 px-3 py-2 text-[10px] text-rose-700">
           {error}
         </p>
       ) : null}
@@ -182,9 +180,9 @@ export function MarketLiveBrowserPanel({
           allow="clipboard-read; clipboard-write"
         />
       ) : runId && running ? (
-        <div className="flex h-24 items-center justify-center gap-2 border-t border-slate-800 text-[10px] text-slate-400">
+        <div className="flex h-20 items-center justify-center gap-2 border-t border-ink-100 text-[10px] text-ink-400">
           <LoaderCircle className="h-4 w-4 animate-spin" />
-          云浏览器正在创建可交互 Live View…
+          正在创建 Live View…
         </div>
       ) : null}
     </section>
