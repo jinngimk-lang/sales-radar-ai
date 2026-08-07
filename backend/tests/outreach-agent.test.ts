@@ -37,13 +37,14 @@ describe('AI Outreach Agent v1', () => {
     const result = await provider.generateOutreach(context())
 
     assert.equal(result.email.subjectOptions.length, 3)
-    assert.match(result.email.opening, /looking for an automation/)
-    assert.match(result.email.body, /cost|delivery reliability|supply stability/)
-    assert.match(result.email.cta, /15-minute/)
+    assert.match(result.email.opening, /looking for an automation/i)
+    assert.match(result.email.body, /cost|delivery reliability|supply stability/i)
+    assert.match(result.email.cta, /actively evaluating|leave it for later/i)
+    assert.equal(result.email.body.includes(result.email.opening), false)
     assert.ok(result.callScript.questions.length >= 3)
     assert.doesNotMatch(
       JSON.stringify(result),
-      /Dear Sir|Hope this email finds you well/i,
+      /Dear Sir|Hope this email finds you well|I noticed|comprehensive solution/i,
     )
   })
 
@@ -59,8 +60,9 @@ describe('AI Outreach Agent v1', () => {
     )
 
     assert.equal(result.email.subjectOptions.length, 3)
-    assert.match(result.email.body, /first confirm whether/)
-    assert.match(result.linkedin.firstMessage, /validate whether/)
+    assert.match(result.email.body, /technical fit|current priority|useful/i)
+    assert.match(result.linkedin.firstMessage, /short example|useful/i)
+    assert.doesNotMatch(result.email.cta, /15-minute/i)
   })
 
   it('returns observation advice instead of strong outreach for C content', async () => {
@@ -96,9 +98,10 @@ describe('AI Outreach Agent v1', () => {
       }),
     )
 
-    assert.match(result.email.body, /complement your current portfolio/i)
-    assert.match(result.email.cta, /possible pilot/i)
+    assert.match(result.email.body, /portfolio|customer coverage|real gap/i)
+    assert.match(result.email.cta, /customer use case|commercial/i)
     assert.match(result.callScript.questions.join(' '), /customer segments/i)
+    assert.equal(result.email.body.includes(result.email.opening), false)
   })
 
   it('mirrors Chinese public content and applies the requested objective', async () => {
@@ -120,7 +123,8 @@ describe('AI Outreach Agent v1', () => {
     )
 
     assert.match(result.email.body, /分享相关案例/)
-    assert.match(result.email.cta, /15 分钟/)
-    assert.match(result.linkedin.connectionMessage, /公开资料|方向相关/)
+    assert.match(result.email.cta, /现在值得聊|晚一点再联系/)
+    assert.match(result.linkedin.connectionMessage, /相关|连接/)
+    assert.equal(result.email.body.includes(result.email.opening), false)
   })
 })
