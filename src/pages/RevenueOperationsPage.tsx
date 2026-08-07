@@ -121,7 +121,7 @@ export function RevenueOperationsPage() {
         </div>
       </section>
 
-      <RevenueMetrics dashboard={dashboard} opportunities={opportunities} />
+      <RevenueMetrics dashboard={dashboard} opportunities={opportunities} loading={loading} />
 
       {loadError ? (
         <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs leading-5 text-rose-700">
@@ -209,9 +209,11 @@ export function RevenueOperationsPage() {
 function RevenueMetrics({
   dashboard,
   opportunities,
+  loading,
 }: {
   dashboard: RevenueDashboard | null
   opportunities: RevenueOpportunity[]
+  loading: boolean
 }) {
   const actionableCount = opportunities.filter((item) =>
     ['QUALIFIED', 'ACTIVE', 'WAITING'].includes(item.status),
@@ -220,26 +222,32 @@ function RevenueMetrics({
     ['ACTIVE', 'WAITING'].includes(item.status),
   ).length
   const currency = dashboard?.summary.currency ?? 'USD'
+  const synced = dashboard !== null
+  const unsyncedDetail = loading ? '正在同步真实数据' : '数据暂不可用'
 
   return (
     <section className="mt-4 grid gap-3 sm:grid-cols-3">
       <MetricCard
         icon={Search}
         label="可执行机会"
-        value={String(actionableCount)}
-        detail="已核验或正在推进"
+        value={synced ? String(actionableCount) : '—'}
+        detail={synced ? '已核验或正在推进' : unsyncedDetail}
       />
       <MetricCard
         icon={CircleDollarSign}
         label="执行中"
-        value={String(executingCount)}
-        detail="执行中或等待结算"
+        value={synced ? String(executingCount) : '—'}
+        detail={synced ? '执行中或等待结算' : unsyncedDetail}
       />
       <MetricCard
         icon={BadgeCheck}
         label="已确认收入"
-        value={formatMoney(dashboard?.summary.confirmedMinor ?? 0, currency)}
-        detail={`已到账 ${formatMoney(dashboard?.summary.paidMinor ?? 0, currency)}`}
+        value={synced ? formatMoney(dashboard.summary.confirmedMinor, currency) : '—'}
+        detail={
+          synced
+            ? `已到账 ${formatMoney(dashboard.summary.paidMinor, currency)}`
+            : unsyncedDetail
+        }
       />
     </section>
   )
