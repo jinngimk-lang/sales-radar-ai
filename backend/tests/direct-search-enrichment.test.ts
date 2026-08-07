@@ -67,15 +67,21 @@ test('search-task contact enrichment is scheduled without blocking core search c
   assert.equal(enrichStarted, true)
 })
 
-test('search task marks core results completed before scheduling public-contact enrichment', async () => {
+test('legacy search-task enrichment entrypoint only queues background discovery', async () => {
   const source = await readFile(
-    new URL('../src/services/search-task.service.ts', import.meta.url),
+    new URL('../src/services/direct-search-contact-enrichment.service.ts', import.meta.url),
     'utf8',
   )
-  const completedIndex = source.indexOf("status: 'COMPLETED'")
-  const scheduleIndex = source.indexOf('scheduleSearchTaskContactEnrichment')
+  const entrypointIndex = source.indexOf('export async function enrichSearchTaskContacts')
+  const schedulerCallIndex = source.indexOf(
+    'scheduleSearchTaskContactEnrichment(taskId, true)',
+    entrypointIndex,
+  )
 
-  assert.ok(completedIndex >= 0)
-  assert.ok(scheduleIndex > completedIndex)
-  assert.doesNotMatch(source, /await enrichSearchTaskContacts\(task\.id\)/)
+  assert.ok(entrypointIndex >= 0)
+  assert.ok(schedulerCallIndex > entrypointIndex)
+  assert.doesNotMatch(
+    source.slice(entrypointIndex, schedulerCallIndex + 120),
+    /await defaultService\.enrich/,
+  )
 })
