@@ -6,7 +6,7 @@ import {
   getMarketSignals,
   runMarketResearch,
 } from '@/services/api'
-import { PageHeader } from '@/components/ui/PageHeader'
+import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
 import { AgentStatusBadge } from '@/components/ui/WorkspaceState'
 import { MarketScanTarget } from '@/features/market-intelligence/MarketScanTarget'
 import { MarketBrowserWorkspace } from '@/features/market-intelligence/MarketBrowserWorkspace'
@@ -28,7 +28,7 @@ const EMPTY_TARGET: MarketScanTargetValue = {
 
 const INITIAL_AGENT_STATE: MarketAgentWorkspaceState = {
   status: 'idle',
-  message: '设置监控目标后开始联网研究。',
+  message: '设置目标后开始研究。',
   startedAt: null,
   completedAt: null,
   errorCode: null,
@@ -75,7 +75,7 @@ export function MarketIntelligenceWorkspacePage() {
     setSelectedSourceId(null)
     setAgentState({
       status: 'running',
-      message: '云端研究正在搜索并打开公开网页。',
+      message: '正在搜索公开来源…',
       startedAt,
       completedAt: null,
       errorCode: null,
@@ -98,8 +98,8 @@ export function MarketIntelligenceWorkspacePage() {
         status: 'completed',
         message:
           result.sources.length > 0
-            ? `研究完成：访问 ${result.sources.length} 个真实来源，保存 ${result.signals.length} 条市场信号。`
-            : '研究完成，但没有找到可验证的相关来源。',
+            ? `${result.sources.length} 个来源 · ${result.signals.length} 条信号`
+            : '没有找到可验证的相关来源',
         startedAt,
         completedAt: result.completedAt,
         errorCode: null,
@@ -111,10 +111,10 @@ export function MarketIntelligenceWorkspacePage() {
         status: 'failed',
         message:
           code === 'MARKET_RESEARCH_PROVIDER_UNAVAILABLE'
-            ? '联网研究服务尚未配置，请在服务端配置 OpenAI 或千问 API。'
+            ? '联网研究服务未配置'
             : error instanceof Error
               ? error.message
-              : '系统暂时无法完成本次市场研究。',
+              : '本次研究失败',
         startedAt,
         completedAt: new Date().toISOString(),
         errorCode: code ?? 'MARKET_SCAN_UNAVAILABLE',
@@ -129,11 +129,10 @@ export function MarketIntelligenceWorkspacePage() {
   const showTimeline = signals.length > 0
 
   return (
-    <div className="workspace-page pb-12">
-      <PageHeader
-        eyebrow="SOURCE-BACKED MARKET MONITORING"
+    <div className="mx-auto w-full max-w-[1180px] px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
+      <WorkspaceHeader
         title="市场雷达"
-        description="持续搜索企业官网、新闻、招聘、投资和行业网页，把公开来源整理成可追溯的市场信号、风险和下一步动作。"
+        description="从公开来源发现变化。"
         actions={<AgentStatusBadge status={visualStatus} />}
       />
 
@@ -147,15 +146,15 @@ export function MarketIntelligenceWorkspacePage() {
       {agentState.status !== 'idle' ? (
         <div
           className={cn(
-            'mt-4 flex items-center gap-3 rounded-xl border px-4 py-3 text-xs',
+            'mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-xs',
             agentState.status === 'failed'
-              ? 'border-rose-200 bg-rose-50 text-rose-700'
-              : 'border-brand-100 bg-brand-50/60 text-ink-700',
+              ? 'bg-rose-50 text-rose-700'
+              : 'bg-ink-100/70 text-ink-600',
           )}
         >
           <Radar
             className={cn(
-              'h-4 w-4 shrink-0',
+              'h-3.5 w-3.5 shrink-0',
               agentState.status === 'running' && 'animate-spin',
             )}
           />
@@ -165,9 +164,9 @@ export function MarketIntelligenceWorkspacePage() {
 
       <div
         className={cn(
-          'mt-5 grid gap-5',
+          'mt-4 grid gap-4',
           showTimeline &&
-            'xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.75fr)]',
+            'xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.7fr)]',
         )}
       >
         <MarketBrowserWorkspace
@@ -201,7 +200,7 @@ export function MarketIntelligenceWorkspacePage() {
       </div>
 
       {selectedSignal ? (
-        <div className="mt-5">
+        <div className="mt-4">
           <SignalAssessmentPanel signal={selectedSignal} />
         </div>
       ) : null}
