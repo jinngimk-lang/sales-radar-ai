@@ -7,10 +7,20 @@ export interface MarketLiveBrowserResult {
     status?: string
   }
   liveView: {
-    runId?: string
-    sessionId?: string | null
-    liveViewUrl?: string | null
-    expiresAt?: string | null
+    debuggerFullscreenUrl?: string | null
+    debuggerUrl?: string | null
+    pages?: Array<{
+      id: string
+      debuggerFullscreenUrl?: string | null
+      debuggerUrl?: string | null
+      title?: string | null
+      url?: string | null
+    }>
+  } | null
+  currentPage?: {
+    title?: string | null
+    url?: string | null
+    faviconUrl?: string | null
   } | null
 }
 
