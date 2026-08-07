@@ -6,6 +6,10 @@ const browserSource = await readFile(
   new URL('./MarketBrowserWorkspace.tsx', import.meta.url),
   'utf8',
 )
+const liveBrowserSource = await readFile(
+  new URL('./MarketLiveBrowserPanel.tsx', import.meta.url),
+  'utf8',
+)
 const timelineSource = await readFile(
   new URL('./SignalTimeline.tsx', import.meta.url),
   'utf8',
@@ -33,9 +37,13 @@ test('source categories expose real state and do not act like useful controls wh
 test('market browser clearly separates a static snapshot from an interactive cloud session', () => {
   assert.match(browserSource, /MarketLiveBrowserPanel/)
   assert.match(browserSource, /网页快照（不可交互）/)
-  assert.match(browserSource, /启动交互浏览器/)
-  assert.match(browserSource, /REVENUE_OPERATOR_TOKEN/)
-  assert.doesNotMatch(browserSource, /网页快照已按完整桌面宽度适配；上下滚动查看页面/)
+  assert.match(liveBrowserSource, /启动交互浏览器/)
+  assert.match(liveBrowserSource, /REVENUE_OPERATOR_TOKEN/)
+  assert.match(liveBrowserSource, /MARKET_LIVE_OPERATOR_TOKEN_KEY/)
+  assert.doesNotMatch(
+    browserSource,
+    /网页快照已按完整桌面宽度适配；上下滚动查看页面/,
+  )
 })
 
 test('generic cross-origin pages never masquerade as a live browser', () => {
