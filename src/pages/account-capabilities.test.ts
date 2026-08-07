@@ -12,12 +12,11 @@ test('account page surfaces the server-reported GPT sales agent capability', () 
   assert.match(accountPageSource, /GPT 销售执行器/)
 })
 
-test('account page explains public-data visibility and field-level verification', () => {
-  assert.match(accountPageSource, /数据可见性/)
+test('account page keeps public-data verification as one concise principle instead of duplicate cards', () => {
+  assert.match(accountPageSource, /数据原则/)
   assert.match(accountPageSource, /公开来源/)
   assert.match(accountPageSource, /观察时间/)
   assert.match(accountPageSource, /不会推断/)
-  assert.match(accountPageSource, /\/app\/home/)
-  assert.match(accountPageSource, /\/app\/market/)
-  assert.doesNotMatch(accountPageSource, /\/app\/assistant|\/app\/dashboard/)
+  assert.doesNotMatch(accountPageSource, /数据可见性/)
+  assert.doesNotMatch(accountPageSource, /Sales Radar 工作区/)
 })
