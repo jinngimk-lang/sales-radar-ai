@@ -87,6 +87,8 @@ jobs:
           tests/market-search-resilience.test.ts
           tests/openai-runtime-verifier.test.ts
           tests/openai-sales-agent.test.ts
+          tests/outreach-agent.test.ts
+          tests/outreach-agent-human-tone.test.ts
           tests/revenue-domain.test.ts
           tests/revenue-persistence-security.test.ts
           tests/revenue-live-domain.test.ts
