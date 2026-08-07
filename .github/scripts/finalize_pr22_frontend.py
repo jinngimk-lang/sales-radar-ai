@@ -65,8 +65,8 @@ replace_once(
 
 replace_once(
     'src/features/market-intelligence/MarketBrowserWorkspace.tsx',
-    "title={count === 0 ? '该分类暂无结果' : `筛选 ${label}`}\n",
-    "title={count === 0 ? '本次扫描没有该类来源' : `筛选 ${label}`}\n",
+    "                  aria-pressed={activeSourceType === sourceType}\n                  className={cn(\n",
+    "                  aria-pressed={activeSourceType === sourceType}\n                  title={count === 0 ? '本次扫描没有该类来源' : `筛选 ${meta.label}`}\n                  className={cn(\n",
 )
 replace_once(
     'src/features/market-intelligence/MarketBrowserWorkspace.tsx',
