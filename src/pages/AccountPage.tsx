@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Bot,
@@ -9,6 +9,7 @@ import {
   Globe2,
   Loader2,
   Radar,
+  RefreshCw,
   Search,
   Settings2,
   ShieldCheck,
@@ -19,15 +20,39 @@ import {
 import type { RuntimeCapabilities, RuntimeCapability } from '@/types'
 import { getRuntimeCapabilities } from '@/services/api'
 
+const UNAVAILABLE_CAPABILITY: RuntimeCapability = {
+  enabled: false,
+  provider: null,
+  model: null,
+  reason: 'missing_api_key',
+}
+
 export function AccountPage() {
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadCapabilities = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await getRuntimeCapabilities()
+      setCapabilities(normalizeRuntimeCapabilities(result))
+    } catch (requestError) {
+      setCapabilities(null)
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : '暂时无法读取运行配置。',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    getRuntimeCapabilities()
-      .then(setCapabilities)
-      .catch(() => setFailed(true))
-  }, [])
+    void loadCapabilities()
+  }, [loadCapabilities])
 
   return (
     <div className="workspace-page max-w-6xl pb-12">
@@ -57,25 +82,49 @@ export function AccountPage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
         <section className="workspace-panel p-6">
-          <div>
-            <h2 className="text-base font-semibold text-ink-900">运行能力</h2>
-            <p className="mt-1 text-sm text-ink-500">只展示服务端实际配置状态，不读取或显示密钥内容。</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-ink-900">运行能力</h2>
+              <p className="mt-1 text-sm text-ink-500">只展示服务端实际配置状态，不读取或显示密钥内容。</p>
+            </div>
+            {!loading ? (
+              <button
+                type="button"
+                onClick={() => void loadCapabilities()}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-2 text-xs font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-700"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                重新读取服务状态
+              </button>
+            ) : null}
           </div>
-          {failed ? (
-            <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">暂时无法读取运行配置。</div>
-          ) : !capabilities ? (
-            <div className="mt-8 flex items-center gap-2 text-sm text-ink-500"><Loader2 className="h-4 w-4 animate-spin" /> 正在读取服务状态…</div>
-          ) : (
+
+          {error ? (
+            <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4">
+              <p className="text-sm font-semibold text-rose-800">暂时无法读取运行配置</p>
+              <p className="mt-1 text-xs leading-5 text-rose-700">{error}</p>
+              <button
+                type="button"
+                onClick={() => void loadCapabilities()}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-800"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                重新读取服务状态
+              </button>
+            </div>
+          ) : loading ? (
+            <div className="mt-8 flex items-center gap-2 text-sm text-ink-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> 正在读取服务状态…
+            </div>
+          ) : capabilities ? (
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <CapabilityCard icon={Globe2} title="市场联网研究" capability={capabilities.marketResearch} />
               <CapabilityCard icon={Bot} title="AI 个性化话术" capability={capabilities.salesAI} />
-              {capabilities.salesAgent ? (
-                <CapabilityCard icon={Bot} title="GPT 销售执行器" capability={capabilities.salesAgent} />
-              ) : null}
+              <CapabilityCard icon={Bot} title="GPT 销售执行器" capability={capabilities.salesAgent} />
               <CapabilityCard icon={Users} title="公开联系人抓取" capability={capabilities.publicContactDiscovery} />
               <CapabilityCard icon={Search} title="销售机会搜索" capability={capabilities.salesDiscovery} />
             </div>
-          )}
+          ) : null}
         </section>
 
         <section className="workspace-panel p-6">
@@ -129,18 +178,46 @@ export function AccountPage() {
   )
 }
 
-function CapabilityCard({ icon: Icon, title, capability }: { icon: typeof Bot; title: string; capability: RuntimeCapability }) {
+export function normalizeRuntimeCapabilities(
+  value: Partial<RuntimeCapabilities> | null | undefined,
+): RuntimeCapabilities {
+  return {
+    marketResearch: value?.marketResearch ?? UNAVAILABLE_CAPABILITY,
+    salesAI: value?.salesAI ?? UNAVAILABLE_CAPABILITY,
+    salesAgent: value?.salesAgent ?? UNAVAILABLE_CAPABILITY,
+    publicContactDiscovery:
+      value?.publicContactDiscovery ?? UNAVAILABLE_CAPABILITY,
+    salesDiscovery: value?.salesDiscovery ?? UNAVAILABLE_CAPABILITY,
+  }
+}
+
+function CapabilityCard({
+  icon: Icon,
+  title,
+  capability,
+}: {
+  icon: typeof Bot
+  title: string
+  capability?: RuntimeCapability
+}) {
+  const reported = capability ?? UNAVAILABLE_CAPABILITY
   return (
     <div className="rounded-2xl border border-ink-200 bg-ink-50/55 p-4">
       <div className="flex items-start justify-between gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-brand-700 ring-1 ring-ink-100"><Icon className="h-4 w-4" /></span>
-        <span className={capability.enabled ? 'text-emerald-600' : 'text-amber-600'}>
-          {capability.enabled ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-brand-700 ring-1 ring-ink-100">
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className={reported.enabled ? 'text-emerald-600' : 'text-amber-600'}>
+          {reported.enabled ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
         </span>
       </div>
       <h3 className="mt-3 text-sm font-semibold text-ink-900">{title}</h3>
       <p className="mt-1 text-xs text-ink-500">
-        {capability.enabled ? `${capability.provider}${capability.model ? ` · ${capability.model}` : ''}` : '尚未配置服务端凭据'}
+        {!capability
+          ? '尚未报告运行状态'
+          : reported.enabled
+            ? `${reported.provider ?? '已连接'}${reported.model ? ` · ${reported.model}` : ''}`
+            : '尚未配置服务端凭据'}
       </p>
     </div>
   )
