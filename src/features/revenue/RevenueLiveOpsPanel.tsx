@@ -435,13 +435,6 @@ function LiveHeading({ active = false }: { active?: boolean }) {
   )
 }
 
-function TrustItem({ label }: { label: string }) {
-  return (
-    <span className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-      <ShieldCheck className="h-4 w-4 shrink-0 text-cyan-300" /> {label}
-    </span>
-  )
-}
 
 function LiveViewEmptyState({
   configured,
