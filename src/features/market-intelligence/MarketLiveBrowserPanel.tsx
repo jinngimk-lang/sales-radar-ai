@@ -16,10 +16,18 @@ export function MarketLiveBrowserPanel({
   const [result, setResult] = useState<MarketLiveBrowserResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const runId = result?.run.id ?? result?.run.runId ?? result?.liveView?.runId ?? null
-  const liveViewUrl = result?.liveView?.liveViewUrl ?? null
+  const runId = result?.run.runId ?? result?.run.id ?? null
+  const liveViewUrl =
+    result?.liveView?.debuggerFullscreenUrl ??
+    result?.liveView?.debuggerUrl ??
+    result?.liveView?.pages?.[0]?.debuggerFullscreenUrl ??
+    result?.liveView?.pages?.[0]?.debuggerUrl ??
+    null
   const running = useMemo(
-    () => ['pending', 'running', 'starting'].includes(result?.run.status?.toLowerCase() ?? ''),
+    () =>
+      ['pending', 'running', 'starting'].includes(
+        result?.run.status?.toLowerCase() ?? '',
+      ),
     [result?.run.status],
   )
 
