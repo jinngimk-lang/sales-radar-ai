@@ -12,3 +12,5 @@ This change is complete only when the pull-request CI verifies all of the follow
 - Backend Prisma validation, typecheck, tests, and build pass.
 
 The PR must not merge while any required check is missing, action-required, cancelled, or failing.
+
+Final verification rerun covers source head `67139e0a572e847c07c43ae58c9ab3a95297eaa2` plus this documentation-only trigger commit.
