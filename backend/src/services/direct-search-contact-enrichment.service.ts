@@ -1,63 +1,113 @@
 import { prisma } from '../prisma/client.js'
 import { contactDiscovery } from './contact-discovery.service.js'
 
-interface SearchTaskLeadReference {
-  id: string
+interface DiscoveredContact {
+  name?: unknown
+  email?: unknown
+  phone?: unknown
+  profileUrl?: unknown
+  [key: string]: unknown
 }
 
-export interface DirectSearchContactEnrichmentDependencies {
-  listLeads: (taskId: string) => Promise<SearchTaskLeadReference[]>
-  discover: (leadId: string) => Promise<unknown>
+export interface DirectSearchContactEnrichmentOptions {
+  discover: (leadId: string) => Promise<DiscoveredContact[]>
   concurrency?: number
 }
 
-const defaultDependencies: DirectSearchContactEnrichmentDependencies = {
-  listLeads: async (taskId) => {
-    const links = await prisma.searchTaskLead.findMany({
-      where: { searchTaskId: taskId },
-      select: { leadId: true },
-    })
-    return links.map(({ leadId }) => ({ id: leadId }))
-  },
-  discover: (leadId) => contactDiscovery.discover(leadId),
-  concurrency: 3,
+export interface DirectSearchContactEnrichmentResult {
+  attemptedLeadCount: number
+  enrichedLeadCount: number
+  observedContactCount: number
 }
 
 /**
- * Enrich every real lead linked to the current task. A broken website must
- * not discard the other task results, so failures are isolated per lead.
+ * Runs bounded public-contact discovery only when the user explicitly chose
+ * the direct global-contact search mode. Duplicate leads are processed once,
+ * and one unavailable website cannot discard the rest of the task.
  */
-export async function enrichSearchTaskContacts(
-  taskId: string,
-  dependencies: DirectSearchContactEnrichmentDependencies = defaultDependencies,
-) {
-  const leads = await dependencies.listLeads(taskId)
-  if (leads.length === 0) return
+export class DirectSearchContactEnrichmentService {
+  private readonly concurrency: number
 
-  const concurrency = Math.max(
-    1,
-    Math.min(8, Math.trunc(dependencies.concurrency ?? 3)),
-  )
-  let cursor = 0
+  constructor(private readonly options: DirectSearchContactEnrichmentOptions) {
+    this.concurrency = Math.max(
+      1,
+      Math.min(8, Math.trunc(options.concurrency ?? 3)),
+    )
+  }
 
-  const workers = Array.from(
-    { length: Math.min(concurrency, leads.length) },
-    async () => {
-      while (cursor < leads.length) {
-        const lead = leads[cursor]
-        cursor += 1
-        if (!lead) continue
-        try {
-          await dependencies.discover(lead.id)
-        } catch (error) {
-          console.warn(
-            `[DirectSearchContactEnrichment] Contact discovery skipped for lead ${lead.id}:`,
-            error instanceof Error ? error.message : 'unknown error',
-          )
+  async enrich(
+    leadIds: string[],
+    enabled: boolean,
+  ): Promise<DirectSearchContactEnrichmentResult> {
+    if (!enabled) return emptyResult()
+
+    const uniqueLeadIds = [...new Set(leadIds.map((id) => id.trim()).filter(Boolean))]
+    if (uniqueLeadIds.length === 0) return emptyResult()
+
+    let cursor = 0
+    let enrichedLeadCount = 0
+    let observedContactCount = 0
+    const workers = Array.from(
+      { length: Math.min(this.concurrency, uniqueLeadIds.length) },
+      async () => {
+        while (cursor < uniqueLeadIds.length) {
+          const leadId = uniqueLeadIds[cursor]
+          cursor += 1
+          if (!leadId) continue
+
+          try {
+            const contacts = await this.options.discover(leadId)
+            const observed = contacts.filter(hasObservedContactField)
+            if (observed.length > 0) enrichedLeadCount += 1
+            observedContactCount += observed.length
+          } catch (error) {
+            console.warn(
+              `[DirectSearchContactEnrichment] Contact discovery skipped for lead ${leadId}:`,
+              error instanceof Error ? error.message : 'unknown error',
+            )
+          }
         }
-      }
-    },
-  )
+      },
+    )
 
-  await Promise.all(workers)
+    await Promise.all(workers)
+    return {
+      attemptedLeadCount: uniqueLeadIds.length,
+      enrichedLeadCount,
+      observedContactCount,
+    }
+  }
+}
+
+const defaultService = new DirectSearchContactEnrichmentService({
+  discover: (leadId) => contactDiscovery.discover(leadId),
+  concurrency: 3,
+})
+
+export async function enrichSearchTaskContacts(taskId: string) {
+  const links = await prisma.searchTaskLead.findMany({
+    where: { searchTaskId: taskId },
+    select: { leadId: true },
+  })
+  return defaultService.enrich(
+    links.map(({ leadId }) => leadId),
+    true,
+  )
+}
+
+function hasObservedContactField(contact: DiscoveredContact) {
+  return [contact.name, contact.email, contact.phone, contact.profileUrl].some(
+    (value) =>
+      typeof value === 'string' &&
+      value.trim().length > 0 &&
+      value.trim().toLowerCase() !== 'unknown',
+  )
+}
+
+function emptyResult(): DirectSearchContactEnrichmentResult {
+  return {
+    attemptedLeadCount: 0,
+    enrichedLeadCount: 0,
+    observedContactCount: 0,
+  }
 }
