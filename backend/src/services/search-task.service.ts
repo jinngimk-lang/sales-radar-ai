@@ -31,6 +31,7 @@ import {
 } from './provider-health.service.js'
 import { radarAssessmentPersistence } from './radar-assessment-persistence.service.js'
 import type { SearchProvider } from '../providers/search/search-provider.interface.js'
+import { enrichSearchTaskContacts } from './direct-search-contact-enrichment.service.js'
 
 export type { SearchProductContext } from '../contracts/product-context.contract.js'
 
@@ -46,6 +47,8 @@ export interface CreateSearchTaskInput {
   regions: Region[]
   productContextSnapshot?: ProductContextSnapshot
   searchIntentSnapshot?: SearchIntentSnapshot
+  includePublicContacts?: boolean
+  maxResults?: number
 }
 
 export async function createSearchTask(input: CreateSearchTaskInput) {
@@ -60,13 +63,15 @@ export async function createSearchTask(input: CreateSearchTaskInput) {
       regions: input.regions,
       provider: 'agent-reach',
       status: 'PENDING',
-      parameters: input.productContextSnapshot || input.searchIntentSnapshot
-        ? toSafeJson({
-            productContext: input.productContextSnapshot?.context,
-            productContextSnapshot: input.productContextSnapshot,
-            searchIntentSnapshot: input.searchIntentSnapshot,
-          })
-        : undefined,
+      parameters: toSafeJson({
+        productContext: input.productContextSnapshot?.context,
+        productContextSnapshot: input.productContextSnapshot,
+        searchIntentSnapshot: input.searchIntentSnapshot,
+        searchOptions: {
+          includePublicContacts: input.includePublicContacts === true,
+          maxResults: input.maxResults,
+        },
+      }),
     },
   })
 }
@@ -139,12 +144,14 @@ export async function processSearchTask(
     }
 
     const provider = dependencies.resolveProvider(task.provider)
+    const searchOptions = readSearchOptions(task.parameters)
     const providerResults = await searchProviderWithRetry(
       provider,
       {
         keyword: task.keyword,
         platforms: task.platforms,
         regions: task.regions,
+        maxResults: searchOptions.maxResults,
       },
       dependencies.waitForProviderRetry,
     )
@@ -395,6 +402,10 @@ export async function processSearchTask(
       }
     }
 
+    if (searchOptions.includePublicContacts) {
+      await enrichSearchTaskContacts(task.id)
+    }
+
     console.info(
       `[SearchTaskService] ${provider.name} task outcome: adapterResults=${providerResults.length}, evidence=${providerResults.length}, radarAssessments=${radarAssessmentCount}, marketSignals=${marketSignalCount}, opportunities=${opportunityCount}, displayedLeads=${displayedLeadCount}, qualifiedLeads=${qualifiedCount}.`,
     )
@@ -474,6 +485,25 @@ async function searchProviderWithRetry(
     'Search provider remained rate limited after retry attempts',
     provider.name,
   )
+}
+
+function readSearchOptions(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { includePublicContacts: false, maxResults: undefined as number | undefined }
+  }
+  const options = (value as Record<string, unknown>).searchOptions
+  if (!options || typeof options !== 'object' || Array.isArray(options)) {
+    return { includePublicContacts: false, maxResults: undefined as number | undefined }
+  }
+  const record = options as Record<string, unknown>
+  const maxResults = Number(record.maxResults)
+  return {
+    includePublicContacts: record.includePublicContacts === true,
+    maxResults:
+      Number.isInteger(maxResults) && maxResults >= 1 && maxResults <= 50
+        ? maxResults
+        : undefined,
+  }
 }
 
 function wait(delayMs: number) {
@@ -689,6 +719,7 @@ export async function getSearchTaskResults(
     include: {
       lead: {
         include: {
+          contacts: true,
           analyses: {
             where: { status: 'COMPLETED' },
             orderBy: { createdAt: 'desc' },

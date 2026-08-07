@@ -1,4 +1,4 @@
-import { AgentReachProvider } from './agent-reach.provider.js'
+import { DeepAgentReachProvider } from './deep-agent-reach.provider.js'
 import { MockSearchProvider } from './mock-search.provider.js'
 import type {
   SearchProvider,
@@ -6,7 +6,7 @@ import type {
 } from './search-provider.interface.js'
 
 const mockProvider = new MockSearchProvider()
-const agentReachProvider = new AgentReachProvider()
+const agentReachProvider = new DeepAgentReachProvider()
 
 export class SearchProviderFactory {
   create(name: SearchProviderName = 'mock'): SearchProvider {

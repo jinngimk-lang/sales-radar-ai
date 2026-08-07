@@ -30,6 +30,7 @@ import {
 } from '@/features/command-center/AgentConversation'
 import { CommandComposer } from '@/features/command-center/CommandComposer'
 import { IntelligenceResultGrid } from '@/features/command-center/IntelligenceResultGrid'
+import { customersToCommandSessions } from '@/features/command-center/customersToCommandSessions'
 import { cn } from '@/lib/utils'
 
 const FALLBACK_MODELS: SalesAgentModelOption[] = [
@@ -75,6 +76,8 @@ const DIRECT_SEARCH_CUSTOMER_TYPES: CustomerType[] = [
   'Individual',
 ]
 const DIRECT_SEARCH_INTENT_LEVELS: IntentLevel[] = ['high', 'medium', 'low']
+const DIRECT_SEARCH_TARGET_RESULTS = 30
+const loadAssistantLeadSessions = getChatSessions
 
 type RunningMode = 'agent' | 'search' | null
 
@@ -182,7 +185,7 @@ export function AICommandCenterPage() {
 
       setSyncingResults(true)
       try {
-        const sessions = await getChatSessions()
+        const sessions = await loadAssistantLeadSessions()
         const sessionsById = new Map(
           sessions.map((session) => [session.id, session]),
         )
@@ -234,10 +237,10 @@ export function AICommandCenterPage() {
         regions: DIRECT_SEARCH_REGIONS,
         customerTypes: DIRECT_SEARCH_CUSTOMER_TYPES,
         intentLevels: DIRECT_SEARCH_INTENT_LEVELS,
+        includePublicContacts: true,
+        maxResults: DIRECT_SEARCH_TARGET_RESULTS,
       })
-      const resultIds = new Set(execution.customers.map((customer) => customer.id))
-      const sessions = await getChatSessions()
-      const selected = sessions.filter((session) => resultIds.has(session.id))
+      const selected = customersToCommandSessions(execution.customers)
       const contactCount = selected.reduce(
         (total, session) => total + session.contacts.length,
         0,

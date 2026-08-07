@@ -92,6 +92,8 @@ export function buildCreateSearchTaskController(
         requestedRegions.length > 0 ? requestedRegions : inferredRegion,
       productContextSnapshot,
       searchIntentSnapshot,
+      includePublicContacts: request.body?.includePublicContacts === true,
+      maxResults: readSearchResultLimit(request.body?.maxResults),
     })
 
     scheduler(task.id)
@@ -221,6 +223,18 @@ function strategyProductContext(
     businessProblem: known(strategy.intent.businessProblem),
     buyingSignals: strategy.intent.buyingSignals,
   }
+}
+
+function readSearchResultLimit(value: unknown) {
+  if (value === undefined || value === null || value === '') return undefined
+  if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > 50) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'maxResults must be an integer between 1 and 50',
+    )
+  }
+  return Number(value)
 }
 
 function readOptionalString(value: unknown, fieldName: string) {

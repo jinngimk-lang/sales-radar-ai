@@ -26,6 +26,7 @@ import {
   type AgentWorkspaceStatus,
 } from '@/components/ui/WorkspaceState'
 import { cn } from '@/lib/utils'
+import { MarketLiveBrowserPanel } from './MarketLiveBrowserPanel'
 import {
   MARKET_WORKSPACE_HEIGHT,
   SIGNAL_META,
@@ -216,6 +217,9 @@ export function MarketBrowserWorkspace({
                   key={sourceType}
                   type="button"
                   onClick={() => selectSourceType(sourceType)}
+                  disabled={count === 0}
+                  aria-pressed={activeSourceType === sourceType}
+                  title={count === 0 ? '本次扫描没有该类来源' : `筛选 ${meta.label}`}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-medium transition',
                     activeSourceType === sourceType
@@ -436,11 +440,22 @@ function BrowserContent({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden">
         {view === 'live' ? (
-          <LiveWebPreview
-            url={url}
-            title={title}
-            onFallbackToSummary={() => onViewChange('summary')}
-          />
+          <div className="flex h-full min-h-0 flex-col">
+            <MarketLiveBrowserPanel
+              query={title}
+              sourceUrl={url}
+            />
+            <div className="shrink-0 border-b border-ink-200 bg-amber-50 px-4 py-1.5 text-[9px] font-medium text-amber-700">
+              网页快照（不可交互）· 仅用于交互式云浏览器不可用时核对来源
+            </div>
+            <div className="min-h-0 flex-1">
+              <LiveWebPreview
+                url={url}
+                title={title}
+                onFallbackToSummary={() => onViewChange('summary')}
+              />
+            </div>
+          </div>
         ) : (
           <div className="h-full overflow-x-hidden overflow-y-auto scrollbar-thin">
             {source && session ? (
@@ -612,7 +627,7 @@ function LiveWebPreview({
 
         <div className="pointer-events-none sticky bottom-3 z-10 mx-auto w-fit rounded-full border border-ink-200 bg-white/95 px-3 py-1.5 text-center text-[9px] text-ink-500 shadow-sm backdrop-blur">
           {media.type === 'page'
-            ? '网页快照已按完整桌面宽度适配；上下滚动查看页面'
+            ? '不可交互网页快照已按桌面宽度适配；上下滚动仅用于核对公开页面'
             : '页面按 1440px 桌面宽度完整缩放；上下滚动查看内容，左右两端保持可见'}
         </div>
       </div>

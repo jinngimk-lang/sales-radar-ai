@@ -6,6 +6,8 @@ export interface SearchProviderInput {
   keyword: string
   platforms: Platform[]
   regions: Region[]
+  /** Requested result target. Providers may split it into bounded upstream batches. */
+  maxResults?: number
 }
 
 /**
