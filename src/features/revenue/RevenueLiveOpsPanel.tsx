@@ -11,7 +11,6 @@ import {
   Play,
   Radio,
   RefreshCw,
-  ShieldCheck,
   Signal,
   UnlockKeyhole,
   WifiOff,
