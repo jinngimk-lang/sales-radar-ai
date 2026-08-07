@@ -20,6 +20,11 @@ export interface DirectSearchContactEnrichmentResult {
   observedContactCount: number
 }
 
+export interface SearchTaskContactEnrichmentScheduleOptions {
+  schedule?: (job: () => void) => void
+  enrich?: (taskId: string) => Promise<DirectSearchContactEnrichmentResult>
+}
+
 /**
  * Runs bounded public-contact discovery only when the user explicitly chose
  * the direct global-contact search mode. Duplicate leads are processed once,
@@ -96,6 +101,39 @@ export async function enrichSearchTaskContacts(taskId: string) {
     links.map(({ leadId }) => leadId),
     true,
   )
+}
+
+/**
+ * Contact enrichment is intentionally detached from SearchTask completion.
+ * Core public-source results should become visible as soon as they are stored;
+ * slower website/contact discovery can continue in the same worker afterward.
+ */
+export function scheduleSearchTaskContactEnrichment(
+  taskId: string,
+  enabled: boolean,
+  options: SearchTaskContactEnrichmentScheduleOptions = {},
+): boolean {
+  if (!enabled) return false
+
+  const schedule = options.schedule ?? ((job: () => void) => setImmediate(job))
+  const enrich = options.enrich ?? enrichSearchTaskContacts
+
+  schedule(() => {
+    void enrich(taskId)
+      .then((result) => {
+        console.info(
+          `[DirectSearchContactEnrichment] Background enrichment completed: task=${taskId}, attempted=${result.attemptedLeadCount}, enriched=${result.enrichedLeadCount}, observedContacts=${result.observedContactCount}.`,
+        )
+      })
+      .catch((error: unknown) => {
+        console.warn(
+          `[DirectSearchContactEnrichment] Background enrichment failed for task ${taskId}:`,
+          error instanceof Error ? error.message : 'unknown error',
+        )
+      })
+  })
+
+  return true
 }
 
 function isDiscoveredContact(value: unknown): value is DiscoveredContact {
