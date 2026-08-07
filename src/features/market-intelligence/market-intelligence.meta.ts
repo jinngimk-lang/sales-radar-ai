@@ -9,8 +9,9 @@ import {
 } from 'lucide-react'
 import type { MarketSignalType } from '@/types'
 
-/** Shared height keeps the browser and timeline visually aligned. */
-export const MARKET_WORKSPACE_HEIGHT = 'h-[760px]'
+/** Keep browser and timeline aligned while giving Live View a useful desktop viewport. */
+export const MARKET_WORKSPACE_HEIGHT =
+  'h-[calc(100vh-200px)] min-h-[760px] max-h-[980px]'
 
 export const SIGNAL_META: Record<
   MarketSignalType,
