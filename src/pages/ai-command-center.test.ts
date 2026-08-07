@@ -26,6 +26,16 @@ test('primary navigation contains only the four product workspaces', async () =>
   assert.doesNotMatch(layout, /销售机会中心|AI 销售助手/)
 })
 
+test('AI home keeps a concise profit-first prompt and a black Agent primary action', async () => {
+  const page = await readSource('./AICommandCenterPage.tsx')
+  const composer = await readSource('../features/command-center/CommandComposer.tsx')
+
+  assert.match(page, /准备好赚钱了吗？/)
+  assert.doesNotMatch(page, /今天要研究什么？/)
+  assert.match(composer, /bg-ink-950[^\n]*text-white/)
+  assert.match(composer, /\{runningMode === 'agent' \? '执行中' : 'Agent'\}/)
+})
+
 test('AI home renders one command composer, tool trace, and source-backed entity results', async () => {
   const page = await readSource('./AICommandCenterPage.tsx')
   const resultCard = await readSource(

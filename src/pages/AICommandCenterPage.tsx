@@ -325,7 +325,7 @@ export function AICommandCenterPage() {
         {!hasWorkspaceActivity ? (
           <section className="mx-auto w-full max-w-3xl">
             <h1 className="mb-8 text-center text-2xl font-medium tracking-[-0.035em] text-ink-950 sm:text-[32px]">
-              今天要研究什么？
+              准备好赚钱了吗？
             </h1>
             <CommandComposer
               value={input}

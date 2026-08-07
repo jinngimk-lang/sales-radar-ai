@@ -20,6 +20,11 @@ export interface DirectSearchContactEnrichmentResult {
   observedContactCount: number
 }
 
+export interface SearchTaskContactEnrichmentScheduleOptions {
+  schedule?: (job: () => void) => void
+  enrich?: (taskId: string) => Promise<DirectSearchContactEnrichmentResult>
+}
+
 /**
  * Runs bounded public-contact discovery only when the user explicitly chose
  * the direct global-contact search mode. Duplicate leads are processed once,
@@ -87,7 +92,7 @@ const defaultService = new DirectSearchContactEnrichmentService({
   concurrency: 3,
 })
 
-export async function enrichSearchTaskContacts(taskId: string) {
+async function runSearchTaskContactEnrichment(taskId: string) {
   const links = await prisma.searchTaskLead.findMany({
     where: { searchTaskId: taskId },
     select: { leadId: true },
@@ -96,6 +101,44 @@ export async function enrichSearchTaskContacts(taskId: string) {
     links.map(({ leadId }) => leadId),
     true,
   )
+}
+
+/**
+ * Compatibility entrypoint used by SearchTaskService. It deliberately resolves
+ * immediately after queueing the slower website/contact pass so core search
+ * results can reach the UI without waiting for every public site to finish.
+ */
+export async function enrichSearchTaskContacts(taskId: string) {
+  scheduleSearchTaskContactEnrichment(taskId, true)
+  return emptyResult()
+}
+
+export function scheduleSearchTaskContactEnrichment(
+  taskId: string,
+  enabled: boolean,
+  options: SearchTaskContactEnrichmentScheduleOptions = {},
+): boolean {
+  if (!enabled) return false
+
+  const schedule = options.schedule ?? ((job: () => void) => setImmediate(job))
+  const enrich = options.enrich ?? runSearchTaskContactEnrichment
+
+  schedule(() => {
+    void enrich(taskId)
+      .then((result) => {
+        console.info(
+          `[DirectSearchContactEnrichment] Background enrichment completed: task=${taskId}, attempted=${result.attemptedLeadCount}, enriched=${result.enrichedLeadCount}, observedContacts=${result.observedContactCount}.`,
+        )
+      })
+      .catch((error: unknown) => {
+        console.warn(
+          `[DirectSearchContactEnrichment] Background enrichment failed for task ${taskId}:`,
+          error instanceof Error ? error.message : 'unknown error',
+        )
+      })
+  })
+
+  return true
 }
 
 function isDiscoveredContact(value: unknown): value is DiscoveredContact {

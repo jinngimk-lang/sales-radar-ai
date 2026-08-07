@@ -1,0 +1,135 @@
+name: Production Action Smoke
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+  schedule:
+    - cron: '23 */12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  action-smoke:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PRODUCTION_BASE_URL: https://sales-radar-ai.vercel.app
+    steps:
+      - name: Verify real production search and Agent runtime
+        shell: bash
+        run: |
+          node <<'NODE'
+          const baseUrl = process.env.PRODUCTION_BASE_URL.replace(/\/+$/, '')
+
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+          async function request(path, init = {}) {
+            const response = await fetch(`${baseUrl}${path}`, {
+              ...init,
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                ...(init.headers ?? {}),
+              },
+            })
+            const text = await response.text()
+            let payload = null
+            try {
+              payload = text ? JSON.parse(text) : null
+            } catch {
+              payload = { raw: text.slice(0, 500) }
+            }
+            if (!response.ok) {
+              throw new Error(`${init.method ?? 'GET'} ${path} -> ${response.status}: ${JSON.stringify(payload)}`)
+            }
+            return payload
+          }
+
+          async function waitForProduction() {
+            let lastError
+            for (let attempt = 1; attempt <= 18; attempt += 1) {
+              try {
+                const health = await request('/api/health')
+                if (health?.status === 'ok') return
+              } catch (error) {
+                lastError = error
+              }
+              await sleep(10_000)
+            }
+            throw lastError ?? new Error('Production health never became ready')
+          }
+
+          await waitForProduction()
+
+          const providerHealth = await request('/api/search/providers/health')
+          if (providerHealth?.data?.state !== 'AVAILABLE') {
+            throw new Error(`Search provider is not AVAILABLE: ${JSON.stringify(providerHealth?.data)}`)
+          }
+
+          const created = await request('/api/search-task', {
+            method: 'POST',
+            body: JSON.stringify({
+              keyword: 'industrial automation companies Thailand',
+              platforms: ['Website'],
+              regions: ['SoutheastAsia'],
+              includePublicContacts: false,
+              maxResults: 1,
+            }),
+          })
+          const taskId = created?.data?.id
+          if (!taskId) throw new Error(`Search task did not return an id: ${JSON.stringify(created)}`)
+
+          let task
+          for (let attempt = 1; attempt <= 60; attempt += 1) {
+            const current = await request(`/api/search-task/${encodeURIComponent(taskId)}`)
+            task = current?.data
+            if (task?.status === 'COMPLETED') break
+            if (task?.status === 'FAILED' || task?.status === 'CANCELLED') {
+              throw new Error(
+                `Production search ${task.status}: ${task.errorCode ?? 'UNKNOWN'} ${task.errorMessage ?? ''}`,
+              )
+            }
+            await sleep(2_000)
+          }
+          if (task?.status !== 'COMPLETED') {
+            throw new Error(`Production search timed out in state ${task?.status ?? 'UNKNOWN'}`)
+          }
+
+          const results = await request(`/api/search-task/${encodeURIComponent(taskId)}/results`)
+          const resultCount = Array.isArray(results?.data) ? results.data.length : 0
+          if (resultCount < 1) {
+            throw new Error('Production search completed but returned zero visible results')
+          }
+          console.log(`Search smoke OK: task=${taskId}, results=${resultCount}`)
+
+          const capabilities = await request('/api/health/capabilities')
+          const agent = capabilities?.data?.salesAgent
+          const verificationStatus = agent?.verification?.status ?? 'unknown'
+          if (!agent?.enabled || verificationStatus !== 'ok') {
+            console.log(
+              `::warning::Agent runtime is not verified (enabled=${Boolean(agent?.enabled)}, verification=${verificationStatus}, code=${agent?.verification?.errorCode ?? 'n/a'}). Search smoke remains authoritative for this job.`,
+            )
+            process.exit(0)
+          }
+
+          const agentResult = await request('/api/assistant/agent', {
+            method: 'POST',
+            body: JSON.stringify({
+              message: '生产烟测：只回复 OK，不运行额外研究。',
+              model: agent.model,
+              history: [],
+            }),
+          })
+          if (!agentResult?.data?.message) {
+            throw new Error('Agent smoke returned no message')
+          }
+          console.log(`Agent smoke OK: model=${agentResult.data.model ?? agent.model}`)
+          NODE
