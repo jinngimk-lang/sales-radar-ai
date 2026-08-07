@@ -33,12 +33,13 @@ test('market browser keeps Live controls but removes Browserbase policy banner',
   assert.match(livePanel, /title="交互式云浏览器"/)
 })
 
-test('revenue workspace removes oversized supervision marketing copy', () => {
+test('revenue workspace removes oversized supervision marketing copy and dead helpers', () => {
   assert.match(revenuePage, /收益中心/)
   assert.doesNotMatch(revenuePage, /Revenue Supervision/)
   assert.doesNotMatch(revenuePage, /Supervision Pipeline/)
   assert.doesNotMatch(revenueLive, /自动任务保持只读，人工接管画面可以点击/)
   assert.doesNotMatch(revenueLive, /function TrustItem/)
+  assert.doesNotMatch(revenueLive, /\bShieldCheck\b/)
 })
 
 test('settings and navigation are concise and do not duplicate explanatory surfaces', () => {
