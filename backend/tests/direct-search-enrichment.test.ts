@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { DirectSearchContactEnrichmentService } from '../src/services/direct-search-contact-enrichment.service.js'
+import {
+  DirectSearchContactEnrichmentService,
+  scheduleSearchTaskContactEnrichment,
+} from '../src/services/direct-search-contact-enrichment.service.js'
 
 test('explicit direct-contact search enriches every unique lead with bounded concurrency and counts only observed contacts', async () => {
   const called: string[] = []
@@ -34,4 +38,44 @@ test('contact enrichment stays off unless the user explicitly selected global co
   const result = await service.enrich(['lead-1'], false)
   assert.equal(called, false)
   assert.equal(result.attemptedLeadCount, 0)
+})
+
+test('search-task contact enrichment is scheduled without blocking core search completion', async () => {
+  let queued: (() => void) | undefined
+  let enrichStarted = false
+
+  const scheduled = scheduleSearchTaskContactEnrichment('task-1', true, {
+    schedule: (job) => {
+      queued = job
+    },
+    enrich: async () => {
+      enrichStarted = true
+      return {
+        attemptedLeadCount: 1,
+        enrichedLeadCount: 1,
+        observedContactCount: 1,
+      }
+    },
+  })
+
+  assert.equal(scheduled, true)
+  assert.equal(enrichStarted, false)
+  assert.ok(queued)
+
+  queued()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(enrichStarted, true)
+})
+
+test('search task marks core results completed before scheduling public-contact enrichment', async () => {
+  const source = await readFile(
+    new URL('../src/services/search-task.service.ts', import.meta.url),
+    'utf8',
+  )
+  const completedIndex = source.indexOf("status: 'COMPLETED'")
+  const scheduleIndex = source.indexOf('scheduleSearchTaskContactEnrichment')
+
+  assert.ok(completedIndex >= 0)
+  assert.ok(scheduleIndex > completedIndex)
+  assert.doesNotMatch(source, /await enrichSearchTaskContacts\(task\.id\)/)
 })
