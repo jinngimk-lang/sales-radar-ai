@@ -80,7 +80,10 @@ export class DirectSearchContactEnrichmentService {
 }
 
 const defaultService = new DirectSearchContactEnrichmentService({
-  discover: (leadId) => contactDiscovery.discover(leadId),
+  discover: async (leadId) => {
+    const contacts = await contactDiscovery.discover(leadId)
+    return contacts.filter(isDiscoveredContact)
+  },
   concurrency: 3,
 })
 
@@ -93,6 +96,10 @@ export async function enrichSearchTaskContacts(taskId: string) {
     links.map(({ leadId }) => leadId),
     true,
   )
+}
+
+function isDiscoveredContact(value: unknown): value is DiscoveredContact {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
 
 function hasObservedContactField(contact: DiscoveredContact) {
