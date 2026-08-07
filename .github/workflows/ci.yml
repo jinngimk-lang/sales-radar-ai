@@ -83,6 +83,7 @@ jobs:
           tests/direct-search-enrichment.test.ts
           tests/exa-runtime-config.test.ts
           tests/market-live-browser.test.ts
+          tests/market-live-api-contract.test.ts
           tests/market-search-resilience.test.ts
           tests/openai-runtime-verifier.test.ts
           tests/openai-sales-agent.test.ts
