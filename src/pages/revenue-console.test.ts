@@ -38,14 +38,28 @@ test('revenue center separates potential rewards from confirmed revenue', () => 
   assert.match(pageSource, /不计入已确认收益/)
 })
 
-test('revenue supervision uses a compact shared header and embeds the existing dashboard after live execution', () => {
-  assert.match(operationsPageSource, /WorkspaceHeader/)
-  assert.match(operationsPageSource, /RevenueSummary/)
+test('revenue center explains how market research becomes execution and settlement', () => {
+  assert.match(operationsPageSource, /把发现推进到收入/)
+  assert.match(operationsPageSource, /发现机会/)
+  assert.match(operationsPageSource, /判断/)
+  assert.match(operationsPageSource, /Live 执行/)
+  assert.match(operationsPageSource, /结算/)
+  assert.match(operationsPageSource, /to="\/app\/market"/)
+  assert.match(operationsPageSource, /to="\/app\/home"/)
+  assert.match(operationsPageSource, /去市场雷达发现机会/)
+})
+
+test('revenue center shows real operational metrics and reveals Live Ops only on demand', () => {
+  assert.match(operationsPageSource, /可执行机会/)
+  assert.match(operationsPageSource, /执行中/)
+  assert.match(operationsPageSource, /已确认收入/)
+  assert.match(operationsPageSource, /showLiveOps/)
+  assert.match(operationsPageSource, /setShowLiveOps/)
+  assert.match(operationsPageSource, /showLiveOps\s*\?/)
   assert.match(operationsPageSource, /RevenueLiveOpsPanel/)
   assert.match(operationsPageSource, /data-revenue-dashboard-mode="embedded"/)
   assert.match(operationsPageSource, /RevenueDashboardPage/)
   assert.match(operationsPageSource, /\[&>div>div>header\]:hidden/)
-  assert.doesNotMatch(operationsPageSource, /Revenue Supervision|Supervision Pipeline/)
 })
 
 test('revenue supervision renders a real operator-gated interactive cloud browser panel', () => {
