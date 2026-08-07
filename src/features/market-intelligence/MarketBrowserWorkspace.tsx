@@ -627,7 +627,7 @@ function LiveWebPreview({
 
         <div className="pointer-events-none sticky bottom-3 z-10 mx-auto w-fit rounded-full border border-ink-200 bg-white/95 px-3 py-1.5 text-center text-[9px] text-ink-500 shadow-sm backdrop-blur">
           {media.type === 'page'
-            ? '网页快照已按完整桌面宽度适配；上下滚动查看页面'
+            ? '不可交互网页快照已按桌面宽度适配；上下滚动仅用于核对公开页面'
             : '页面按 1440px 桌面宽度完整缩放；上下滚动查看内容，左右两端保持可见'}
         </div>
       </div>
