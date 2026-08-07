@@ -1,0 +1,32 @@
+name: Clarify snapshot label
+
+on:
+  push:
+    branches:
+      - fix/market-radar-and-contact-depth
+    paths:
+      - .github/scripts/clarify_snapshot_label.py
+      - .github/workflows/clarify-snapshot-label.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/market-radar-and-contact-depth
+          fetch-depth: 0
+      - run: python3 .github/scripts/clarify_snapshot_label.py
+      - run: |
+          rm .github/scripts/clarify_snapshot_label.py
+          rm .github/workflows/clarify-snapshot-label.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: label static market preview truthfully"
+          git push origin HEAD:fix/market-radar-and-contact-depth
