@@ -199,9 +199,6 @@ export function RevenueOperationsPage() {
             className="rounded-[20px] border border-black/[0.08] bg-white px-5 py-5 text-xs leading-5 text-ink-500"
           >
             暂无机会队列或结算记录。完成真实机会判断后，这里才会出现执行状态和收益证据。
-            <span className="sr-only">
-              <RevenueDashboardPage />
-            </span>
           </div>
         )}
       </div>
