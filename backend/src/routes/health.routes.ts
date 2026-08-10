@@ -16,7 +16,9 @@ healthRouter.get('/', (_request, response) => {
 })
 
 healthRouter.get('/capabilities', (_request, response) => {
-  void openAIRuntimeVerifier.verify()
+  const agentRuntimeProvider =
+    process.env.AGENT_RUNTIME_PROVIDER?.trim().toLowerCase() || 'openai'
+  if (agentRuntimeProvider === 'openai') void openAIRuntimeVerifier.verify()
   const market = readHostedResearchConfig()
   const sales = readAIProviderConfig()
   const agent = readOpenAISalesAgentConfig()
@@ -25,7 +27,10 @@ healthRouter.get('/capabilities', (_request, response) => {
   const salesAIEnabled =
     ['qwen', 'glm', 'kimi', 'openai'].includes(sales.provider) &&
     Boolean(sales.apiKey && sales.baseUrl && sales.model)
-  const salesAgentEnabled = Boolean(agent.apiKey && agent.baseUrl && agent.model)
+  const salesAgentEnabled =
+    agentRuntimeProvider === 'livekit'
+      ? Boolean(process.env.LIVEKIT_AGENT_RUNTIME_URL?.trim())
+      : Boolean(agent.apiKey && agent.baseUrl && agent.model)
 
   response.json({
     data: {
@@ -47,11 +52,21 @@ healthRouter.get('/capabilities', (_request, response) => {
       },
       salesAgent: {
         enabled: salesAgentEnabled,
-        provider: salesAgentEnabled ? 'openai' : null,
-        model: agent.model,
+        provider: salesAgentEnabled ? agentRuntimeProvider : null,
+        model: agentRuntimeProvider === 'livekit' ? 'livekit-bridge' : agent.model,
         reason: salesAgentEnabled ? 'ready' : 'missing_api_key',
-        models: listSalesAgentModelOptions(agent),
-        verification: openaiRuntime,
+        models:
+          agentRuntimeProvider === 'openai'
+            ? listSalesAgentModelOptions(agent)
+            : [],
+        verification:
+          agentRuntimeProvider === 'openai' ? openaiRuntime : null,
+      },
+      agentRuntime: {
+        provider: agentRuntimeProvider,
+        enabled: salesAgentEnabled,
+        transport:
+          agentRuntimeProvider === 'livekit' ? 'http-bridge' : 'in-process',
       },
       publicContactDiscovery: {
         enabled: true,

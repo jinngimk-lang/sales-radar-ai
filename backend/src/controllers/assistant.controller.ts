@@ -1,9 +1,9 @@
 import type { RequestHandler } from 'express'
 import { assistantLeadService } from '../services/assistant-lead.service.js'
 import {
-  openAISalesAgent,
   type SalesAgentHistoryMessage,
 } from '../services/openai-sales-agent.service.js'
+import { agentRuntimeFactory } from '../providers/agent-runtime/agent-runtime.factory.js'
 import { AppError } from '../utils/app-error.js'
 
 interface AssistantLeadReader {
@@ -71,7 +71,7 @@ export const runSalesAgentController: RequestHandler = async (
     )
   }
 
-  const result = await openAISalesAgent.run({
+  const result = await agentRuntimeFactory.resolve().run({
     message,
     model:
       typeof request.body?.model === 'string' && request.body.model.trim()
