@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose a focused sales-intelligence capability
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Sales problem
+      description: What does a salesperson or integrator need to accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the smallest useful outcome, not only the implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Primary layer
+      options:
+        - Product intelligence
+        - Search or ingestion
+        - Evidence validation
+        - Radar or opportunity assessment
+        - Company intelligence
+        - Contact intelligence
+        - Sales action
+        - Runtime or deployment
+    validations:
+      required: true
+  - type: textarea
+    id: trust
+    attributes:
+      label: Evidence and trust boundary
+      description: Explain what is fact, assessment, recommendation and still unknown.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

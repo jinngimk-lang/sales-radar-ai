@@ -58,6 +58,21 @@ describe('Radar result grouping', () => {
 
     assert.equal(clusters[0]?.primaryAssessment.id, 'newer')
   })
+
+  it('preserves server-computed evidence quality and freshness in the source view', () => {
+    const item = assessment()
+    item.evidence.sourceTier = 'TIER_1'
+    item.evidence.freshnessStatus = 'FRESH'
+    item.evidence.qualityScore = 92
+    item.evidence.corroborationRequired = false
+
+    const [cluster] = groupRadarAssessments([item])
+
+    assert.equal(cluster?.sources[0]?.sourceTier, 'TIER_1')
+    assert.equal(cluster?.sources[0]?.freshnessStatus, 'FRESH')
+    assert.equal(cluster?.sources[0]?.qualityScore, 92)
+    assert.equal(cluster?.sources[0]?.corroborationRequired, false)
+  })
 })
 
 describe('Radar result filtering and sorting', () => {

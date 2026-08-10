@@ -8,7 +8,7 @@ export interface RevenueLiveLoopWorkerOptions {
   configured: boolean
   intervalMinutes: number
   resolveUserId(): Promise<string>
-  runNext(userId: string): Promise<unknown>
+  reconcile(userId: string): Promise<unknown>
   setIntervalImpl?: typeof setInterval
   clearIntervalImpl?: typeof clearInterval
   logger?: RevenueLiveLoopLogger
@@ -35,7 +35,7 @@ export function createRevenueLiveLoopWorker(
     running = true
     try {
       const userId = await options.resolveUserId()
-      await options.runNext(userId)
+      await options.reconcile(userId)
     } catch {
       logger.warn(
         '[revenue-live] Cloud browser loop iteration failed; details are available through the protected operations timeline.',
@@ -49,7 +49,7 @@ export function createRevenueLiveLoopWorker(
     start() {
       if (timer || !options.enabled || !options.configured) return
       logger.log(
-        `[revenue-live] Read-only cloud browser loop enabled; interval=${Math.round(intervalMilliseconds / 60_000)}m`,
+        `[revenue-live] Active-run reconciliation enabled; interval=${Math.round(intervalMilliseconds / 60_000)}m`,
       )
       void tick()
       timer = setIntervalImpl(() => {

@@ -1,0 +1,360 @@
+openapi: 3.1.0
+info:
+  title: Sales Radar AI Agent API
+  version: 0.1.0
+  description: >-
+    Authenticated, workspace-scoped API subset for evidence-backed search,
+    Radar assessment, opportunity research and sales assistance. A 202 search
+    response creates a task; it does not assert provider success.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: https://your-sales-radar-backend.example
+    description: Self-hosted backend
+security:
+  - workspaceSession: []
+paths:
+  /api/search-task:
+    post:
+      operationId: createSearchTask
+      summary: Create an asynchronous, evidence-backed search task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSearchTaskRequest'
+      responses:
+        '202':
+          description: Task accepted for asynchronous execution
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SearchTask'
+                  strategy:
+                    type: object
+                    additionalProperties: true
+                  productContext:
+                    type: object
+                    additionalProperties: true
+                  searchIntent:
+                    type: object
+                    additionalProperties: true
+        '400':
+          $ref: '#/components/responses/ApiError'
+  /api/search-task/{id}:
+    get:
+      operationId: getSearchTask
+      summary: Read task lifecycle and provider execution state
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Search task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SearchTask'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /api/search-task/{id}/results:
+    get:
+      operationId: listSearchTaskResults
+      summary: List results owned by this SearchTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task-owned real-source results; failed tasks return an empty list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListResponse'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /api/search-task/{id}/opportunities:
+    get:
+      operationId: listSearchTaskOpportunities
+      summary: List evidence-linked opportunities owned by this SearchTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Opportunity list; only EVIDENCE_LINKED records are returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListResponse'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /api/radar/assessments:
+    get:
+      operationId: listRadarAssessments
+      summary: List assessment snapshots for a SearchTask
+      parameters:
+        - name: searchTaskId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: includeBlocked
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Workspace-owned Radar assessments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListResponse'
+        '401':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /api/opportunities/{id}:
+    get:
+      operationId: getOpportunity
+      summary: Read an evidence-linked opportunity detail
+      parameters:
+        - $ref: '#/components/parameters/OpportunityId'
+      responses:
+        '200':
+          description: Opportunity detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectResponse'
+        '401':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /api/opportunities/{id}/research-trace:
+    get:
+      operationId: getOpportunityResearchTrace
+      summary: Explain the evidence-to-assessment research path
+      parameters:
+        - $ref: '#/components/parameters/OpportunityId'
+      responses:
+        '200':
+          description: User-facing research trace without prompt or secret exposure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectResponse'
+        '401':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /api/opportunities/{id}/company-intelligence/workspace:
+    get:
+      operationId: getCompanyIntelligenceWorkspace
+      summary: Read the opportunity's company research workspace
+      parameters:
+        - $ref: '#/components/parameters/OpportunityId'
+      responses:
+        '200':
+          description: Read-only company research workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectResponse'
+        '401':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+  /api/assistant/agent:
+    post:
+      operationId: runSalesAgent
+      summary: Run the configured Sales Agent with explicit user context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunSalesAgentRequest'
+      responses:
+        '200':
+          description: Agent output and tool trace from the configured runtime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectResponse'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '401':
+          $ref: '#/components/responses/ApiError'
+components:
+  securitySchemes:
+    workspaceSession:
+      type: apiKey
+      in: cookie
+      name: sales_radar_session
+      description: >-
+        Deployment-defined authenticated workspace session. The repository's
+        demo middleware is not a substitute for multi-tenant production auth.
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    OpportunityId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    CreateSearchTaskRequest:
+      type: object
+      required: [keyword]
+      properties:
+        keyword:
+          type: string
+          minLength: 1
+        productProfileId:
+          type: string
+        platforms:
+          type: array
+          items:
+            type: string
+        regions:
+          type: array
+          items:
+            type: string
+        includePublicContacts:
+          type: boolean
+          default: false
+        maxResults:
+          type: integer
+          minimum: 1
+          maximum: 50
+        productContext:
+          type: object
+          properties:
+            product:
+              type: string
+            category:
+              type: string
+            industry:
+              type: string
+            region:
+              type: string
+            country:
+              type: string
+            customerType:
+              type: string
+            businessProblem:
+              type: string
+            applications:
+              type: array
+              items:
+                type: string
+            buyingSignals:
+              type: array
+              items:
+                type: string
+            buyerKeywords:
+              type: array
+              items:
+                type: string
+            channelKeywords:
+              type: array
+              items:
+                type: string
+    SearchTask:
+      type: object
+      required: [id, keyword, status]
+      properties:
+        id:
+          type: string
+        keyword:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, RUNNING, COMPLETED, FAILED, CANCELLED]
+        provider:
+          type: string
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        resultCount:
+          type: integer
+        errorCode:
+          type: [string, 'null']
+        errorMessage:
+          type: [string, 'null']
+        parameters:
+          type: object
+          additionalProperties: true
+    RunSalesAgentRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 12000
+        model:
+          type: string
+        leadId:
+          type: string
+        history:
+          type: array
+          maxItems: 12
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role:
+                type: string
+                enum: [user, assistant]
+              content:
+                type: string
+    ObjectResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+    ListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        meta:
+          type: object
+          required: [total]
+          properties:
+            total:
+              type: integer
+              minimum: 0
+    ApiErrorBody:
+      type: object
+      additionalProperties: true
+  responses:
+    ApiError:
+      description: Structured validation, authentication, ownership or provider error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'

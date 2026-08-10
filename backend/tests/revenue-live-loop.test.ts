@@ -14,7 +14,7 @@ function createHarness(options: { enabled?: boolean; configured?: boolean } = {}
     configured: options.configured ?? true,
     intervalMinutes: 30,
     resolveUserId: async () => 'workspace-1',
-    runNext: async () => {
+    reconcile: async () => {
       runCount += 1
       await new Promise<void>((resolve) => {
         resolveRun = resolve
@@ -108,7 +108,7 @@ test('iteration failures are contained and do not crash scheduling', async () =>
     configured: true,
     intervalMinutes: 30,
     resolveUserId: async () => 'workspace-1',
-    runNext: async () => {
+    reconcile: async () => {
       throw new Error('provider unavailable with secret details')
     },
     setIntervalImpl(callback) {

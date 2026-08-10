@@ -15,6 +15,7 @@ import {
 import type { SearchProductContext } from '../contracts/product-context.contract.js'
 import { prisma } from '../prisma/client.js'
 import { AppError } from '../utils/app-error.js'
+import { evidenceRankingService } from './evidence-ranking.service.js'
 import { radarAssessment } from './radar-assessment.service.js'
 import { toSafeJson } from './safe-json.service.js'
 
@@ -48,6 +49,14 @@ export type RadarAssessmentWorkspaceItem = Omit<
     platform: Platform
     identityStatus: string
     evidenceStatus: string
+    sourceTier: 'TIER_1' | 'TIER_2' | 'TIER_3' | 'UNKNOWN'
+    sourceType: string
+    publishedAt: string | null
+    capturedAt: string
+    freshnessStatus: 'FRESH' | 'RECENT' | 'STALE' | 'UNKNOWN'
+    qualityScore: number
+    corroborationRequired: boolean
+    qualityReasons: string[]
     createdAt: Date
     updatedAt: Date
   }
@@ -238,6 +247,7 @@ export class RadarAssessmentPersistenceService {
             platform: true,
             identityStatus: true,
             evidenceStatus: true,
+            rawMetadata: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -246,12 +256,24 @@ export class RadarAssessmentPersistenceService {
     })
 
     return assessments.map(({ searchEvidence, ...assessment }) => {
-      const { content, ...evidence } = searchEvidence
+      const { content, rawMetadata, ...evidence } = searchEvidence
+      const ranking = evidenceRankingService.rank({
+        sourceUrl: evidence.rawUrl,
+        provider: evidence.provider,
+        platform: evidence.platform,
+        rawMetadata,
+        capturedAt: evidence.createdAt,
+        identityStatus: evidence.identityStatus,
+        evidenceStatus: evidence.evidenceStatus,
+      })
+      const { reasons: qualityReasons, ...rankingFields } = ranking
       return {
         ...assessment,
         evidence: {
           ...evidence,
           excerpt: evidenceExcerpt(content),
+          ...rankingFields,
+          qualityReasons,
         },
       }
     })

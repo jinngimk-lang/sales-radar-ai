@@ -28,7 +28,7 @@ export interface SalesAgentRunResult {
   message: string
   actions: SalesAgentAction[]
   leadIds: string[]
-  provider: 'openai'
+  provider: 'openai' | 'livekit'
   model: string
   traceId: string
   requiresApproval: boolean

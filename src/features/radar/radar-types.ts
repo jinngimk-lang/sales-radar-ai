@@ -46,6 +46,10 @@ export interface RadarClusterSource {
   provider: string
   identityStatus: string | null
   evidenceStatus: string | null
+  sourceTier: RadarAssessment['evidence']['sourceTier']
+  freshnessStatus: RadarAssessment['evidence']['freshnessStatus']
+  qualityScore: number | null
+  corroborationRequired: boolean
   publishedAt: string | null
   createdAt: string
   assessmentIds: string[]
