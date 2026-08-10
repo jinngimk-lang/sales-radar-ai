@@ -229,10 +229,11 @@ export class RevenueLiveService {
     }
   }
 
-  async runNextEligibleOpportunity(userId: string) {
-    const existing = await this.persistence.getActiveRun(userId)
-    if (existing && isActiveStatus(existing.status)) return this.getStatus(userId)
-    return this.startRun(userId)
+  async reconcileActiveRun(userId: string) {
+    // Background work may observe an explicitly started run, but it must never
+    // create a new external browser session. POST /api/revenue/live/runs is the
+    // sole entry point that authorizes provider execution.
+    return this.getStatus(userId)
   }
 
   private emptyStatus() {

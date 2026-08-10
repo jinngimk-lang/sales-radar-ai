@@ -136,6 +136,15 @@ test('starts a server-generated read-only run for an owned opportunity', async (
   assert.match(harness.providerTasks[0] ?? '', /https:\/\/example\.com\/bounty/)
 })
 
+test('background reconciliation never starts an eligible opportunity', async () => {
+  const harness = createHarness()
+
+  const status = await harness.service.reconcileActiveRun('workspace-1')
+
+  assert.equal(status.run, null)
+  assert.equal(harness.providerTasks.length, 0)
+})
+
 test('rejects a second active run', async () => {
   const harness = createHarness()
   harness.setActiveRun({ id: 'existing', status: 'RUNNING' })

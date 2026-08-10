@@ -75,7 +75,7 @@ export function createProductionRevenueLiveLoop(
     configured: config.providerConfigured,
     intervalMinutes: config.loopIntervalMinutes,
     resolveUserId: async () => (await ensureDemoUser()).id,
-    runNext: (userId) => revenueLiveService.runNextEligibleOpportunity(userId),
+    reconcile: (userId) => revenueLiveService.reconcileActiveRun(userId),
     logger,
   })
 }
