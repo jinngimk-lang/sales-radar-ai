@@ -293,4 +293,55 @@ describe('SearchTask provider health execution boundary', () => {
       stored.searchEvidence[0]?.id,
     )
   })
+
+  it('uses optional grounded page content while preserving the search provider identity', async () => {
+    const task = await createSearchTask({
+      userId,
+      keyword: `content-acquisition-${suffix}`,
+      platforms: [Platform.Website],
+      regions: [Region.Europe],
+    })
+    taskIds.push(task.id)
+    const dependencies: SearchTaskExecutionDependencies = {
+      checkProviderHealth: async () => providerHealth('AVAILABLE', 'OK'),
+      resolveProvider: () => ({
+        name: 'agent-reach',
+        search: async () => [{
+          externalId: `content-acquisition-${suffix}`,
+          platform: Platform.Website,
+          sourceUrl: `https://example.com/content-acquisition/${suffix}`,
+          profileUrl: `https://example.com/content-acquisition/${suffix}`,
+          company: 'Evidence Manufacturing GmbH',
+          customerName: 'Evidence Manufacturing GmbH',
+          country: 'Germany',
+          region: Region.Europe,
+          industry: Industry.IndustrialManufacturing,
+          rawContent: 'Short search snippet.',
+          metadata: { title: 'Original search title' },
+        }],
+      }),
+      enrichContent: async (input) => ({
+        ...input,
+        title: 'Verified official announcement',
+        content: 'Verified official page content about a factory expansion and its project timeline.',
+        metadata: {
+          ...input.metadata,
+          contentAcquisition: 'ENRICHED',
+          contentAcquisitionProvider: 'crawl4ai',
+        },
+        status: 'ENRICHED',
+      }),
+    }
+
+    await processSearchTask(task.id, dependencies)
+
+    const evidence = await prisma.searchEvidence.findFirstOrThrow({
+      where: { searchTaskId: task.id },
+    })
+    const metadata = evidence.rawMetadata as Record<string, unknown>
+    assert.equal(evidence.provider, 'agent-reach')
+    assert.equal(evidence.title, 'Verified official announcement')
+    assert.match(evidence.content, /official page content/)
+    assert.equal(metadata.contentAcquisitionProvider, 'crawl4ai')
+  })
 })

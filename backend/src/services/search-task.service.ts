@@ -32,6 +32,11 @@ import {
 import { radarAssessmentPersistence } from './radar-assessment-persistence.service.js'
 import type { SearchProvider } from '../providers/search/search-provider.interface.js'
 import { enrichSearchTaskContacts } from './direct-search-contact-enrichment.service.js'
+import {
+  contentAcquisitionService,
+  type ContentEnrichmentInput,
+  type ContentEnrichmentResult,
+} from './content-acquisition.service.js'
 
 export type { SearchProductContext } from '../contracts/product-context.contract.js'
 
@@ -85,6 +90,9 @@ export interface SearchTaskExecutionDependencies {
     userId: string
     searchEvidenceId: string
   }) => Promise<unknown>
+  enrichContent?: (
+    input: ContentEnrichmentInput,
+  ) => Promise<ContentEnrichmentResult>
   waitForProviderRetry?: (delayMs: number) => Promise<void>
 }
 
@@ -96,6 +104,7 @@ const defaultExecutionDependencies: SearchTaskExecutionDependencies = {
   resolveProvider: (provider) => searchProviderFactory.resolve(provider),
   persistRadarAssessment: (input) =>
     radarAssessmentPersistence.createForEvidence(input),
+  enrichContent: (input) => contentAcquisitionService.enrich(input),
 }
 
 export async function processSearchTask(
@@ -166,16 +175,30 @@ export async function processSearchTask(
     let radarAssessmentCount = 0
 
     for (const result of providerResults) {
-      const title =
+      const originalTitle =
         typeof result.metadata.title === 'string'
           ? result.metadata.title.trim()
           : null
+      const enriched = await (
+        dependencies.enrichContent ?? defaultExecutionDependencies.enrichContent!
+      )({
+        url: result.sourceUrl,
+        title: originalTitle,
+        content: result.rawContent,
+        metadata: result.metadata,
+      })
+      const effectiveResult: SearchResult = {
+        ...result,
+        rawContent: enriched.content,
+        metadata: enriched.metadata,
+      }
+      const title = enriched.title
       const evidenceMetadata = toSafeJson({
-        ...result.metadata,
-        customerName: result.customerName,
-        country: result.country,
-        region: result.region,
-        industry: result.industry,
+        ...effectiveResult.metadata,
+        customerName: effectiveResult.customerName,
+        country: effectiveResult.country,
+        region: effectiveResult.region,
+        industry: effectiveResult.industry,
       })
       const evidence = await prisma.searchEvidence.upsert({
         where: {
@@ -188,22 +211,22 @@ export async function processSearchTask(
         create: {
           searchTaskId: task.id,
           provider: provider.name,
-          externalId: result.externalId,
-          platform: result.platform,
-          rawUrl: sanitizeProviderString(result.sourceUrl),
-          profileUrl: sanitizeProviderString(result.profileUrl),
+          externalId: effectiveResult.externalId,
+          platform: effectiveResult.platform,
+          rawUrl: sanitizeProviderString(effectiveResult.sourceUrl),
+          profileUrl: sanitizeProviderString(effectiveResult.profileUrl),
           title: title ? sanitizeProviderString(title) : null,
-          content: sanitizeProviderString(result.rawContent),
+          content: sanitizeProviderString(effectiveResult.rawContent),
           rawMetadata: evidenceMetadata,
           extractionStatus: SearchEvidenceExtractionStatus.PENDING,
           qualificationVersion: CURRENT_QUALIFICATION_VERSION,
         },
         update: {
-          platform: result.platform,
-          rawUrl: sanitizeProviderString(result.sourceUrl),
-          profileUrl: sanitizeProviderString(result.profileUrl),
+          platform: effectiveResult.platform,
+          rawUrl: sanitizeProviderString(effectiveResult.sourceUrl),
+          profileUrl: sanitizeProviderString(effectiveResult.profileUrl),
           title: title ? sanitizeProviderString(title) : null,
-          content: sanitizeProviderString(result.rawContent),
+          content: sanitizeProviderString(effectiveResult.rawContent),
           rawMetadata: evidenceMetadata,
           extractionStatus: SearchEvidenceExtractionStatus.PENDING,
           qualificationVersion: CURRENT_QUALIFICATION_VERSION,
@@ -223,7 +246,7 @@ export async function processSearchTask(
       const marketSignals = await captureMarketSignalsSafely({
         userId: task.userId,
         provider: provider.name,
-        result,
+        result: effectiveResult,
       })
       marketSignalCount += marketSignals.length
 
@@ -234,7 +257,7 @@ export async function processSearchTask(
             searchTaskId: task.id,
             searchEvidenceId: evidence.id,
             providerName: provider.name,
-            result,
+            result: effectiveResult,
             title,
             rawMetadata: evidenceMetadata,
             productContext,
@@ -250,11 +273,11 @@ export async function processSearchTask(
 
       try {
         const evaluation = searchEvidencePipeline.evaluate(
-          result,
+          effectiveResult,
           productContext,
         )
         const qualifiedResult = searchEvidencePipeline.qualifyResult(
-          result,
+          effectiveResult,
           evaluation,
         )
 
@@ -262,7 +285,7 @@ export async function processSearchTask(
         // evidence and relevance remain explicit labels instead of silently
         // removing people who do not have a company domain.
         const lead = leadNormalizer.normalize(
-          qualifiedResult ?? result,
+          qualifiedResult ?? effectiveResult,
           provider.name,
         )
         const isQualified = Boolean(qualifiedResult)
