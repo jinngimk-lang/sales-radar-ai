@@ -53,8 +53,8 @@ export class ContentAcquisitionService {
         content: acquired.content,
         metadata: {
           ...input.metadata,
-          ...acquired.metadata,
-          publishedAt: acquired.publishedAt ?? input.metadata.publishedAt,
+          publishedAt: input.metadata.publishedAt ?? acquired.publishedAt,
+          contentAcquisitionMetadata: acquired.metadata,
           contentAcquisition: 'ENRICHED',
           contentAcquisitionProvider: this.provider.name,
           contentHash: acquired.contentHash,

@@ -1,6 +1,7 @@
 import { openAISalesAgent } from '../../services/openai-sales-agent.service.js'
 import type { AgentRuntime } from './agent-runtime.interface.js'
 import { LiveKitAgentRuntime } from './livekit-agent.runtime.js'
+import { AppError } from '../../utils/app-error.js'
 
 interface AgentRuntimeFactoryOptions {
   openai?: AgentRuntime
@@ -23,10 +24,20 @@ export class AgentRuntimeFactory {
     const provider = environment.AGENT_RUNTIME_PROVIDER?.trim().toLowerCase() || 'openai'
     if (provider === 'openai') return this.openai
     if (provider === 'livekit') {
-      if (!this.livekit) throw new Error('LiveKit agent runtime is not configured')
+      if (!this.livekit) {
+        throw new AppError(
+          503,
+          'AGENT_RUNTIME_NOT_CONFIGURED',
+          'Sales Agent runtime is not configured',
+        )
+      }
       return this.livekit
     }
-    throw new Error(`Unsupported agent runtime provider: ${provider}`)
+    throw new AppError(
+      503,
+      'AGENT_RUNTIME_NOT_CONFIGURED',
+      `Unsupported agent runtime provider: ${provider}`,
+    )
   }
 }
 

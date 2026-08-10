@@ -71,9 +71,10 @@ export const runSalesAgentController: RequestHandler = async (
     )
   }
 
-  const result = await agentRuntimeFactory.resolve().run({
+  const runtime = agentRuntimeFactory.resolve()
+  const result = await runtime.run({
     message,
-    model:
+    model: runtime.name === 'openai' &&
       typeof request.body?.model === 'string' && request.body.model.trim()
         ? request.body.model.trim().slice(0, 100)
         : undefined,

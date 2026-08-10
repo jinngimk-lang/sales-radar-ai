@@ -266,13 +266,14 @@ export class RadarAssessmentPersistenceService {
         identityStatus: evidence.identityStatus,
         evidenceStatus: evidence.evidenceStatus,
       })
+      const { reasons: qualityReasons, ...rankingFields } = ranking
       return {
         ...assessment,
         evidence: {
           ...evidence,
           excerpt: evidenceExcerpt(content),
-          ...ranking,
-          qualityReasons: ranking.reasons,
+          ...rankingFields,
+          qualityReasons,
         },
       }
     })

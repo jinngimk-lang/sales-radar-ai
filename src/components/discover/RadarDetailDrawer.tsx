@@ -6,7 +6,10 @@ import {
   CircleHelp,
   X,
 } from 'lucide-react'
-import type { RadarResultCluster } from '@/features/radar/radar-types'
+import type {
+  RadarClusterSource,
+  RadarResultCluster,
+} from '@/features/radar/radar-types'
 import {
   ACTION_LABELS,
   reasonCodeLabel,
@@ -140,10 +143,19 @@ export function RadarDetailDrawer({
                       {source.excerpt}
                     </p>
                   )}
-                  {(source.identityStatus || source.evidenceStatus) && (
+                  {(source.identityStatus ||
+                    source.evidenceStatus ||
+                    source.sourceTier ||
+                    source.freshnessStatus ||
+                    source.qualityScore !== null ||
+                    source.corroborationRequired) && (
                     <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-medium text-ink-500">
                       {source.evidenceStatus && <span className="rounded-full bg-ink-50 px-2 py-1">证据状态：{source.evidenceStatus}</span>}
                       {source.identityStatus && <span className="rounded-full bg-ink-50 px-2 py-1">主体状态：{source.identityStatus}</span>}
+                      {source.sourceTier && <span className="rounded-full bg-ink-50 px-2 py-1">来源等级：{source.sourceTier.replace('_', ' ')}</span>}
+                      {source.freshnessStatus && <span className="rounded-full bg-ink-50 px-2 py-1">时效：{sourceFreshnessLabel(source.freshnessStatus)}</span>}
+                      {source.qualityScore !== null && <span className="rounded-full bg-ink-50 px-2 py-1">证据质量：{source.qualityScore}/100</span>}
+                      {source.corroborationRequired && <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">需要独立来源佐证</span>}
                     </div>
                   )}
                   {isHttpUrl(source.url) ? (
@@ -206,6 +218,15 @@ export function RadarDetailDrawer({
     </div>,
     document.body,
   )
+}
+
+function sourceFreshnessLabel(value: NonNullable<RadarClusterSource['freshnessStatus']>) {
+  return {
+    FRESH: '近期',
+    RECENT: '较新',
+    STALE: '历史',
+    UNKNOWN: '待确认',
+  }[value]
 }
 
 function SectionTitle({ title }: { title: string }) {

@@ -184,6 +184,14 @@ function collectSources(
       provider: assessment.evidence.provider,
       identityStatus: assessment.evidence.identityStatus ?? null,
       evidenceStatus: assessment.evidence.evidenceStatus ?? null,
+      sourceTier: assessment.evidence.sourceTier,
+      freshnessStatus: assessment.evidence.freshnessStatus,
+      qualityScore:
+        typeof assessment.evidence.qualityScore === 'number'
+          ? assessment.evidence.qualityScore
+          : null,
+      corroborationRequired:
+        assessment.evidence.corroborationRequired === true,
       publishedAt: assessment.evidence.publishedAt ?? null,
       createdAt: assessment.evidence.createdAt,
       assessmentIds: [assessment.id],

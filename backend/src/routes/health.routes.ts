@@ -54,7 +54,11 @@ healthRouter.get('/capabilities', (_request, response) => {
         enabled: salesAgentEnabled,
         provider: salesAgentEnabled ? agentRuntimeProvider : null,
         model: agentRuntimeProvider === 'livekit' ? 'livekit-bridge' : agent.model,
-        reason: salesAgentEnabled ? 'ready' : 'missing_api_key',
+        reason: salesAgentEnabled
+          ? 'ready'
+          : agentRuntimeProvider === 'livekit'
+            ? 'missing_runtime_configuration'
+            : 'missing_api_key',
         models:
           agentRuntimeProvider === 'openai'
             ? listSalesAgentModelOptions(agent)

@@ -35,18 +35,36 @@ async function defaultResolveHost(hostname: string) {
 function isPrivateAddress(address: string) {
   if (address.includes(':')) {
     const normalized = address.toLowerCase()
-    return normalized === '::1' || normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80:')
+    if (normalized.startsWith('::ffff:')) {
+      // URL parsers may normalize dotted IPv4 into hexadecimal IPv6. Direct
+      // mapped-address targets are unnecessary here because DNS A records are
+      // returned separately, so reject the ambiguous form conservatively.
+      return true
+    }
+    return (
+      normalized === '::' ||
+      normalized === '::1' ||
+      normalized.startsWith('fc') ||
+      normalized.startsWith('fd') ||
+      normalized.startsWith('fe80:') ||
+      normalized.startsWith('2001:db8:')
+    )
   }
   const parts = address.split('.').map(Number)
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) return true
-  const [a, b] = parts
+  const [a, b, c] = parts
   return (
     a === 0 ||
     a === 10 ||
     a === 127 ||
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0 && c === 2) ||
     (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113) ||
+    (a === 100 && b >= 64 && b <= 127) ||
     a >= 224
   )
 }

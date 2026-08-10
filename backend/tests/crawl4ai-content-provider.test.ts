@@ -54,11 +54,12 @@ test('Crawl4AI provider sends only a validated URL and parses grounded content',
 test('public crawl validator blocks local and private targets', async () => {
   const validator = new PublicCrawlTargetValidator(async (hostname) => {
     if (hostname === 'internal.example') return ['10.0.0.12']
-    return ['203.0.113.20']
+    return ['8.8.8.8']
   })
 
   await assert.rejects(() => validator.validate('http://localhost:8080/admin'))
   await assert.rejects(() => validator.validate('http://127.0.0.1/private'))
+  await assert.rejects(() => validator.validate('http://[::ffff:127.0.0.1]/private'))
   await assert.rejects(() => validator.validate('https://internal.example/'))
   await assert.doesNotReject(() => validator.validate('https://public.example/news'))
 })
