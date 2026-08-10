@@ -556,6 +556,13 @@ export interface RadarAssessment {
     platform: Platform
     identityStatus?: string
     evidenceStatus?: string
+    sourceTier?: 'TIER_1' | 'TIER_2' | 'TIER_3' | 'UNKNOWN'
+    sourceType?: string
+    capturedAt?: string
+    freshnessStatus?: 'FRESH' | 'RECENT' | 'STALE' | 'UNKNOWN'
+    qualityScore?: number
+    corroborationRequired?: boolean
+    qualityReasons?: string[]
     publishedAt?: string | null
     createdAt: string
     updatedAt?: string

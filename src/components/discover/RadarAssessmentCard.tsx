@@ -316,6 +316,17 @@ export function RadarAssessmentCard({
               <p className="mt-1 text-[11px] text-ink-500">
                 来源平台：{sourcePlatform.label}
               </p>
+              {assessment.evidence.sourceTier && (
+                <p className="mt-1 text-[11px] text-ink-500">
+                  来源等级 {assessment.evidence.sourceTier.replace('_', ' ')}
+                  {typeof assessment.evidence.qualityScore === 'number'
+                    ? ` · 证据质量 ${assessment.evidence.qualityScore}/100`
+                    : ''}
+                  {assessment.evidence.freshnessStatus
+                    ? ` · ${freshnessLabel(assessment.evidence.freshnessStatus)}`
+                    : ''}
+                </p>
+              )}
               <p className="mt-1 flex items-center gap-1 text-[11px] text-ink-500">
                 <CalendarDays className="h-3 w-3" />
                 {assessment.evidence.publishedAt
@@ -441,6 +452,17 @@ function formatDate(value: string) {
     month: 'short',
     day: 'numeric',
   }).format(date)
+}
+
+function freshnessLabel(
+  value: NonNullable<RadarAssessment['evidence']['freshnessStatus']>,
+) {
+  return {
+    FRESH: '近期信息',
+    RECENT: '较新信息',
+    STALE: '历史信息',
+    UNKNOWN: '时间待确认',
+  }[value]
 }
 
 function formatScore(value: number) {
