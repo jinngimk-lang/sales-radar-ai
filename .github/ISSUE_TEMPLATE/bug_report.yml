@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible product or engineering defect
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve Sales Radar AI. Do not include API keys, cookies or private customer data.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What happened?
+      description: Describe the user-visible behavior and what you expected instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Search and providers
+        - Evidence and Radar assessment
+        - Opportunity and company research
+        - Sales Agent
+        - Revenue Live
+        - Frontend experience
+        - Deployment
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Provide minimal steps using non-sensitive test data.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Safe diagnostics
+      description: Add redacted logs, screenshots or task IDs. Never paste secrets.
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or release
+      placeholder: v0.1.0 or commit hash
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed API keys, cookies and private customer data.
+          required: true

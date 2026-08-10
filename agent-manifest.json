@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1",
+  "name": "sales-radar-ai",
+  "description": "Evidence-first sales intelligence workspace for market signals, opportunities, company research and sales action.",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/jinngimk-lang/sales-radar-ai",
+  "instructions": "AGENTS.md",
+  "context": "CONTEXT.md",
+  "skillRegistry": ".agent/SKILL_REGISTRY.md",
+  "runtimeGuide": "docs/AGENT_INTEGRATION.md",
+  "openapi": "docs/openapi/agent-api.yaml",
+  "verification": {
+    "frontend": ["npm run typecheck", "npm test", "npm run build"],
+    "backend": [
+      "npm run prisma:generate",
+      "npm run prisma:validate",
+      "npm run typecheck",
+      "npm test",
+      "npm run build"
+    ]
+  },
+  "boundaries": [
+    "Evidence First",
+    "Opportunity is not Customer",
+    "No inferred contacts or purchase intent",
+    "No quality-gate bypass",
+    "External action requires explicit user intent"
+  ]
+}

@@ -1,0 +1,45 @@
+name: Provider adapter proposal
+description: Propose or implement a search, content, agent-runtime or CRM adapter
+title: "[Provider]: "
+labels: [provider]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      placeholder: Provider and official documentation URL
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Adapter type
+      options:
+        - Search provider
+        - Content acquisition
+        - Agent runtime
+        - Data source
+        - CRM or action connector
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Provenance contract
+      description: How will the adapter preserve source URL, time, provider identity and failure state?
+    validations:
+      required: true
+  - type: textarea
+    id: auth
+    attributes:
+      label: Authentication and rate limits
+      description: Name required environment variables without including real values.
+    validations:
+      required: true
+  - type: textarea
+    id: failure
+    attributes:
+      label: Failure behavior
+      description: Confirm that provider failure will not create mock results or customer facts.
+    validations:
+      required: true

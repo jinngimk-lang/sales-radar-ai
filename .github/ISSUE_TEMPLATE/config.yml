@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/jinngimk-lang/sales-radar-ai/discussions
+    about: Ask usage questions and discuss early product ideas.
+  - name: Security report
+    url: https://github.com/jinngimk-lang/sales-radar-ai/security/advisories/new
+    about: Privately report a suspected vulnerability.

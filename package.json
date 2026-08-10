@@ -2,6 +2,12 @@
   "name": "sales-radar-ai",
   "private": true,
   "version": "0.1.0",
+  "license": "Apache-2.0",
+  "homepage": "https://sales-radar-ai.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jinngimk-lang/sales-radar-ai.git"
+  },
   "type": "module",
   "description": "AI-powered global customer discovery platform - Sales Radar AI",
   "scripts": {
