@@ -29,6 +29,21 @@ export class ContentAcquisitionService {
 
   async enrich(input: ContentEnrichmentInput): Promise<ContentEnrichmentResult> {
     if (!this.provider) return { ...input, status: 'SKIPPED' }
+    const provenance = record(input.metadata.sourceProvenance)
+    if (
+      provenance?.sourceCategory === 'SOCIAL' ||
+      provenance?.sourceCategory === 'VIDEO'
+    ) {
+      return {
+        ...input,
+        metadata: {
+          ...input.metadata,
+          contentAcquisition: 'SKIPPED',
+          contentAcquisitionReason: 'SOCIAL_SOURCE_REQUIRES_DEDICATED_ADAPTER',
+        },
+        status: 'SKIPPED',
+      }
+    }
     try {
       await this.validator.validate(input.url)
       const acquired = await this.provider.acquire({ url: input.url })
@@ -59,6 +74,12 @@ export class ContentAcquisitionService {
       }
     }
   }
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
 }
 
 function providerFromEnvironment(): ContentProvider | null {

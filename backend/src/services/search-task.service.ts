@@ -37,6 +37,7 @@ import {
   type ContentEnrichmentInput,
   type ContentEnrichmentResult,
 } from './content-acquisition.service.js'
+import { sourceProvenanceProvider } from '../providers/source/social-source.provider.js'
 
 export type { SearchProductContext } from '../contracts/product-context.contract.js'
 
@@ -179,13 +180,21 @@ export async function processSearchTask(
         typeof result.metadata.title === 'string'
           ? result.metadata.title.trim()
           : null
+      const sourceProvenance = sourceProvenanceProvider.describe({
+        sourceUrl: result.sourceUrl,
+        platform: result.platform,
+        metadata: result.metadata,
+      })
       const enriched = await (
         dependencies.enrichContent ?? defaultExecutionDependencies.enrichContent!
       )({
         url: result.sourceUrl,
         title: originalTitle,
         content: result.rawContent,
-        metadata: result.metadata,
+        metadata: {
+          ...result.metadata,
+          sourceProvenance,
+        },
       })
       const effectiveResult: SearchResult = {
         ...result,
