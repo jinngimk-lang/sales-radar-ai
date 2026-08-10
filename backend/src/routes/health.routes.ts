@@ -10,11 +10,9 @@ import { readHostedResearchConfig } from '../services/market-intelligence/market
 export const healthRouter = Router()
 
 healthRouter.get('/', (_request, response) => {
-  void openAIRuntimeVerifier.verify()
-  response.status(200).json({
-    status: 'ok',
-    openai: openAIRuntimeVerifier.getStatus(),
-  })
+  // Liveness must stay independent from every optional provider. Runtime
+  // verification belongs to /capabilities and may perform bounded probes.
+  response.status(200).json({ status: 'ok' })
 })
 
 healthRouter.get('/capabilities', (_request, response) => {

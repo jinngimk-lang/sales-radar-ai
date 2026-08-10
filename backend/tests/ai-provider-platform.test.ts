@@ -167,7 +167,8 @@ describe('AI Provider Platform v1', () => {
     const result = await service.generateContent(outreachContext)
 
     assert.equal(result.provider, 'openai')
-    assert.match(result.content.email.body, /first step/i)
+    assert.match(result.content.email.body, /improve production efficiency/i)
+    assert.doesNotMatch(result.content.email.body, /already buying|confirmed purchase/i)
   })
 
   it('falls back when the configured AI Provider is unavailable', async () => {
@@ -186,6 +187,7 @@ describe('AI Provider Platform v1', () => {
     const result = await service.generateContent(outreachContext)
 
     assert.equal(result.provider, 'rule-based')
-    assert.match(result.content.email.body, /first step/i)
+    assert.match(result.content.email.body, /improve production efficiency/i)
+    assert.doesNotMatch(result.content.email.body, /already buying|confirmed purchase/i)
   })
 })
