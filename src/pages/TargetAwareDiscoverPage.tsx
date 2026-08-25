@@ -242,7 +242,7 @@ function CommercialTargetSearchBanner({
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {!exact ? (
+          {!exact && !hasUnmappedTargetFilters ? (
             <button
               type="button"
               onClick={onRestoreTargetSearch}
