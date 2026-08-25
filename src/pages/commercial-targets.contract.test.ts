@@ -62,3 +62,28 @@ test('an exact persisted target crosses from recommendation into target-aware pr
   assert.match(compiler, /FIND_SUPPLIERS: \['供应商', '制造商', '供货'\]/)
   assert.match(compiler, /RESEARCH_COMPETITORS: \['竞品', '竞争对手', '替代方案'\]/)
 })
+
+test('saved target dimensions initialize the real discover filters and manual edits downgrade exact attribution', async () => {
+  const [bridge, discover, mapping] = await Promise.all([
+    read('./TargetAwareDiscoverPage.tsx'),
+    read('./DiscoverPage.tsx'),
+    read('../features/market-intelligence/discover-target-filters.ts'),
+  ])
+
+  assert.match(bridge, /mapCommercialTargetToDiscoverFilters/)
+  assert.match(bridge, /discoverTargetFiltersMatch/)
+  assert.match(bridge, /initialTargetFilters=/)
+  assert.match(bridge, /onTargetFiltersChange=/)
+  assert.match(bridge, /部分目标条件未映射/)
+  assert.match(bridge, /当前关键词或结构化筛选已修改/)
+
+  assert.match(discover, /initialTargetFilters\?\.region/)
+  assert.match(discover, /initialTargetFilters\?\.customerType/)
+  assert.match(discover, /initialTargetFilters\?\.industry/)
+  assert.match(discover, /onTargetFiltersChange\?\./)
+
+  assert.match(mapping, /ALL_INDUSTRIES\.find/)
+  assert.match(mapping, /unmappedDimensions/)
+  assert.match(mapping, /current\.region === expected\.region/)
+  assert.match(mapping, /current\.customerType === expected\.customerType/)
+})
