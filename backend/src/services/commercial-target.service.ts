@@ -30,7 +30,6 @@ export interface CommercialTargetInput {
   goal: MarketResearchCommercialGoal
   signalFocus: string
   status?: CommercialTargetStatus
-  lastRunAt?: Date | null
 }
 
 export type CommercialTargetUpdate = Partial<CommercialTargetInput>
@@ -96,7 +95,7 @@ export class CommercialTargetService {
         ${input.goal},
         ${input.signalFocus},
         ${input.status ?? 'ACTIVE'},
-        ${input.lastRunAt ?? null}
+        ${null}
       )
       RETURNING *
     `
@@ -118,8 +117,6 @@ export class CommercialTargetService {
       goal: input.goal ?? current.goal,
       signalFocus: input.signalFocus ?? current.signalFocus,
       status: input.status ?? current.status,
-      lastRunAt:
-        input.lastRunAt === undefined ? current.lastRunAt : input.lastRunAt,
     }
 
     const rows = await prisma.$queryRaw<CommercialTargetRecord[]>`
@@ -133,7 +130,26 @@ export class CommercialTargetService {
         "goal" = ${next.goal},
         "signalFocus" = ${next.signalFocus},
         "status" = ${next.status},
-        "lastRunAt" = ${next.lastRunAt},
+        "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${id} AND "userId" = ${userId}
+      RETURNING *
+    `
+    const target = rows[0]
+    if (!target) {
+      throw new AppError(
+        404,
+        'COMMERCIAL_TARGET_NOT_FOUND',
+        'Commercial target was not found',
+      )
+    }
+    return target
+  }
+
+  async recordSuccessfulRun(userId: string, id: string, completedAt: Date) {
+    const rows = await prisma.$queryRaw<CommercialTargetRecord[]>`
+      UPDATE "CommercialTarget"
+      SET
+        "lastRunAt" = ${completedAt},
         "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = ${id} AND "userId" = ${userId}
       RETURNING *
