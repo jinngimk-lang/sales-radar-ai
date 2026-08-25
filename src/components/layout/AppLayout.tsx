@@ -1,10 +1,18 @@
-import { Bot, Radar, Search, Settings2, WalletCards } from 'lucide-react'
+import {
+  Bot,
+  Radar,
+  Search,
+  Settings2,
+  Target,
+  WalletCards,
+} from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 
 const WORKSPACE_ITEMS = [
   { to: '/app/home', label: 'AI 首页', icon: Bot },
+  { to: '/app/targets', label: '目标', icon: Target },
   { to: '/app/market', label: '市场雷达', icon: Radar },
   { to: '/app/discover', label: '搜索', icon: Search },
   { to: '/app/revenue', label: '收益中心', icon: WalletCards },
