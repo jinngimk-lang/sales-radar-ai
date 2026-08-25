@@ -185,8 +185,14 @@ export function MarketIntelligenceWorkspacePage() {
   }
 
   const openProactiveSearch = () => {
+    const params = new URLSearchParams()
     const query = target.product.trim()
-    navigate(query ? `/app/discover?q=${encodeURIComponent(query)}` : '/app/discover')
+    if (query) params.set('q', query)
+    if (commercialTargetId && targetMatchesPersisted) {
+      params.set('targetId', commercialTargetId)
+    }
+    const suffix = params.toString()
+    navigate(`/app/discover${suffix ? `?${suffix}` : ''}`)
   }
 
   const focusAssessment = () => {
