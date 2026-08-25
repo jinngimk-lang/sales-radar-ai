@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Radar } from 'lucide-react'
+import { Radar, Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import type { MarketResearchSession, MarketSignal } from '@/types'
 import {
   ApiRequestError,
   getMarketSignals,
   runMarketResearch,
 } from '@/services/api'
+import { Button } from '@/components/ui/Button'
 import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
 import { AgentStatusBadge } from '@/components/ui/WorkspaceState'
 import { MarketScanTarget } from '@/features/market-intelligence/MarketScanTarget'
@@ -23,6 +25,7 @@ const EMPTY_TARGET: MarketScanTargetValue = {
   industry: '',
   region: '',
   customerType: '',
+  goal: 'FIND_BUYERS',
   signalFocus: 'ALL',
 }
 
@@ -35,6 +38,7 @@ const INITIAL_AGENT_STATE: MarketAgentWorkspaceState = {
 }
 
 export function MarketIntelligenceWorkspacePage() {
+  const navigate = useNavigate()
   const [signals, setSignals] = useState<MarketSignal[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
@@ -83,13 +87,15 @@ export function MarketIntelligenceWorkspacePage() {
     })
 
     try {
-      const result = await runMarketResearch({
+      const researchInput = {
         product: target.product.trim(),
         industry: target.industry || undefined,
         region: target.region || undefined,
         customerType: target.customerType || undefined,
+        goal: target.goal,
         signalFocus: target.signalFocus,
-      })
+      }
+      const result = await runMarketResearch(researchInput)
       setSession(result)
       setSelectedSourceId(result.sources[0]?.id ?? null)
       const updatedSignals = await getMarketSignals()
@@ -142,8 +148,20 @@ export function MarketIntelligenceWorkspacePage() {
     <div className="mx-auto w-full max-w-[1180px] px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
       <WorkspaceHeader
         title="市场雷达"
-        description="从公开来源发现变化。"
-        actions={<AgentStatusBadge status={visualStatus} />}
+        description="设定你要找的交易对象，从公开来源发现变化并继续判断。"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate('/app/discover')}
+            >
+              <Search className="h-3.5 w-3.5" />
+              主动搜索
+            </Button>
+            <AgentStatusBadge status={visualStatus} />
+          </div>
+        }
       />
 
       <MarketScanTarget
