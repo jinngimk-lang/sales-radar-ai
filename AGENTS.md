@@ -9,10 +9,13 @@ Sales Radar AI turns public market changes into evidence-backed sales opportunit
 ## Read before changing code
 
 1. `CONTEXT.md` — current product and architecture context.
-2. `.agent/SKILL_REGISTRY.md` — skill ownership and write boundaries.
-3. `.agent/PROJECT_MEMORY.md` — stable product decisions.
-4. Relevant `.agent/skills/*/SKILL.md` files for the requested domain.
-5. `docs/adr/` for architectural decisions that affect the change.
+2. `PROJECT_BLUEPRINT.md` — living product direction, buyer/seller workspace plan, technology-watch policy and context-recovery protocol.
+3. `.agent/SKILL_REGISTRY.md` — skill ownership and write boundaries.
+4. `.agent/PROJECT_MEMORY.md` — stable product decisions.
+5. Relevant `.agent/skills/*/SKILL.md` files for the requested domain.
+6. `docs/adr/`, relevant specs and plans for architectural decisions that affect the change.
+
+When context becomes long or implementation direction changes, re-read `PROJECT_BLUEPRINT.md` and update it when a validated new direction is accepted. Do not let implementation drift become undocumented product strategy.
 
 Do not scan unrelated historical documents when the current code and the files above answer the task.
 
