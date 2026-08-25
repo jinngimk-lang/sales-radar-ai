@@ -12,6 +12,16 @@ const CommercialTargetsPage = lazy(() =>
     default: module.CommercialTargetsPage,
   })),
 )
+const CommunicationWorkspacePage = lazy(() =>
+  import('@/pages/CommunicationWorkspacePage').then((module) => ({
+    default: module.CommunicationWorkspacePage,
+  })),
+)
+const VerifiedIntentPage = lazy(() =>
+  import('@/pages/VerifiedIntentPage').then((module) => ({
+    default: module.VerifiedIntentPage,
+  })),
+)
 const DiscoverPage = lazy(() =>
   import('@/pages/DiscoverPage').then((module) => ({
     default: module.DiscoverPage,
@@ -76,6 +86,22 @@ export default function App() {
           element={
             <Suspense fallback={<PageFallback />}>
               <MarketIntelligenceWorkspacePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="communication"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <CommunicationWorkspacePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="intent"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <VerifiedIntentPage />
             </Suspense>
           }
         />
