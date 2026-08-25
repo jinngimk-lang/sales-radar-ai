@@ -129,6 +129,11 @@ export function MarketIntelligenceWorkspacePage() {
     }
   }
 
+  const openProactiveSearch = () => {
+    const query = target.product.trim()
+    navigate(query ? `/app/discover?q=${encodeURIComponent(query)}` : '/app/discover')
+  }
+
   const focusAssessment = () => {
     window.requestAnimationFrame(() => {
       assessmentRef.current?.scrollIntoView({
@@ -151,11 +156,7 @@ export function MarketIntelligenceWorkspacePage() {
         description="设定你要找的交易对象，从公开来源发现变化并继续判断。"
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate('/app/discover')}
-            >
+            <Button variant="secondary" size="sm" onClick={openProactiveSearch}>
               <Search className="h-3.5 w-3.5" />
               主动搜索
             </Button>
