@@ -9,13 +9,16 @@ Sales Radar AI turns public market changes into evidence-backed sales opportunit
 ## Read before changing code
 
 1. `CONTEXT.md` — current product and architecture context.
-2. `PROJECT_BLUEPRINT.md` — living product direction, buyer/seller workspace plan, technology-watch policy and context-recovery protocol.
-3. `.agent/SKILL_REGISTRY.md` — skill ownership and write boundaries.
-4. `.agent/PROJECT_MEMORY.md` — stable product decisions.
-5. Relevant `.agent/skills/*/SKILL.md` files for the requested domain.
-6. `docs/adr/`, relevant specs and plans for architectural decisions that affect the change.
+2. `PROJECT_BLUEPRINT.md` — living product direction, buyer/seller workspace plan, autonomous-owner contract, technology-watch policy and context-recovery protocol.
+3. `docs/technology-radar.md` — current external project/provider/runtime watch decisions and adoption status.
+4. `.agent/SKILL_REGISTRY.md` — skill ownership and write boundaries.
+5. `.agent/PROJECT_MEMORY.md` — stable product decisions.
+6. Relevant `.agent/skills/*/SKILL.md` files for the requested domain.
+7. `docs/adr/`, relevant specs and plans for architectural decisions that affect the change.
 
 When context becomes long or implementation direction changes, re-read `PROJECT_BLUEPRINT.md` and update it when a validated new direction is accepted. Do not let implementation drift become undocumented product strategy.
+
+Before introducing a new external subsystem, runtime, dependency, copied file, adapted component or provider integration, check `docs/technology-radar.md` and refresh the relevant upstream evidence. If a finding materially changes adoption status or product direction, update the radar and blueprint in the same delivery slice.
 
 Do not scan unrelated historical documents when the current code and the files above answer the task.
 
@@ -71,6 +74,27 @@ Product Intelligence
 
 Providers must remain replaceable. Business services call interfaces or factories, not a specific external model, crawler or agent runtime.
 
+## Autonomous owner operating mode
+
+The owner has delegated normal, reversible, evidence-backed repository decisions to the operating agent. Within the permissions actually available to the connected tools, the agent may independently research, create branches/issues/PRs, modify files, run or inspect CI, merge validated changes, coordinate deployments and update repository governance without asking again for each routine decision.
+
+The autonomous default does **not** cover destructive or irreversible operations, secrets/credential changes, paid-plan changes, legal commitments, sensitive security disclosure or external publication. Those remain subject to the applicable safety and authorization gate.
+
+For ongoing maintenance, use this loop:
+
+```text
+Recover context
+  -> inspect production/open work evidence
+  -> scan relevant GitHub + technical developments
+  -> classify value/license/risk
+  -> integrate only the smallest change that solves a verified weakness
+  -> test / CI / production verification
+  -> update technology radar
+  -> update PROJECT_BLUEPRINT.md if direction changed
+```
+
+A healthy existing path is a reason to defer a redundant runtime, not a reason to add it pre-emptively.
+
 ## Engineering workflow
 
 - Diagnose before fixing: `.agent/skills/diagnosing-bugs/SKILL.md`.
@@ -78,6 +102,8 @@ Providers must remain replaceable. Business services call interfaces or factorie
 - Review public seams with `.agent/skills/codebase-design/SKILL.md`.
 - Review before merge with `.agent/skills/code-review/SKILL.md`.
 - Track work in GitHub: `docs/agents/issue-tracker.md`.
+- Check relevant actively maintained GitHub projects and recent provider/runtime information before adding a subsystem or when a current subsystem shows a verified weakness.
+- Record meaningful external candidates and adoption/rejection evidence in `docs/technology-radar.md`.
 
 Keep changes small and scoped. Preserve unrelated user changes in a dirty worktree. Do not commit secrets or generated local environments.
 
