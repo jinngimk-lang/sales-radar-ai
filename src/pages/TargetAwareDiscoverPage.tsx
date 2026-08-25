@@ -158,7 +158,7 @@ function CommercialTargetSearchBanner({
                   : 'rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800'
               }
             >
-              {exact ? '目标搜索已应用' : '临时搜索'}
+              {exact ? '目标意图已应用' : '临时关键词'}
             </span>
           </div>
           <p className="mt-1 truncate text-sm font-semibold text-ink-900">
@@ -167,8 +167,8 @@ function CommercialTargetSearchBanner({
           <p className="mt-1 text-[10px] leading-4 text-ink-500">
             {details.join(' · ')}
             {exact
-              ? ' · 已编译进本次真实 SearchTask 关键词'
-              : ' · 当前关键词已修改，本次结果不冒充已保存目标的精确运行'}
+              ? ' · 商业目标已编译进本次真实 SearchTask 关键词；行业/地区/对象类型为目标参考，实际筛选以页面选择为准'
+              : ' · 当前关键词已修改，本次搜索按临时关键词执行，不冒充已保存目标意图'}
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -178,7 +178,7 @@ function CommercialTargetSearchBanner({
               onClick={onRestoreTargetSearch}
               className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-[10px] font-semibold text-amber-800 transition hover:bg-amber-50"
             >
-              恢复目标搜索
+              恢复目标关键词
             </button>
           ) : null}
           <button
@@ -207,7 +207,7 @@ function TargetSearchLoading() {
     <div className="flex h-full items-center justify-center bg-ink-50">
       <div className="flex items-center gap-2 text-xs font-medium text-ink-500">
         <Loader2 className="h-4 w-4 animate-spin text-brand-600" />
-        正在把商业目标编译成真实搜索条件…
+        正在把商业目标编译成真实搜索意图…
       </div>
     </div>
   )
