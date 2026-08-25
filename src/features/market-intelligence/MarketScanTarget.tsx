@@ -1,4 +1,11 @@
-import { Building2, Factory, MapPin, Radar, Users } from 'lucide-react'
+import {
+  Building2,
+  Factory,
+  MapPin,
+  Radar,
+  Target,
+  Users,
+} from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Surface } from '@/components/ui/Surface'
 import {
@@ -7,6 +14,7 @@ import {
   ALL_REGIONS,
 } from '@/data/meta'
 import type {
+  CommercialGoal,
   MarketScanTarget as MarketScanTargetValue,
   SignalFocus,
 } from './market-intelligence.contract'
@@ -18,6 +26,18 @@ interface MarketScanTargetProps {
   onChange: (value: MarketScanTargetValue) => void
   onStart: () => void
 }
+
+const COMMERCIAL_GOAL_OPTIONS: Array<{
+  value: CommercialGoal
+  label: string
+}> = [
+  { value: 'FIND_BUYERS', label: '找买家' },
+  { value: 'FIND_SUPPLIERS', label: '找供应商' },
+  { value: 'FIND_PARTNERS', label: '找合作伙伴' },
+  { value: 'FIND_DISTRIBUTORS', label: '找渠道' },
+  { value: 'RESEARCH_COMPETITORS', label: '研究竞品' },
+  { value: 'EXPLORE_MARKET', label: '探索市场' },
+]
 
 const SIGNAL_OPTIONS: Array<{ value: SignalFocus; label: string }> = [
   { value: 'ALL', label: '全部变化' },
@@ -40,7 +60,7 @@ export function MarketScanTarget({
 
   return (
     <Surface className="p-3 sm:p-4">
-      <div className="grid gap-2 lg:grid-cols-[1.4fr_repeat(4,minmax(0,0.78fr))_auto]">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[1.35fr_repeat(5,minmax(0,0.78fr))_auto]">
         <TargetField icon={Radar} label="产品 / 服务">
           <input
             value={value.product}
@@ -48,6 +68,22 @@ export function MarketScanTarget({
             placeholder="输入研究目标"
             className="market-target-control"
           />
+        </TargetField>
+
+        <TargetField icon={Target} label="商业目标">
+          <select
+            value={value.goal}
+            onChange={(event) =>
+              update('goal', event.target.value as CommercialGoal)
+            }
+            className="market-target-control"
+          >
+            {COMMERCIAL_GOAL_OPTIONS.map((goal) => (
+              <option key={goal.value} value={goal.value}>
+                {goal.label}
+              </option>
+            ))}
+          </select>
         </TargetField>
 
         <TargetField icon={Factory} label="行业">
@@ -65,7 +101,7 @@ export function MarketScanTarget({
           </select>
         </TargetField>
 
-        <TargetField icon={Users} label="客户类型">
+        <TargetField icon={Users} label="对象类型">
           <select
             value={value.customerType}
             onChange={(event) =>
@@ -124,7 +160,7 @@ export function MarketScanTarget({
         <Button
           onClick={onStart}
           disabled={!value.product.trim() || running}
-          className="min-h-[50px] self-stretch px-4 lg:self-end"
+          className="min-h-[50px] self-stretch px-4 md:col-span-2 xl:col-span-1 xl:self-end"
         >
           <Radar className={running ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
           {running ? '扫描中' : '扫描'}
