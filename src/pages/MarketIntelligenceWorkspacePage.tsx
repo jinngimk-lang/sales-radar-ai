@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Radar, Search } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Radar, Search, Target } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { MarketResearchSession, MarketSignal } from '@/types'
 import {
   ApiRequestError,
   getMarketSignals,
   runMarketResearch,
 } from '@/services/api'
+import {
+  commercialTargetToMarketTarget,
+  getCommercialTarget,
+  updateCommercialTarget,
+} from '@/services/commercial-targets'
 import { Button } from '@/components/ui/Button'
 import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
 import { AgentStatusBadge } from '@/components/ui/WorkspaceState'
@@ -39,11 +44,17 @@ const INITIAL_AGENT_STATE: MarketAgentWorkspaceState = {
 
 export function MarketIntelligenceWorkspacePage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const commercialTargetId = searchParams.get('targetId')
   const [signals, setSignals] = useState<MarketSignal[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
   const [session, setSession] = useState<MarketResearchSession | null>(null)
   const [target, setTarget] = useState<MarketScanTargetValue>(EMPTY_TARGET)
+  const [commercialTargetName, setCommercialTargetName] = useState<string | null>(
+    null,
+  )
+  const [targetContextError, setTargetContextError] = useState<string | null>(null)
   const [agentState, setAgentState] =
     useState<MarketAgentWorkspaceState>(INITIAL_AGENT_STATE)
   const [loadingSignals, setLoadingSignals] = useState(true)
@@ -67,6 +78,35 @@ export function MarketIntelligenceWorkspacePage() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!commercialTargetId) {
+      setCommercialTargetName(null)
+      setTargetContextError(null)
+      return
+    }
+
+    let cancelled = false
+    setTargetContextError(null)
+    getCommercialTarget(commercialTargetId)
+      .then((persistedTarget) => {
+        if (cancelled) return
+        setTarget(commercialTargetToMarketTarget(persistedTarget))
+        setCommercialTargetName(persistedTarget.name)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        console.error('[MarketRadar] Unable to restore commercial target', error)
+        setCommercialTargetName(null)
+        setTargetContextError(
+          error instanceof Error ? error.message : '无法恢复这个商业目标',
+        )
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [commercialTargetId])
 
   const selectedSignal = useMemo(
     () => signals.find((signal) => signal.id === selectedId) ?? null,
@@ -111,6 +151,14 @@ export function MarketIntelligenceWorkspacePage() {
         completedAt: result.completedAt,
         errorCode: null,
       })
+
+      if (commercialTargetId) {
+        void updateCommercialTarget(commercialTargetId, {
+          lastRunAt: result.completedAt,
+        }).catch((error) => {
+          console.error('[MarketRadar] Unable to update target run time', error)
+        })
+      }
     } catch (error) {
       console.error('[MarketRadar] Hosted research failed', error)
       const code = error instanceof ApiRequestError ? error.code : undefined
@@ -155,7 +203,18 @@ export function MarketIntelligenceWorkspacePage() {
         title="市场雷达"
         description="设定你要找的交易对象，从公开来源发现变化并继续判断。"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {commercialTargetName ? (
+              <button
+                type="button"
+                onClick={() => navigate('/app/targets')}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand-100 bg-brand-50 px-3 text-[10px] font-semibold text-brand-700 transition hover:bg-brand-100"
+                title="切换商业目标"
+              >
+                <Target className="h-3.5 w-3.5" />
+                <span className="max-w-40 truncate">{commercialTargetName}</span>
+              </button>
+            ) : null}
             <Button variant="secondary" size="sm" onClick={openProactiveSearch}>
               <Search className="h-3.5 w-3.5" />
               主动搜索
@@ -164,6 +223,12 @@ export function MarketIntelligenceWorkspacePage() {
           </div>
         }
       />
+
+      {targetContextError ? (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          目标上下文未恢复：{targetContextError}。你仍然可以使用临时条件继续研究。
+        </div>
+      ) : null}
 
       <MarketScanTarget
         value={target}
