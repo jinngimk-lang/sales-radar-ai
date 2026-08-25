@@ -22,9 +22,9 @@ const VerifiedIntentPage = lazy(() =>
     default: module.VerifiedIntentPage,
   })),
 )
-const DiscoverPage = lazy(() =>
-  import('@/pages/DiscoverPage').then((module) => ({
-    default: module.DiscoverPage,
+const TargetAwareDiscoverPage = lazy(() =>
+  import('@/pages/TargetAwareDiscoverPage').then((module) => ({
+    default: module.TargetAwareDiscoverPage,
   })),
 )
 const CustomerDetailPage = lazy(() =>
@@ -112,7 +112,7 @@ export default function App() {
           path="discover"
           element={
             <Suspense fallback={<PageFallback />}>
-              <DiscoverPage />
+              <TargetAwareDiscoverPage />
             </Suspense>
           }
         />
