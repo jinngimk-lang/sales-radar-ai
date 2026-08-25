@@ -24,7 +24,7 @@ test('commercial targets are a first-class persisted workspace surface', async (
   assert.match(api, /method: 'PUT'/)
 })
 
-test('market radar restores an exact persisted target and records only successful exact-context runs', async () => {
+test('market radar restores an exact persisted target and delegates run evidence to the backend', async () => {
   const market = await read('./MarketIntelligenceWorkspacePage.tsx')
 
   assert.match(market, /useSearchParams/)
@@ -33,6 +33,7 @@ test('market radar restores an exact persisted target and records only successfu
   assert.match(market, /commercialTargetToMarketTarget\(persistedTarget\)/)
   assert.match(market, /setTarget\(restoredTarget\)/)
   assert.match(market, /canRecordCommercialTargetRun\(target, persistedTargetSnapshot\)/)
-  assert.match(market, /updateCommercialTarget/)
-  assert.match(market, /lastRunAt: result\.completedAt/)
+  assert.match(market, /targetId:/)
+  assert.doesNotMatch(market, /lastRunAt: result\.completedAt/)
+  assert.doesNotMatch(market, /updateCommercialTarget\(commercialTargetId/)
 })
