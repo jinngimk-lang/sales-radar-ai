@@ -1,13 +1,25 @@
-import { Bot, Radar, Search, Settings2, WalletCards } from 'lucide-react'
+import {
+  BadgeCheck,
+  Bot,
+  MessageSquareText,
+  Radar,
+  Search,
+  Settings2,
+  Target,
+  WalletCards,
+} from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 
 const WORKSPACE_ITEMS = [
-  { to: '/app/home', label: 'AI 首页', icon: Bot },
-  { to: '/app/market', label: '市场雷达', icon: Radar },
+  { to: '/app/home', label: 'AI 工作台', icon: Bot },
+  { to: '/app/targets', label: '目标', icon: Target },
+  { to: '/app/market', label: '推荐', icon: Radar },
   { to: '/app/discover', label: '搜索', icon: Search },
-  { to: '/app/revenue', label: '收益中心', icon: WalletCards },
+  { to: '/app/communication', label: '沟通', icon: MessageSquareText },
+  { to: '/app/intent', label: '意向', icon: BadgeCheck },
+  { to: '/app/revenue', label: '收益', icon: WalletCards },
   { to: '/app/account', label: '设置', icon: Settings2 },
 ]
 
@@ -18,7 +30,7 @@ export function AppLayout() {
         <div className="flex h-[64px] items-center px-5">
           <Link
             to="/app/home"
-            aria-label="返回 Sales Radar AI 的 AI 首页"
+            aria-label="返回 Sales Radar AI 的 AI 工作台"
             className="flex items-center gap-2.5"
           >
             <Logo variant="light" />
@@ -51,16 +63,16 @@ export function AppLayout() {
 
         <div className="px-5 pb-5 text-[10px] text-white/25">
           <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" />
-          Source-backed
+          Evidence-first workspace
         </div>
       </aside>
 
       <div className="app-workspace-canvas flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-16 items-center justify-between border-b border-white/10 bg-brand-950 px-4 lg:hidden">
-          <Link to="/app/home" aria-label="返回 AI 首页">
+          <Link to="/app/home" aria-label="返回 AI 工作台">
             <Logo variant="light" />
           </Link>
-          <div className="flex items-center gap-1">
+          <div className="flex max-w-[calc(100vw-120px)] items-center gap-1 overflow-x-auto scrollbar-thin">
             {WORKSPACE_ITEMS.map((item) => (
               <NavLink
                 key={item.to}
@@ -68,7 +80,7 @@ export function AppLayout() {
                 aria-label={item.label}
                 className={({ isActive }) =>
                   cn(
-                    'rounded-lg p-2 transition-colors',
+                    'shrink-0 rounded-lg p-2 transition-colors',
                     isActive
                       ? 'bg-white/10 text-sky-300'
                       : 'text-white/45 hover:bg-white/[0.06] hover:text-white',

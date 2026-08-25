@@ -10,6 +10,10 @@ import {
   type MarketResearchCommercialGoal,
 } from '../services/market-intelligence/commercial-goal.js'
 import { resilientMarketWebResearch } from '../services/market-intelligence/resilient-market-web-research.service.js'
+import {
+  commercialTargetService,
+  type CommercialTargetRecord,
+} from '../services/commercial-target.service.js'
 import { ensureDemoUser } from '../services/demo-user.service.js'
 import { AppError } from '../utils/app-error.js'
 import { marketLiveBrowserService } from '../services/market-live-browser.service.js'
@@ -79,13 +83,51 @@ export function createRunMarketResearchController(
     const authenticatedUserId = readAuthenticatedUserId(request)
     const userId = authenticatedUserId ?? (await demoUserResolver()).id
     const target = readResearchTarget(request.body)
+    const targetId = readText(request.body?.targetId, 160)
+
+    let exactCommercialTargetId: string | null = null
+    if (targetId) {
+      const persistedTarget = await commercialTargetService.get(userId, targetId)
+      if (matchesCommercialTarget(persistedTarget, request.body)) {
+        exactCommercialTargetId = targetId
+      }
+    }
+
     const session = await service.run(userId, target)
+
+    if (exactCommercialTargetId) {
+      await commercialTargetService.recordSuccessfulRun(
+        userId,
+        exactCommercialTargetId,
+        new Date(),
+      )
+    }
+
     response.status(201).json({ data: session })
   }
 }
 
 export const runMarketResearchController =
   createRunMarketResearchController()
+
+export function matchesCommercialTarget(
+  persisted: CommercialTargetRecord,
+  value: unknown,
+) {
+  const input =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {}
+
+  return (
+    readText(input.product, 200) === persisted.product &&
+    nullableText(input.industry, 120) === persisted.industry &&
+    nullableText(input.region, 80) === persisted.region &&
+    nullableText(input.customerType, 80) === persisted.customerType &&
+    readText(input.goal, 40) === persisted.goal &&
+    (readText(input.signalFocus, 40) ?? 'ALL') === persisted.signalFocus
+  )
+}
 
 export function readResearchTarget(value: unknown): MarketResearchTarget {
   const input =
@@ -134,6 +176,10 @@ export function readResearchTarget(value: unknown): MarketResearchTarget {
       : customerType,
     signalFocus: focus as MarketResearchSignalFocus,
   }
+}
+
+function nullableText(value: unknown, maxLength: number) {
+  return readText(value, maxLength) ?? null
 }
 
 function readText(value: unknown, maxLength: number) {

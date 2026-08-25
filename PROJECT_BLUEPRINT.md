@@ -68,24 +68,27 @@ These modes must change the actual research/search intent sent upstream, not onl
 
 ## 4. Core workspace information architecture
 
-Primary navigation target state:
+Primary navigation is now:
 
-1. **AI workbench** — conversational command center and tool orchestration.
-2. **Targets** — persistent commercial targets and their state.
-3. **Recommended** — evidence-ranked signals/opportunities for the active target.
-4. **Search** — proactive global search with rich filters and result ranking.
-5. **Communication** — drafts and externally verified communication states.
-6. **Intent** — only verified or attributable intent/interaction signals.
-7. **Revenue** — discover -> assess -> live execute -> settle.
-8. **Settings** — providers, models, runtime, data-source state and operator gates.
+1. **AI 工作台** — conversational command center and tool orchestration.
+2. **目标** — persistent commercial targets and their state.
+3. **推荐** — evidence-ranked signals/opportunities for the active target; currently reuses Market Radar.
+4. **搜索** — proactive global search with rich filters and result ranking.
+5. **沟通** — communication preparation and, only when evidence exists, verified communication state.
+6. **意向** — only persisted/attributable outcome states; predictions remain predictions.
+7. **收益** — discover -> assess -> live execute -> settle.
+8. **设置** — providers, models, runtime, data-source state and operator gates.
 
-The first implementation may reuse existing routes where that preserves stability:
+Current route mapping:
 
-- `/app/home` -> AI workbench
-- `/app/market` -> Recommended / market radar
-- `/app/discover` -> Search
-- `/app/revenue` -> Revenue
-- new routes should only be added when backed by truthful state.
+- `/app/home` -> AI 工作台
+- `/app/targets` -> 目标
+- `/app/market` -> 推荐 / 市场雷达
+- `/app/discover` -> 搜索
+- `/app/communication` -> 沟通
+- `/app/intent` -> 意向
+- `/app/revenue` -> 收益
+- `/app/account` -> 设置
 
 ## 5. Interaction principles extracted from the reference product
 
@@ -125,11 +128,13 @@ MEETING_VERIFIED
 CLOSED
 ```
 
-Do not render a conversation as sent unless a platform/API/user-confirmed receipt exists.
+Do not render a conversation as sent unless a platform/API/user-confirmed receipt exists. The current `/app/communication` implementation is deliberately a preparation workspace backed by real lead/public-contact records; it does not manufacture send or reply events.
 
 ### E. Intent and interaction are evidence views
 
 Intent surfaces should be derived from attributable evidence such as replies, saved/contacted state, public buying signals, repeated verified interaction, meetings or explicit user confirmation. Predicted intent must remain a score or recommendation, never a factual event.
+
+The current `/app/intent` implementation reads persisted `LeadOutcome` records and only surfaces `REPLIED`, `MEETING`, `QUALIFIED`, `PROPOSAL`, `WON`, or `LOST` as verified workflow outcomes. Prediction scores are excluded.
 
 ## 6. Data and backend evolution
 
@@ -149,23 +154,22 @@ Existing useful foundations:
 - OutreachMessage
 - Revenue evidence/state
 - DataSource / IngestionRun / RawSourceDocument
+- CommercialTarget
 
-Candidate future model if persistence cannot be represented cleanly with existing entities:
+`CommercialTarget` is now the persisted long-running demand object required by the marketplace workflow.
 
-`CommercialTarget` / `OpportunityCampaign`
-
-Suggested fields:
+Current fields:
 
 - id / userId
-- name
-- productProfileId or product snapshot
+- name / product
 - goal: FIND_BUYERS | FIND_SUPPLIERS | FIND_PARTNERS | FIND_DISTRIBUTORS | RESEARCH_COMPETITORS | EXPLORE_MARKET
-- industry / region / entity-role filters
+- industry / region / customerType
 - signalFocus
 - status: DRAFT | ACTIVE | PAUSED | CLOSED
+- lastRunAt
 - createdAt / updatedAt
 
-Do not add this model until a real UI flow requires persistence that ProductProfile + SearchTask cannot safely represent.
+`lastRunAt` is **server-owned run evidence**. Generic target create/update clients cannot write it. It is recorded only after a successful Market Research request whose submitted target context exactly matches the persisted target for the same user.
 
 ## 7. Crawl, social and agent integration
 
@@ -251,26 +255,30 @@ For every major direction change, append a dated note containing:
 
 Goal: translate the strongest marketplace/recruiting interaction patterns into an original Sales Radar buyer/seller opportunity workflow while preserving production truth boundaries.
 
-Phase 1 deliverables:
+Implemented in the current delivery slice:
 
-- make Search a first-class navigation surface;
-- make the market/recommendation workspace more target-driven and card-oriented;
-- expose buyer/supplier/partner goal semantics in the active target;
-- add a persistent target context without inventing backend facts;
-- add regression tests for navigation and target semantics;
-- keep current production search, market Live View and revenue workflow invariants intact.
+- Search is a first-class navigation surface.
+- Market research supports buyer/supplier/partner/distributor/competitor/exploration goals that alter real upstream research intent.
+- Commercial targets are persisted and can be restored exactly into Market Radar.
+- Target `lastRunAt` is server-owned successful-run evidence, not client-editable metadata.
+- Primary navigation follows `AI 工作台 -> 目标 -> 推荐 -> 搜索 -> 沟通 -> 意向 -> 收益 -> 设置`.
+- Communication workspace is backed by real discovered leads/public contacts and does not invent sent/replied state.
+- Intent workspace is backed by persisted `LeadOutcome` records and excludes predicted purchase probability.
+- Existing Market Live fullscreen/viewport semantics and Revenue truth boundaries remain protected.
 
-Phase 2 deliverables:
+Next delivery slices:
 
-- persisted commercial target management;
-- communication workspace backed by real draft/send/reply state;
-- verified intent and interaction views;
-- tighter opportunity-to-communication handoff;
-- LiveKit realtime agent surface where runtime configuration is valid.
-
-Phase 3 deliverables:
-
+- tighter target-to-recommendation and target-to-search context handoff;
+- real outbound transport/receipt ingestion before `SENT_VERIFIED` can exist;
+- reply/meeting ingestion with attributable evidence;
+- LiveKit realtime agent surface where runtime configuration is valid;
 - recommendation learning from explicit feedback and verified outcomes;
 - richer source ingestion, job-platform/public hiring signals and global social evidence;
 - evaluation and ranking benchmarks;
 - safe workflow automation with explicit approvals.
+
+## 12. Deployment discipline — 2026-08-25
+
+Vercel is connected to Git pushes and builds every preview commit. Deliberately RED TDD commits caused noisy preview failure emails even when the failure was expected. For Vercel-connected feature branches, keep TDD locally/CI-isolated where practical and publish atomic implementation + contract commits so the branch does not linger in intentionally broken build states.
+
+This deployment discipline must not weaken tests: GitHub CI remains the merge gate, and production is only considered complete after frontend CI, backend CI, Vercel production, both Railway services, production API semantics, and protected UI workflow invariants are revalidated.

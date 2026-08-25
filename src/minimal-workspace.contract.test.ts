@@ -43,13 +43,16 @@ test('revenue workspace removes oversized supervision marketing copy and dead he
   assert.doesNotMatch(revenueLive, /\bShieldCheck\b/)
 })
 
-test('settings and navigation are concise and expose proactive search as a primary workspace', () => {
+test('settings and navigation are concise and expose the marketplace operating sequence', () => {
   assert.doesNotMatch(layout, /item\.desc/)
   assert.doesNotMatch(layout, /真实来源模式/)
-  assert.match(layout, /to: '\/app\/home', label: 'AI 首页'/)
-  assert.match(layout, /to: '\/app\/market', label: '市场雷达'/)
+  assert.match(layout, /to: '\/app\/home', label: 'AI 工作台'/)
+  assert.match(layout, /to: '\/app\/targets', label: '目标'/)
+  assert.match(layout, /to: '\/app\/market', label: '推荐'/)
   assert.match(layout, /to: '\/app\/discover', label: '搜索'/)
-  assert.match(layout, /to: '\/app\/revenue', label: '收益中心'/)
+  assert.match(layout, /to: '\/app\/communication', label: '沟通'/)
+  assert.match(layout, /to: '\/app\/intent', label: '意向'/)
+  assert.match(layout, /to: '\/app\/revenue', label: '收益'/)
   assert.match(layout, /to: '\/app\/account', label: '设置'/)
   assert.doesNotMatch(account, /Sales Radar 工作区/)
   assert.doesNotMatch(account, /数据可见性/)
