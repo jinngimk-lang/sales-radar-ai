@@ -76,6 +76,7 @@ test('saved target dimensions initialize the real discover filters and manual ed
   assert.match(bridge, /onTargetFiltersChange=/)
   assert.match(bridge, /部分目标条件未映射/)
   assert.match(bridge, /当前关键词或结构化筛选已修改/)
+  assert.match(bridge, /!exact && !hasUnmappedTargetFilters/)
 
   assert.match(discover, /initialTargetFilters\?\.region/)
   assert.match(discover, /initialTargetFilters\?\.customerType/)
