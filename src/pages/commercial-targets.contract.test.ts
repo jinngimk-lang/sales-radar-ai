@@ -32,7 +32,10 @@ test('market radar restores an exact persisted target and delegates run evidence
   assert.match(market, /searchParams\.get\('targetId'\)/)
   assert.match(market, /commercialTargetToMarketTarget\(persistedTarget\)/)
   assert.match(market, /setTarget\(restoredTarget\)/)
-  assert.match(market, /canRecordCommercialTargetRun\(target, persistedTargetSnapshot\)/)
+  assert.match(
+    market,
+    /canRecordCommercialTargetRun\(\s*target,\s*persistedTargetSnapshot,?\s*\)/,
+  )
   assert.match(market, /targetId:/)
   assert.doesNotMatch(market, /lastRunAt: result\.completedAt/)
   assert.doesNotMatch(market, /updateCommercialTarget\(commercialTargetId/)

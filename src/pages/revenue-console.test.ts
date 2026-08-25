@@ -24,11 +24,10 @@ const liveApiSource = await readFile(
   'utf8',
 )
 
-test('revenue center is reachable from the simplified workspace navigation', () => {
+test('revenue center is reachable from the marketplace workspace navigation', () => {
   assert.match(appSource, /path="revenue"/)
   assert.match(appSource, /RevenueOperationsPage/)
-  assert.match(layoutSource, /\/app\/revenue/)
-  assert.match(layoutSource, /收益中心/)
+  assert.match(layoutSource, /to: '\/app\/revenue', label: '收益'/)
 })
 
 test('revenue center separates potential rewards from confirmed revenue', () => {
