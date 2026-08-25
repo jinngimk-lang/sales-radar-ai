@@ -31,10 +31,7 @@ test('records a persisted target run only when the executed target still matches
 test('compiles persisted commercial intent into the real proactive-search expression', () => {
   const expression = buildCommercialTargetSearchExpression(persisted)
 
-  assert.equal(
-    expression,
-    'industrial robots 买家 采购 采购需求 Industrial Manufacturing 欧洲 企业客户',
-  )
+  assert.equal(expression, 'industrial robots 买家 采购 采购需求')
   assert.equal(isExactCommercialTargetSearchQuery('industrial robots', persisted), true)
   assert.equal(isExactCommercialTargetSearchQuery(expression, persisted), true)
   assert.equal(
@@ -43,7 +40,7 @@ test('compiles persisted commercial intent into the real proactive-search expres
   )
 })
 
-test('commercial goal changes the actual proactive-search expression', () => {
+test('commercial goal changes the actual proactive-search expression without shadowing structured filters', () => {
   const supplierExpression = buildCommercialTargetSearchExpression({
     ...persisted,
     goal: 'FIND_SUPPLIERS',
@@ -52,4 +49,5 @@ test('commercial goal changes the actual proactive-search expression', () => {
   assert.match(supplierExpression, /供应商/)
   assert.match(supplierExpression, /制造商/)
   assert.doesNotMatch(supplierExpression, /买家/)
+  assert.doesNotMatch(supplierExpression, /Europe|欧洲|Company|企业客户/)
 })
