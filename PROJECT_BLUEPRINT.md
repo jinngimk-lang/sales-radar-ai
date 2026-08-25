@@ -1,7 +1,7 @@
 # Sales Radar AI Project Blueprint
 
 Last updated: 2026-08-25
-Owner intent: build Sales Radar AI into a two-sided, evidence-first opportunity marketplace and sales operating workspace.
+Owner intent: build Sales Radar AI into a two-sided, evidence-first opportunity marketplace and sales operating workspace, operated as a continuously maintained autonomous project within explicit safety boundaries.
 
 ## 1. North star
 
@@ -130,6 +130,19 @@ CLOSED
 
 Do not render a conversation as sent unless a platform/API/user-confirmed receipt exists. The current `/app/communication` implementation is deliberately a preparation workspace backed by real lead/public-contact records; it does not manufacture send or reply events.
 
+Future communication automation must add a control plane before autonomous channel behavior is enabled:
+
+```text
+Channel / audience scope
+  -> schedule / availability policy
+  -> explicit user or policy-authorized action
+  -> provider send/call event
+  -> attributable receipt / reply / meeting event
+  -> evidence-backed interaction timeline
+```
+
+Templates, agent availability, audience rules and scheduling may improve the operating experience, but they do not weaken send/reply evidence requirements.
+
 ### E. Intent and interaction are evidence views
 
 Intent surfaces should be derived from attributable evidence such as replies, saved/contacted state, public buying signals, repeated verified interaction, meetings or explicit user confirmation. Predicted intent must remain a score or recommendation, never a factual event.
@@ -194,9 +207,13 @@ Commercial target
 
 Agent failure must never invalidate a search chain that independently passed.
 
+Realtime-agent adoption has additional privacy and observability gates. Before storing transcripts, recordings or realtime interaction traces, define retention, PII handling/redaction, telemetry destination, user visibility and failure behavior. Provider-side redaction is a useful defense layer but is never the sole privacy boundary.
+
 ## 8. Open-source technology watch
 
-Every meaningful product iteration should check for relevant actively maintained open-source projects and recent technical information before introducing a new subsystem.
+Every meaningful product iteration should check for relevant actively maintained open-source projects and recent technical information before introducing a new subsystem. In addition, the project runs a recurring continuous radar so important upstream changes are not dependent on a single feature iteration.
+
+The auditable record is `docs/technology-radar.md`.
 
 ### Watch categories
 
@@ -209,6 +226,8 @@ Every meaningful product iteration should check for relevant actively maintained
 - social-source ingestion
 - agent orchestration / MCP
 - evaluation, tracing and observability
+- provider/model/runtime changes that can affect production
+- privacy/PII handling for realtime communication
 
 ### Adoption rules
 
@@ -219,12 +238,25 @@ Every meaningful product iteration should check for relevant actively maintained
 5. Record adopted project, source commit/tag, license, files/ideas used, local modifications and tests.
 6. Do not add a dependency only because it is popular.
 7. New external runtimes remain behind interfaces/factories.
+8. A healthy current runtime is a reason to defer redundant infrastructure until a concrete limitation appears.
+9. Failed experiments are recorded and rolled back; tests/truth boundaries are not weakened to force adoption.
+
+Technology-radar statuses:
+
+```text
+WATCH
+EXPERIMENT
+ADOPTED
+DEFERRED
+REJECTED
+```
 
 Current watch references:
 
-- `unclecode/crawl4ai` — Apache-2.0; already represented through an optional content-provider adapter.
-- `livekit/agents` / `livekit/agents-js` — framework code Apache-2.0; model licenses are separate and must be reviewed independently.
-- `chatwoot/chatwoot` — core outside enterprise directory is MIT; useful as a communication-inbox interaction reference. Prefer original Sales Radar components unless a small compatible component is demonstrably worth adapting.
+- `unclecode/crawl4ai` — Apache-2.0; current observed release `v0.9.2`; already represented through an optional content-provider/enrichment path. Do not add a second crawler simply because the upstream released a new version.
+- `livekit/agents` / `@livekit/agents` — Apache-2.0; current observed package `1.7.0`; strong candidate for realtime communication, subject to PII/retention/observability requirements.
+- `browser-use/browser-use` — MIT; current observed package `0.13.8`; deferred while Browserbase remains the healthy production browser path.
+- `chatwoot/chatwoot` — useful communication-inbox interaction reference. August 2026 updates reinforce template visibility, audience/schedule controls, call timelines and drill-down from metrics to source conversations. Prefer original Sales Radar components unless a small compatible component is demonstrably worth adapting.
 
 ## 9. Context recovery protocol
 
@@ -232,11 +264,12 @@ When conversation/context becomes long or a new coding agent starts work, recove
 
 1. `AGENTS.md`
 2. `PROJECT_BLUEPRINT.md`
-3. `CONTEXT.md`
-4. `.agent/PROJECT_MEMORY.md`
-5. relevant `.agent/skills/*/SKILL.md`
-6. relevant ADR/spec/plan
-7. current code and open PR/issue evidence
+3. `docs/technology-radar.md`
+4. `CONTEXT.md`
+5. `.agent/PROJECT_MEMORY.md`
+6. relevant `.agent/skills/*/SKILL.md`
+7. relevant ADR/spec/plan
+8. current code and open PR/issue/CI/deployment evidence
 
 If implementation reveals a better validated direction, update this blueprint in the same change or immediately after the evidence is accepted. Do not let implementation drift become undocumented product strategy.
 
@@ -250,6 +283,8 @@ For every major direction change, append a dated note containing:
 - affected routes/models/providers;
 - what remains protected;
 - rollback path.
+
+For external technology adoption, `docs/technology-radar.md` must additionally record upstream version/date, license, exact problem solved, files/protocols/ideas used, verification and rollback.
 
 ## 11. Current phase — 2026-08-25
 
@@ -265,20 +300,51 @@ Implemented in the current delivery slice:
 - Communication workspace is backed by real discovered leads/public contacts and does not invent sent/replied state.
 - Intent workspace is backed by persisted `LeadOutcome` records and excludes predicted purchase probability.
 - Existing Market Live fullscreen/viewport semantics and Revenue truth boundaries remain protected.
+- Autonomous owner governance and the continuous technology radar are now part of the project operating model.
 
 Next delivery slices:
 
 - tighter target-to-recommendation and target-to-search context handoff;
 - real outbound transport/receipt ingestion before `SENT_VERIFIED` can exist;
 - reply/meeting ingestion with attributable evidence;
-- LiveKit realtime agent surface where runtime configuration is valid;
+- communication control plane for channel scope, audience rules, templates and schedule/availability policy;
+- LiveKit realtime agent evaluation where runtime configuration is valid, including explicit PII/retention/observability design;
 - recommendation learning from explicit feedback and verified outcomes;
 - richer source ingestion, job-platform/public hiring signals and global social evidence;
 - evaluation and ranking benchmarks;
-- safe workflow automation with explicit approvals.
+- safe workflow automation with explicit policy authorization and verifiable outcomes.
 
 ## 12. Deployment discipline — 2026-08-25
 
 Vercel is connected to Git pushes and builds every preview commit. Deliberately RED TDD commits caused noisy preview failure emails even when the failure was expected. For Vercel-connected feature branches, keep TDD locally/CI-isolated where practical and publish atomic implementation + contract commits so the branch does not linger in intentionally broken build states.
 
 This deployment discipline must not weaken tests: GitHub CI remains the merge gate, and production is only considered complete after frontend CI, backend CI, Vercel production, both Railway services, production API semantics, and protected UI workflow invariants are revalidated.
+
+## 13. Autonomous owner operating contract — 2026-08-25
+
+The owner delegates normal, reversible, evidence-backed repository decisions to the project operating agent within the actual permissions available through connected tools. This includes research, issues, branches, file changes, pull requests, CI/reverification, validated merges, deployment coordination and repository documentation updates without repeated approval for each routine action.
+
+The autonomous default does not include destructive or irreversible operations, secrets/credential changes, paid-plan changes, legal commitments, sensitive security disclosure, or repository-external publication. Those remain subject to the applicable safety and authorization gate.
+
+### Autonomous maintenance loop
+
+```text
+Recover authoritative context
+  -> inspect production and open-work evidence
+  -> scan relevant GitHub projects + technical/provider changes
+  -> classify maintenance/activity/license/value/risk
+  -> WATCH / DEFER when there is no concrete gap
+  -> EXPERIMENT when a reversible test can falsify the benefit
+  -> ADOPT only the smallest change that solves a verified weakness
+  -> run tests / CI / deployment verification
+  -> update docs/technology-radar.md
+  -> update PROJECT_BLUEPRINT.md when validated direction changes
+```
+
+### Notification discipline
+
+Routine healthy checks, unchanged release states and non-actionable watch items remain silent. Notify the owner only for a meaningful production regression, blocked integration, quota/plan/credential intervention, destructive-risk decision, or material strategy change that cannot be safely completed under the existing delegation.
+
+### Current radar decision record
+
+The 2026-08-25 scan found relevant active upstream work but no reason to stack a second production crawler or browser runtime today. Crawl4AI stays on the existing adapter/enrichment path; Browser Use remains deferred while Browserbase is healthy; LiveKit Agents remains a high-value realtime candidate with privacy/observability gates; Chatwoot is used as communication-workflow research rather than copied product code.
