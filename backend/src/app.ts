@@ -9,6 +9,7 @@ import { productRouter } from './routes/product.routes.js'
 import { productsRouter } from './routes/products.routes.js'
 import { learningRouter } from './routes/learning.routes.js'
 import { assistantRouter } from './routes/assistant.routes.js'
+import { commercialTargetRouter } from './routes/commercial-target.routes.js'
 import { marketSignalRouter } from './routes/market-signal.routes.js'
 import { opportunityRouter } from './routes/opportunity.routes.js'
 import { radarRouter } from './routes/radar.routes.js'
@@ -28,6 +29,7 @@ app.use('/api/products', productsRouter)
 app.use('/api/leads', leadRouter)
 app.use('/api/assistant', attachDemoWorkspaceUser, assistantRouter)
 app.use('/api/learning', learningRouter)
+app.use('/api/commercial-targets', attachDemoWorkspaceUser, commercialTargetRouter)
 app.use('/api/market-signals', attachDemoWorkspaceUser, marketSignalRouter)
 app.use('/api/opportunities', attachDemoWorkspaceUser, opportunityRouter)
 app.use('/api/radar', attachDemoWorkspaceUser, radarRouter)
