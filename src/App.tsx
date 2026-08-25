@@ -7,6 +7,11 @@ const AICommandCenterPage = lazy(() =>
     default: module.AICommandCenterPage,
   })),
 )
+const CommercialTargetsPage = lazy(() =>
+  import('@/pages/CommercialTargetsPage').then((module) => ({
+    default: module.CommercialTargetsPage,
+  })),
+)
 const DiscoverPage = lazy(() =>
   import('@/pages/DiscoverPage').then((module) => ({
     default: module.DiscoverPage,
@@ -55,6 +60,14 @@ export default function App() {
           element={
             <Suspense fallback={<PageFallback />}>
               <AICommandCenterPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="targets"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <CommercialTargetsPage />
             </Suspense>
           }
         />
