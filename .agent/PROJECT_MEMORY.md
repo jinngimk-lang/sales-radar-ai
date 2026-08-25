@@ -448,3 +448,40 @@ CompanyProfile、MarketSignal 和 Opportunity 都不能绕过 Lead Quality Gate�
 - 每次引入新的开源子系统前检查项目身份、维护活跃度、发布日期与许可证；Apache-2.0 / MIT / BSD 优先。只在能解决具体已验证问题时集成最小必要部分。
 
 长期方向与上下文恢复以根目录 `PROJECT_BLUEPRINT.md` 为准；如果验证出更好的方向，必须同步更新该文件。
+
+---
+
+# 2026-08-25 自主项目维护授权
+
+用户已将 Sales Radar AI 的正常、可逆、证据充分的仓库级决策长期委托给项目操作 Agent。在当前连接工具实际可用权限内，Agent 可以不逐项询问地执行研究、Issue/PR/分支/文件变更、CI 复验、必要合并、部署协调和大纲同步。
+
+永久自治流程：
+
+```text
+恢复 AGENTS / PROJECT_BLUEPRINT / CONTEXT / PROJECT_MEMORY
+  ↓
+检查当前生产与开放工作证据
+  ↓
+持续扫描相关 GitHub 项目、SDK/Provider 变化和新技术信息
+  ↓
+核验活跃度、版本、许可证、具体价值和风险
+  ↓
+只吸收解决真实缺口的最小部分
+  ↓
+测试 / CI / 生产复验
+  ↓
+更新 docs/technology-radar.md
+  ↓
+若产品或架构方向改变，同步 PROJECT_BLUEPRINT.md
+```
+
+自治不等于无边界：破坏性或不可逆操作、秘密/凭据变更、付费/套餐、法律承诺、敏感安全披露或仓库之外的外部发布仍需遵守对应安全门槛。
+
+新增稳定规则：
+
+- `docs/technology-radar.md` 是外部项目和技术信息的审计记录，不是依赖愿望清单。
+- 新依赖、新 Runtime、复制/改编文件或 Provider 集成必须有当前具体问题作为采用理由。
+- 现有路径健康时，相关热门项目默认 WATCH/DEFERRED，不因为流行就叠加架构。
+- 未来 LiveKit/实时沟通能力在生产采纳前必须明确 transcript/audio 保留、PII redaction、observability 和失败行为。
+- Browserbase 当前健康时，不为了“多一套 Agent 浏览器”自动引入 Browser Use；只有出现具体缺口才做隔离实验。
+- 例行健康检查和无变化雷达保持安静；只有实质退化、阻塞、需用户介入或重大策略变化才通知。
