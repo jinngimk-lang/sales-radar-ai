@@ -19,6 +19,7 @@ import { MarketScanTarget } from '@/features/market-intelligence/MarketScanTarge
 import { MarketBrowserWorkspace } from '@/features/market-intelligence/MarketBrowserWorkspace'
 import { SignalTimeline } from '@/features/market-intelligence/SignalTimeline'
 import { SignalAssessmentPanel } from '@/features/market-intelligence/SignalAssessmentPanel'
+import { canRecordCommercialTargetRun } from '@/features/market-intelligence/commercial-target-context'
 import type {
   MarketAgentWorkspaceState,
   MarketScanTarget as MarketScanTargetValue,
@@ -51,6 +52,8 @@ export function MarketIntelligenceWorkspacePage() {
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
   const [session, setSession] = useState<MarketResearchSession | null>(null)
   const [target, setTarget] = useState<MarketScanTargetValue>(EMPTY_TARGET)
+  const [persistedTargetSnapshot, setPersistedTargetSnapshot] =
+    useState<MarketScanTargetValue | null>(null)
   const [commercialTargetName, setCommercialTargetName] = useState<string | null>(
     null,
   )
@@ -80,6 +83,8 @@ export function MarketIntelligenceWorkspacePage() {
   }, [])
 
   useEffect(() => {
+    setPersistedTargetSnapshot(null)
+
     if (!commercialTargetId) {
       setCommercialTargetName(null)
       setTargetContextError(null)
@@ -91,12 +96,15 @@ export function MarketIntelligenceWorkspacePage() {
     getCommercialTarget(commercialTargetId)
       .then((persistedTarget) => {
         if (cancelled) return
-        setTarget(commercialTargetToMarketTarget(persistedTarget))
+        const restoredTarget = commercialTargetToMarketTarget(persistedTarget)
+        setTarget(restoredTarget)
+        setPersistedTargetSnapshot(restoredTarget)
         setCommercialTargetName(persistedTarget.name)
       })
       .catch((error) => {
         if (cancelled) return
         console.error('[MarketRadar] Unable to restore commercial target', error)
+        setPersistedTargetSnapshot(null)
         setCommercialTargetName(null)
         setTargetContextError(
           error instanceof Error ? error.message : '无法恢复这个商业目标',
@@ -111,6 +119,10 @@ export function MarketIntelligenceWorkspacePage() {
   const selectedSignal = useMemo(
     () => signals.find((signal) => signal.id === selectedId) ?? null,
     [selectedId, signals],
+  )
+  const targetMatchesPersisted = canRecordCommercialTargetRun(
+    target,
+    persistedTargetSnapshot,
   )
 
   const runMarketScan = async () => {
@@ -152,7 +164,10 @@ export function MarketIntelligenceWorkspacePage() {
         errorCode: null,
       })
 
-      if (commercialTargetId) {
+      if (
+        commercialTargetId &&
+        canRecordCommercialTargetRun(target, persistedTargetSnapshot)
+      ) {
         void updateCommercialTarget(commercialTargetId, {
           lastRunAt: result.completedAt,
         }).catch((error) => {
@@ -213,6 +228,11 @@ export function MarketIntelligenceWorkspacePage() {
               >
                 <Target className="h-3.5 w-3.5" />
                 <span className="max-w-40 truncate">{commercialTargetName}</span>
+                {!targetMatchesPersisted ? (
+                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] text-amber-800">
+                    临时修改
+                  </span>
+                ) : null}
               </button>
             ) : null}
             <Button variant="secondary" size="sm" onClick={openProactiveSearch}>
