@@ -96,6 +96,8 @@ Current route mapping:
 
 The user should not re-describe the same commercial goal on every page. A selected target should carry product/service, buyer/supplier/partner goal, industry, region, entity role and signal focus across recommendation and search workflows.
 
+An exact persisted target may be compiled into a richer proactive-search expression so its commercial goal and targeting dimensions affect the actual `SearchTask` keyword. If the user edits the search expression or target conditions, the UI must explicitly downgrade the run to a temporary search instead of attributing the modified run to the persisted target.
+
 ### B. Dense recommendation cards
 
 A recommendation card should answer, at a glance:
@@ -296,6 +298,7 @@ Implemented in the current delivery slice:
 - Market research supports buyer/supplier/partner/distributor/competitor/exploration goals that alter real upstream research intent.
 - Commercial targets are persisted and can be restored exactly into Market Radar.
 - Target `lastRunAt` is server-owned successful-run evidence, not client-editable metadata.
+- Exact persisted targets now cross from Market Radar into proactive search with `targetId`; goal/industry/region/customer type are compiled into the actual SearchTask keyword, while manual edits are labelled temporary and are not attributed as an exact saved-target run.
 - Primary navigation follows `AI 工作台 -> 目标 -> 推荐 -> 搜索 -> 沟通 -> 意向 -> 收益 -> 设置`.
 - Communication workspace is backed by real discovered leads/public contacts and does not invent sent/replied state.
 - Intent workspace is backed by persisted `LeadOutcome` records and excludes predicted purchase probability.
@@ -304,7 +307,6 @@ Implemented in the current delivery slice:
 
 Next delivery slices:
 
-- tighter target-to-recommendation and target-to-search context handoff;
 - real outbound transport/receipt ingestion before `SENT_VERIFIED` can exist;
 - reply/meeting ingestion with attributable evidence;
 - communication control plane for channel scope, audience rules, templates and schedule/availability policy;
