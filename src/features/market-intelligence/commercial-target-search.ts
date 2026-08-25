@@ -1,4 +1,3 @@
-import { CUSTOMER_TYPE_META, REGION_META } from '@/data/meta'
 import type {
   CommercialGoal,
   MarketScanTarget,
@@ -26,15 +25,10 @@ export function buildCommercialTargetSearchExpression(
   target: MarketScanTarget,
   baseQuery = target.product,
 ): string {
-  const parts = [
+  return uniqueNonEmpty([
     baseQuery.trim() || target.product.trim(),
     ...GOAL_SEARCH_TERMS[target.goal],
-    target.industry.trim(),
-    target.region ? REGION_META[target.region].label : '',
-    target.customerType ? CUSTOMER_TYPE_META[target.customerType].label : '',
-  ]
-
-  return uniqueNonEmpty(parts).join(' ')
+  ]).join(' ')
 }
 
 export function isExactCommercialTargetSearchQuery(
