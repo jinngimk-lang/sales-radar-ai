@@ -10,7 +10,6 @@ import {
 import {
   commercialTargetToMarketTarget,
   getCommercialTarget,
-  updateCommercialTarget,
 } from '@/services/commercial-targets'
 import { Button } from '@/components/ui/Button'
 import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
@@ -146,6 +145,10 @@ export function MarketIntelligenceWorkspacePage() {
         customerType: target.customerType || undefined,
         goal: target.goal,
         signalFocus: target.signalFocus,
+        targetId:
+          commercialTargetId && targetMatchesPersisted
+            ? commercialTargetId
+            : undefined,
       }
       const result = await runMarketResearch(researchInput)
       setSession(result)
@@ -163,17 +166,6 @@ export function MarketIntelligenceWorkspacePage() {
         completedAt: result.completedAt,
         errorCode: null,
       })
-
-      if (
-        commercialTargetId &&
-        canRecordCommercialTargetRun(target, persistedTargetSnapshot)
-      ) {
-        void updateCommercialTarget(commercialTargetId, {
-          lastRunAt: result.completedAt,
-        }).catch((error) => {
-          console.error('[MarketRadar] Unable to update target run time', error)
-        })
-      }
     } catch (error) {
       console.error('[MarketRadar] Hosted research failed', error)
       const code = error instanceof ApiRequestError ? error.code : undefined
