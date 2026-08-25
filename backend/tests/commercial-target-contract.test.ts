@@ -46,3 +46,18 @@ test('repository scopes list and update operations by user id', async () => {
   assert.match(service, /WHERE "userId" = \$\{userId\}/)
   assert.match(service, /WHERE "id" = \$\{id\} AND "userId" = \$\{userId\}/)
 })
+
+test('lastRunAt is server-owned evidence written only by a successful exact market scan', async () => {
+  const [targetController, targetService, marketController] = await Promise.all([
+    read('src/controllers/commercial-target.controller.ts'),
+    read('src/services/commercial-target.service.ts'),
+    read('src/controllers/market-signal.controller.ts'),
+  ])
+
+  assert.doesNotMatch(targetController, /input\.lastRunAt/)
+  assert.doesNotMatch(targetController, /COMMERCIAL_TARGET_LAST_RUN_INVALID/)
+  assert.match(targetService, /recordSuccessfulRun/)
+  assert.match(marketController, /targetId/)
+  assert.match(marketController, /matchesCommercialTarget/)
+  assert.match(marketController, /recordSuccessfulRun/)
+})
