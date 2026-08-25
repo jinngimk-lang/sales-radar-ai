@@ -7,11 +7,20 @@ import type { AgentWorkspaceStatus } from '@/components/ui/WorkspaceState'
 
 export type SignalFocus = 'ALL' | MarketSignalType
 
+export type CommercialGoal =
+  | 'FIND_BUYERS'
+  | 'FIND_SUPPLIERS'
+  | 'FIND_PARTNERS'
+  | 'FIND_DISTRIBUTORS'
+  | 'RESEARCH_COMPETITORS'
+  | 'EXPLORE_MARKET'
+
 export interface MarketScanTarget {
   product: string
   industry: string
   region: Region | ''
   customerType: CustomerType | ''
+  goal: CommercialGoal
   signalFocus: SignalFocus
 }
 

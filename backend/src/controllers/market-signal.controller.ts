@@ -4,6 +4,11 @@ import {
   type MarketResearchSignalFocus,
   type MarketResearchTarget,
 } from '../services/market-intelligence/market-web-research.service.js'
+import {
+  buildCommercialResearchAudience,
+  MARKET_RESEARCH_GOALS,
+  type MarketResearchCommercialGoal,
+} from '../services/market-intelligence/commercial-goal.js'
 import { resilientMarketWebResearch } from '../services/market-intelligence/resilient-market-web-research.service.js'
 import { ensureDemoUser } from '../services/demo-user.service.js'
 import { AppError } from '../utils/app-error.js'
@@ -82,7 +87,7 @@ export function createRunMarketResearchController(
 export const runMarketResearchController =
   createRunMarketResearchController()
 
-function readResearchTarget(value: unknown): MarketResearchTarget {
+export function readResearchTarget(value: unknown): MarketResearchTarget {
   const input =
     value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
@@ -104,11 +109,29 @@ function readResearchTarget(value: unknown): MarketResearchTarget {
     )
   }
 
+  const customerType = readText(input.customerType, 80)
+  const requestedGoal = readText(input.goal, 40)
+  if (
+    requestedGoal &&
+    !MARKET_RESEARCH_GOALS.has(requestedGoal as MarketResearchCommercialGoal)
+  ) {
+    throw new AppError(
+      400,
+      'MARKET_RESEARCH_GOAL_INVALID',
+      'goal is invalid',
+    )
+  }
+
   return {
     product,
     industry: readText(input.industry, 120),
     region: readText(input.region, 80),
-    customerType: readText(input.customerType, 80),
+    customerType: requestedGoal
+      ? buildCommercialResearchAudience(
+          requestedGoal as MarketResearchCommercialGoal,
+          customerType,
+        )
+      : customerType,
     signalFocus: focus as MarketResearchSignalFocus,
   }
 }
@@ -118,7 +141,6 @@ function readText(value: unknown, maxLength: number) {
     ? value.trim().slice(0, maxLength)
     : undefined
 }
-
 
 export const startMarketLiveBrowserController: RequestHandler = async (
   request,
