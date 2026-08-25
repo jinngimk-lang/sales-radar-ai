@@ -87,6 +87,25 @@ describe('Global Search Intelligence v1', () => {
     )
   })
 
+  it('carries saved target industry, region and customer type through structured Product Context', async () => {
+    const strategy = await intelligence.createStrategy(
+      'industrial automation SaaS buyers procurement purchasing demand',
+      {
+        product: 'industrial automation SaaS',
+        industry: '工业制造',
+        region: 'Europe',
+        customerType: 'Company',
+      },
+    )
+
+    assert.equal(strategy.intent.industry, '工业制造')
+    assert.equal(strategy.intent.region, 'Europe')
+    assert.equal(strategy.intent.customerType, 'Company')
+    assert.match(intelligence.optimizedKeyword(strategy, ''), /工业制造/)
+    assert.match(intelligence.optimizedKeyword(strategy, ''), /companies/i)
+    assert.match(intelligence.optimizedKeyword(strategy, ''), /Europe/)
+  })
+
   it('understands an English commercial search', async () => {
     const intent = await provider.parse(
       'Find packaging machinery system integrators in Germany',

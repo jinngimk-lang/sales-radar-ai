@@ -51,6 +51,7 @@ import {
   ALL_INDUSTRIES,
   ALL_REGIONS,
 } from '@/data/meta'
+import type { DiscoverTargetFilters } from '@/features/market-intelligence/discover-target-filters'
 
 const DEFAULT_FILTERS: SearchFilters = {
   query: '',
@@ -67,6 +68,11 @@ type OpportunitySortKey = 'recommended' | 'confidence' | 'latest'
 type ResultCategory = 'radar' | 'opportunities' | 'leads'
 type AudienceFilter = 'all' | AudienceType
 
+interface DiscoverPageProps {
+  initialTargetFilters?: DiscoverTargetFilters
+  onTargetFiltersChange?: (filters: DiscoverTargetFilters) => void
+}
+
 const AUDIENCE_META: Array<{ key: AudienceFilter; label: string }> = [
   { key: 'all', label: '全部对象' },
   { key: 'person', label: '个人联系人' },
@@ -82,13 +88,20 @@ const CHANNELS: { key: OutreachChannel; label: string; icon: typeof Mail }[] = [
 ]
 
 /** 客户搜索页面 */
-export function DiscoverPage() {
+export function DiscoverPage({
+  initialTargetFilters,
+  onTargetFiltersChange,
+}: DiscoverPageProps = {}) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const selectingForAssistant = searchParams.get('selectFor') === 'assistant'
   const [filters, setFilters] = useState<SearchFilters>({
     ...DEFAULT_FILTERS,
     query: searchParams.get('q') || '',
+    regions: initialTargetFilters?.region ? [initialTargetFilters.region] : [],
+    customerTypes: initialTargetFilters?.customerType
+      ? [initialTargetFilters.customerType]
+      : [],
   })
   const [customers, setCustomers] = useState<Customer[]>([])
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([])
@@ -111,7 +124,9 @@ export function DiscoverPage() {
     useState<ProductContextSnapshot | null>(null)
   const [productProfiles, setProductProfiles] = useState<ProductProfile[]>([])
   const [selectedProductId, setSelectedProductId] = useState('')
-  const [industryFocus, setIndustryFocus] = useState('')
+  const [industryFocus, setIndustryFocus] = useState(
+    initialTargetFilters?.industry ?? '',
+  )
   const [hasSearched, setHasSearched] = useState(
     Boolean(searchParams.get('q')?.trim()),
   )
@@ -127,6 +142,19 @@ export function DiscoverPage() {
   useEffect(() => {
     getProductProfiles().then(setProductProfiles).catch(() => setProductProfiles([]))
   }, [])
+
+  useEffect(() => {
+    onTargetFiltersChange?.({
+      industry: industryFocus,
+      region: filters.regions[0] ?? '',
+      customerType: filters.customerTypes[0] ?? '',
+    })
+  }, [
+    filters.customerTypes,
+    filters.regions,
+    industryFocus,
+    onTargetFiltersChange,
+  ])
 
   // 搜索
   const runSearch = useCallback(async (currentFilters: SearchFilters) => {

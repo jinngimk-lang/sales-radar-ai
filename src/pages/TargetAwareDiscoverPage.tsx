@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Loader2, Target } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { DiscoverPage } from '@/pages/DiscoverPage'
@@ -13,6 +13,16 @@ import {
   COMMERCIAL_GOAL_LABELS,
   isExactCommercialTargetSearchQuery,
 } from '@/features/market-intelligence/commercial-target-search'
+import {
+  discoverTargetFiltersMatch,
+  mapCommercialTargetToDiscoverFilters,
+  type DiscoverTargetFilters,
+} from '@/features/market-intelligence/discover-target-filters'
+
+interface ObservedTargetFilters {
+  targetId: string
+  filters: DiscoverTargetFilters
+}
 
 export function TargetAwareDiscoverPage() {
   const navigate = useNavigate()
@@ -22,6 +32,9 @@ export function TargetAwareDiscoverPage() {
   const [target, setTarget] = useState<CommercialTarget | null>(null)
   const [targetLoading, setTargetLoading] = useState(Boolean(targetId))
   const [targetError, setTargetError] = useState<string | null>(null)
+  const [observedTargetFilters, setObservedTargetFilters] =
+    useState<ObservedTargetFilters | null>(null)
+  const [discoverResetVersion, setDiscoverResetVersion] = useState(0)
 
   useEffect(() => {
     if (!targetId) {
@@ -58,6 +71,11 @@ export function TargetAwareDiscoverPage() {
     () => (target ? commercialTargetToMarketTarget(target) : null),
     [target],
   )
+  const targetFilterMapping = useMemo(
+    () =>
+      marketTarget ? mapCommercialTargetToDiscoverFilters(marketTarget) : null,
+    [marketTarget],
+  )
   const compiledQuery = useMemo(
     () =>
       marketTarget
@@ -69,6 +87,10 @@ export function TargetAwareDiscoverPage() {
     marketTarget &&
       (query.trim() === '' || sameQuery(query, marketTarget.product)),
   )
+  const currentTargetFilters =
+    target && observedTargetFilters?.targetId === target.id
+      ? observedTargetFilters.filters
+      : targetFilterMapping?.filters ?? null
 
   useEffect(() => {
     if (!marketTarget || !shouldCompileTargetQuery || !compiledQuery) return
@@ -83,13 +105,42 @@ export function TargetAwareDiscoverPage() {
     shouldCompileTargetQuery,
   ])
 
+  const handleTargetFiltersChange = useCallback(
+    (filters: DiscoverTargetFilters) => {
+      if (!target) return
+      setObservedTargetFilters((current) => {
+        if (
+          current?.targetId === target.id &&
+          discoverTargetFiltersMatch(current.filters, filters)
+        ) {
+          return current
+        }
+        return { targetId: target.id, filters }
+      })
+    },
+    [target],
+  )
+
   if (targetId && (targetLoading || shouldCompileTargetQuery)) {
     return <TargetSearchLoading />
   }
 
-  const exactTargetSearch = Boolean(
+  const exactTargetQuery = Boolean(
     marketTarget && isExactCommercialTargetSearchQuery(query, marketTarget),
   )
+  const hasUnmappedTargetFilters = Boolean(
+    targetFilterMapping?.unmappedDimensions.length,
+  )
+  const exactTargetFilters = Boolean(
+    targetFilterMapping &&
+      currentTargetFilters &&
+      !hasUnmappedTargetFilters &&
+      discoverTargetFiltersMatch(
+        currentTargetFilters,
+        targetFilterMapping.filters,
+      ),
+  )
+  const exactTargetSearch = exactTargetQuery && exactTargetFilters
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-ink-50">
@@ -97,11 +148,14 @@ export function TargetAwareDiscoverPage() {
         <CommercialTargetSearchBanner
           target={target}
           exact={exactTargetSearch}
+          hasUnmappedTargetFilters={hasUnmappedTargetFilters}
           onBackToRecommendation={() =>
             navigate(`/app/market?targetId=${encodeURIComponent(target.id)}`)
           }
           onSwitchTarget={() => navigate('/app/targets')}
           onRestoreTargetSearch={() => {
+            setObservedTargetFilters(null)
+            setDiscoverResetVersion((value) => value + 1)
             const nextParams = new URLSearchParams(searchParams)
             nextParams.set('q', target.product)
             setSearchParams(nextParams)
@@ -113,7 +167,13 @@ export function TargetAwareDiscoverPage() {
         </div>
       ) : null}
       <div className="min-h-0 flex-1">
-        <DiscoverPage />
+        <DiscoverPage
+          key={`${target?.id ?? 'free'}:${discoverResetVersion}`}
+          initialTargetFilters={targetFilterMapping?.filters}
+          onTargetFiltersChange={
+            targetFilterMapping ? handleTargetFiltersChange : undefined
+          }
+        />
       </div>
     </div>
   )
@@ -122,12 +182,14 @@ export function TargetAwareDiscoverPage() {
 function CommercialTargetSearchBanner({
   target,
   exact,
+  hasUnmappedTargetFilters,
   onBackToRecommendation,
   onSwitchTarget,
   onRestoreTargetSearch,
 }: {
   target: CommercialTarget
   exact: boolean
+  hasUnmappedTargetFilters: boolean
   onBackToRecommendation: () => void
   onSwitchTarget: () => void
   onRestoreTargetSearch: () => void
@@ -138,6 +200,16 @@ function CommercialTargetSearchBanner({
     target.region ? REGION_META[target.region].label : null,
     target.customerType ? CUSTOMER_TYPE_META[target.customerType].label : null,
   ].filter((value): value is string => Boolean(value))
+  const statusLabel = exact
+    ? '目标意图已应用'
+    : hasUnmappedTargetFilters
+      ? '部分目标条件未映射'
+      : '临时关键词 / 筛选'
+  const statusDescription = exact
+    ? ' · 商业目标已编译进本次真实 SearchTask 关键词；可映射的行业/地区/对象类型已作为页面结构化筛选应用，后续实际筛选以页面选择为准'
+    : hasUnmappedTargetFilters
+      ? ' · 商业目标关键词已应用；行业无法映射到当前结构化筛选，不会偷偷塞进关键词或伪装成已应用条件'
+      : ' · 当前关键词或结构化筛选已修改，本次搜索按临时关键词执行，不冒充已保存目标意图；结构化筛选以页面当前选择为准'
 
   return (
     <section
@@ -158,7 +230,7 @@ function CommercialTargetSearchBanner({
                   : 'rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800'
               }
             >
-              {exact ? '目标意图已应用' : '临时关键词'}
+              {statusLabel}
             </span>
           </div>
           <p className="mt-1 truncate text-sm font-semibold text-ink-900">
@@ -166,19 +238,17 @@ function CommercialTargetSearchBanner({
           </p>
           <p className="mt-1 text-[10px] leading-4 text-ink-500">
             {details.join(' · ')}
-            {exact
-              ? ' · 商业目标已编译进本次真实 SearchTask 关键词；行业/地区/对象类型为目标参考，实际筛选以页面选择为准'
-              : ' · 当前关键词已修改，本次搜索按临时关键词执行，不冒充已保存目标意图'}
+            {statusDescription}
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {!exact ? (
+          {!exact && !hasUnmappedTargetFilters ? (
             <button
               type="button"
               onClick={onRestoreTargetSearch}
               className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-[10px] font-semibold text-amber-800 transition hover:bg-amber-50"
             >
-              恢复目标关键词
+              恢复目标条件
             </button>
           ) : null}
           <button
