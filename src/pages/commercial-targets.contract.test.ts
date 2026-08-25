@@ -40,3 +40,24 @@ test('market radar restores an exact persisted target and delegates run evidence
   assert.doesNotMatch(market, /lastRunAt: result\.completedAt/)
   assert.doesNotMatch(market, /updateCommercialTarget\(commercialTargetId/)
 })
+
+test('an exact persisted target crosses from recommendation into target-aware proactive search', async () => {
+  const [app, market, bridge, compiler] = await Promise.all([
+    read('../App.tsx'),
+    read('./MarketIntelligenceWorkspacePage.tsx'),
+    read('./TargetAwareDiscoverPage.tsx'),
+    read('../features/market-intelligence/commercial-target-search.ts'),
+  ])
+
+  assert.match(app, /TargetAwareDiscoverPage/)
+  assert.match(market, /params\.set\('targetId', commercialTargetId\)/)
+  assert.match(market, /commercialTargetId && targetMatchesPersisted/)
+  assert.match(bridge, /getCommercialTarget\(targetId\)/)
+  assert.match(bridge, /buildCommercialTargetSearchExpression/)
+  assert.match(bridge, /目标搜索已应用/)
+  assert.match(bridge, /临时搜索/)
+  assert.match(bridge, /本次结果不冒充已保存目标的精确运行/)
+  assert.match(compiler, /FIND_BUYERS: \['买家', '采购', '采购需求'\]/)
+  assert.match(compiler, /FIND_SUPPLIERS: \['供应商', '制造商', '供货'\]/)
+  assert.match(compiler, /RESEARCH_COMPETITORS: \['竞品', '竞争对手', '替代方案'\]/)
+})
