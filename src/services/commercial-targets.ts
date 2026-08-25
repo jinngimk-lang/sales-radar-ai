@@ -32,7 +32,6 @@ export interface CommercialTargetInput {
   goal: CommercialGoal
   signalFocus?: SignalFocus
   status?: CommercialTargetStatus
-  lastRunAt?: string | null
 }
 
 export type CommercialTargetUpdate = Partial<CommercialTargetInput>
