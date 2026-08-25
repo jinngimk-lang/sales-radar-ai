@@ -5,15 +5,20 @@ import test from 'node:test'
 const root = new URL('../', import.meta.url)
 const read = (path: string) => readFile(new URL(path, root), 'utf8')
 
-test('persistent commercial target has a user-scoped Prisma model', async () => {
-  const schema = await read('prisma/schema.prisma')
+test('persistent commercial target has a user-scoped database table', async () => {
+  const migration = await read(
+    'prisma/migrations/20260825042000_add_commercial_targets/migration.sql',
+  )
 
-  assert.match(schema, /enum CommercialTargetStatus \{[\s\S]*DRAFT[\s\S]*ACTIVE[\s\S]*PAUSED[\s\S]*CLOSED[\s\S]*\}/)
-  assert.match(schema, /model CommercialTarget \{[\s\S]*userId\s+String/)
-  assert.match(schema, /goal\s+RadarCustomerGoal/)
-  assert.match(schema, /signalFocus\s+String/)
-  assert.match(schema, /lastRunAt\s+DateTime\?/)
-  assert.match(schema, /commercialTargets\s+CommercialTarget\[\]/)
+  assert.match(migration, /CREATE TABLE "CommercialTarget"/)
+  assert.match(migration, /"userId" TEXT NOT NULL/)
+  assert.match(migration, /REFERENCES "User"\("id"\) ON DELETE CASCADE/)
+  assert.match(migration, /FIND_BUYERS/)
+  assert.match(migration, /FIND_SUPPLIERS/)
+  assert.match(migration, /FIND_PARTNERS/)
+  assert.match(migration, /FIND_DISTRIBUTORS/)
+  assert.match(migration, /RESEARCH_COMPETITORS/)
+  assert.match(migration, /EXPLORE_MARKET/)
 })
 
 test('commercial targets are mounted behind the workspace user boundary', async () => {
@@ -33,4 +38,11 @@ test('commercial target parser rejects unknown goals instead of silently changin
   assert.match(controller, /COMMERCIAL_TARGET_GOAL_INVALID/)
   assert.match(controller, /MARKET_RESEARCH_GOALS/)
   assert.doesNotMatch(controller, /goal:\s*['\"]FIND_BUYERS['\"]/)
+})
+
+test('repository scopes list and update operations by user id', async () => {
+  const service = await read('src/services/commercial-target.service.ts')
+
+  assert.match(service, /WHERE "userId" = \$\{userId\}/)
+  assert.match(service, /WHERE "id" = \$\{id\} AND "userId" = \$\{userId\}/)
 })
