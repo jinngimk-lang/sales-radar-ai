@@ -155,21 +155,6 @@ export function readCommercialTargetInput(
   if (goalRaw) parsed.goal = goalRaw as MarketResearchCommercialGoal
   if (signalFocusRaw) parsed.signalFocus = signalFocusRaw
   if (statusRaw) parsed.status = statusRaw as CommercialTargetStatus
-  if (Object.prototype.hasOwnProperty.call(input, 'lastRunAt')) {
-    if (input.lastRunAt === null) {
-      parsed.lastRunAt = null
-    } else if (typeof input.lastRunAt === 'string') {
-      const date = new Date(input.lastRunAt)
-      if (Number.isNaN(date.getTime())) {
-        throw new AppError(
-          400,
-          'COMMERCIAL_TARGET_LAST_RUN_INVALID',
-          'lastRunAt is invalid',
-        )
-      }
-      parsed.lastRunAt = date
-    }
-  }
 
   if (partial) return parsed
 
