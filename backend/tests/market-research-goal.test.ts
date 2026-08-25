@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { Platform } from '@prisma/client'
 import { readResearchTarget } from '../src/controllers/market-signal.controller.js'
 import { MarketWebResearchService } from '../src/services/market-intelligence/market-web-research.service.js'
 import { AppError } from '../src/utils/app-error.js'
@@ -85,9 +84,5 @@ describe('market research commercial goal', () => {
     })
 
     assert.equal(target.customerType, 'Buyer')
-  })
-
-  it('does not require a real external network during goal tests', () => {
-    assert.equal(Platform.Website, 'Website')
   })
 })
