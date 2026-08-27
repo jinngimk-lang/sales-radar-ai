@@ -4,14 +4,14 @@ import test from 'node:test'
 
 const read = (path: string) => readFile(new URL(path, import.meta.url), 'utf8')
 
-const [home, composer, marketPage, marketTarget, livePanel, revenuePage, revenueLive, account, layout] = await Promise.all([
+const [app, home, composer, marketPage, marketTarget, livePanel, discoverBridge, account, layout] = await Promise.all([
+  read('./App.tsx'),
   read('./pages/AICommandCenterPage.tsx'),
   read('./features/command-center/CommandComposer.tsx'),
   read('./pages/MarketIntelligenceWorkspacePage.tsx'),
   read('./features/market-intelligence/MarketScanTarget.tsx'),
   read('./features/market-intelligence/MarketLiveBrowserPanel.tsx'),
-  read('./pages/RevenueOperationsPage.tsx'),
-  read('./features/revenue/RevenueLiveOpsPanel.tsx'),
+  read('./pages/TargetAwareDiscoverPage.tsx'),
   read('./pages/AccountPage.tsx'),
   read('./components/layout/AppLayout.tsx'),
 ])
@@ -24,6 +24,7 @@ test('AI home is input-first and removes marketing-style authenticated hero cont
   assert.doesNotMatch(home, /<Capability/)
   assert.doesNotMatch(composer, /示例 \{index \+ 1\}/)
   assert.doesNotMatch(composer, /全网搜索可在没有 GPT API 时运行/)
+  assert.doesNotMatch(home, /label: '找收益'/)
 })
 
 test('market browser keeps Live controls but removes Browserbase policy banner', () => {
@@ -34,29 +35,32 @@ test('market browser keeps Live controls but removes Browserbase policy banner',
   assert.match(livePanel, /title="交互式云浏览器"/)
 })
 
-test('revenue workspace removes oversized supervision marketing copy and dead helpers', () => {
-  assert.match(revenuePage, /收益中心/)
-  assert.doesNotMatch(revenuePage, /Revenue Supervision/)
-  assert.doesNotMatch(revenuePage, /Supervision Pipeline/)
-  assert.doesNotMatch(revenueLive, /自动任务保持只读，人工接管画面可以点击/)
-  assert.doesNotMatch(revenueLive, /function TrustItem/)
-  assert.doesNotMatch(revenueLive, /\bShieldCheck\b/)
-})
-
-test('settings and navigation are concise and expose the marketplace operating sequence', () => {
+test('primary navigation follows the operating loop and removes the standalone revenue workspace', () => {
   assert.doesNotMatch(layout, /item\.desc/)
   assert.doesNotMatch(layout, /真实来源模式/)
-  assert.match(layout, /to: '\/app\/home', label: 'AI 工作台'/)
+  assert.match(layout, /to: '\/app\/home', label: '工作台'/)
   assert.match(layout, /to: '\/app\/targets', label: '目标'/)
-  assert.match(layout, /to: '\/app\/market', label: '推荐'/)
-  assert.match(layout, /to: '\/app\/discover', label: '搜索'/)
+  assert.match(layout, /to: '\/app\/market', label: '发现'/)
+  assert.match(layout, /activePaths: \['\/app\/market', '\/app\/discover'\]/)
   assert.match(layout, /to: '\/app\/communication', label: '沟通'/)
-  assert.match(layout, /to: '\/app\/intent', label: '意向'/)
-  assert.match(layout, /to: '\/app\/revenue', label: '收益'/)
+  assert.match(layout, /to: '\/app\/intent', label: '机会'/)
   assert.match(layout, /to: '\/app\/account', label: '设置'/)
+  assert.doesNotMatch(layout, /label: '推荐'/)
+  assert.doesNotMatch(layout, /label: '搜索'/)
+  assert.doesNotMatch(layout, /label: '收益'/)
+  assert.doesNotMatch(layout, /WalletCards/)
+  assert.doesNotMatch(app, /RevenueOperationsPage/)
+  assert.doesNotMatch(app, /path="revenue"/)
   assert.doesNotMatch(account, /Sales Radar 工作区/)
   assert.doesNotMatch(account, /数据可见性/)
   assert.match(account, /运行能力/)
+})
+
+test('discovery is one workspace with recommendation and proactive search modes', () => {
+  assert.match(marketPage, /DiscoveryModeSwitch/)
+  assert.match(discoverBridge, /DiscoveryModeSwitch/)
+  assert.match(marketPage, /mode="recommend"/)
+  assert.match(discoverBridge, /mode="search"/)
 })
 
 test('market target carries a real commercial goal while assessment stays in the market workspace', () => {
