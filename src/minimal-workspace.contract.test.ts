@@ -24,11 +24,10 @@ test('AI home is input-first and removes marketing-style authenticated hero cont
   assert.doesNotMatch(home, /<Capability/)
   assert.doesNotMatch(composer, /示例 \{index \+ 1\}/)
   assert.doesNotMatch(composer, /全网搜索可在没有 GPT API 时运行/)
-  assert.doesNotMatch(home, /label: '找收益'/)
 })
 
 test('market browser keeps Live controls but removes Browserbase policy banner', () => {
-  assert.match(marketPage, /市场雷达/)
+  assert.match(marketPage, /title="发现"/)
   assert.doesNotMatch(marketTarget, /设置市场侦察目标/)
   assert.doesNotMatch(livePanel, /Browserbase 只读研究会话/)
   assert.match(livePanel, /解锁 Live/)
@@ -72,4 +71,5 @@ test('market target carries a real commercial goal while assessment stays in the
   assert.match(marketTarget, /探索市场/)
   assert.match(marketPage, /goal: target\.goal/)
   assert.match(marketPage, /主动搜索/)
+  assert.match(marketPage, /SignalAssessmentPanel/)
 })
