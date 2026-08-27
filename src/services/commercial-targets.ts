@@ -6,6 +6,7 @@ import type {
 } from '@/features/market-intelligence/market-intelligence.contract'
 
 export type CommercialTargetStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'CLOSED'
+export type CommercialTargetRunStatus = 'RUNNING' | 'COMPLETED' | 'FAILED'
 
 export interface CommercialTarget {
   id: string
@@ -19,6 +20,12 @@ export interface CommercialTarget {
   signalFocus: SignalFocus
   status: CommercialTargetStatus
   lastRunAt: string | null
+  lastRunStatus: CommercialTargetRunStatus | null
+  lastRunStartedAt: string | null
+  lastRunCompletedAt: string | null
+  lastRunSourceCount: number | null
+  lastRunSignalCount: number | null
+  lastRunErrorCode: string | null
   createdAt: string
   updatedAt: string
 }
