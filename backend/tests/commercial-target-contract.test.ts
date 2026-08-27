@@ -47,17 +47,42 @@ test('repository scopes list and update operations by user id', async () => {
   assert.match(service, /WHERE "id" = \$\{id\} AND "userId" = \$\{userId\}/)
 })
 
-test('lastRunAt is server-owned evidence written only by a successful exact market scan', async () => {
-  const [targetController, targetService, marketController] = await Promise.all([
-    read('src/controllers/commercial-target.controller.ts'),
+test('commercial target run lifecycle is server-owned and persists truthful progress', async () => {
+  const [migration, targetController, targetService, marketController] =
+    await Promise.all([
+      read('prisma/migrations/20260827180000_add_commercial_target_run_state/migration.sql'),
+      read('src/controllers/commercial-target.controller.ts'),
+      read('src/services/commercial-target.service.ts'),
+      read('src/controllers/market-signal.controller.ts'),
+    ])
+
+  assert.match(migration, /"lastRunStatus" TEXT/)
+  assert.match(migration, /"lastRunStartedAt" TIMESTAMP\(3\)/)
+  assert.match(migration, /"lastRunCompletedAt" TIMESTAMP\(3\)/)
+  assert.match(migration, /"lastRunSourceCount" INTEGER/)
+  assert.match(migration, /"lastRunSignalCount" INTEGER/)
+  assert.match(migration, /"lastRunErrorCode" TEXT/)
+
+  assert.doesNotMatch(targetController, /input\.lastRunAt/)
+  assert.doesNotMatch(targetController, /input\.lastRunStatus/)
+  assert.match(targetService, /recordRunStarted/)
+  assert.match(targetService, /recordRunCompleted/)
+  assert.match(targetService, /recordRunFailed/)
+  assert.match(marketController, /COMMERCIAL_TARGET_INACTIVE/)
+  assert.match(marketController, /recordRunStarted/)
+  assert.match(marketController, /recordRunCompleted/)
+  assert.match(marketController, /recordRunFailed/)
+  assert.match(marketController, /sources\.length/)
+  assert.match(marketController, /signals\.length/)
+})
+
+test('lastRunAt remains successful-run evidence rather than generic activity time', async () => {
+  const [targetService, marketController] = await Promise.all([
     read('src/services/commercial-target.service.ts'),
     read('src/controllers/market-signal.controller.ts'),
   ])
 
-  assert.doesNotMatch(targetController, /input\.lastRunAt/)
-  assert.doesNotMatch(targetController, /COMMERCIAL_TARGET_LAST_RUN_INVALID/)
-  assert.match(targetService, /recordSuccessfulRun/)
-  assert.match(marketController, /targetId/)
-  assert.match(marketController, /matchesCommercialTarget/)
-  assert.match(marketController, /recordSuccessfulRun/)
+  assert.match(targetService, /"lastRunAt" = \$\{completedAt\}/)
+  assert.match(marketController, /recordRunCompleted/)
+  assert.doesNotMatch(marketController, /recordSuccessfulRun/)
 })
