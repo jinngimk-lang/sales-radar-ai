@@ -1,0 +1,59 @@
+name: Reconcile PR64 Radar
+
+on:
+  push:
+    branches:
+      - radar/exa-mcp-shelljs-20260828
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: radar/exa-mcp-shelljs-20260828
+          fetch-depth: 0
+
+      - name: Reconcile Exa finding into canonical radar
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/technology-radar.md')
+          text = path.read_text()
+
+          old_row = "| `exa-labs/exa-mcp-server` | Repository active through 2026-08-21; npm `3.4.1` published in Aug 2026. Sales Radar production is intentionally pinned to `3.2.1`. Upstream issue #421 (2026-08-19) shows the hosted Exa MCP endpoint still negotiates `2025-11-25` and rejects `MCP-Protocol-Version: 2026-07-28` on subsequent calls. Current upstream package still depends on MCP JS SDK `^1.12.1`. | MIT | WATCH | Keep the production `exa-mcp-server@3.2.1` + `mcporter@0.12.3` path while health checks remain green. Do not upgrade the server or force a newer MCP protocol header merely for freshness. Any upgrade must run the existing runtime/config/search-depth tests and verify initialize/tool-list/search semantics with the negotiated protocol version; rollback is the current Dockerfile pin. |"
+          new_row = "| `exa-labs/exa-mcp-server` | Repository active through 2026-08-28; npm `3.4.1` remains current in this scan. Sales Radar production is intentionally pinned to `3.2.1`. Upstream issue #421 (2026-08-19) shows the hosted Exa MCP endpoint still negotiates `2025-11-25` and rejects `MCP-Protocol-Version: 2026-07-28` on subsequent calls. Upstream issue #407 documents the `whoami@0.0.3 -> shelljs@0.3.0` dependency chain; GitHub Reviewed advisory GHSA-4rq4-32rv-6wp6 / CVE-2022-0144 rates `shelljs <0.8.5` HIGH and identifies `0.8.5` as the patched floor. Current upstream `3.4.1` removes `whoami`, but also changes package/tool behavior compared with the proven `3.2.1` runtime. | MIT | WATCH | Keep the production Exa MCP tool contract pinned to `3.2.1` while applying the narrow isolated-runtime npm override to `shelljs@0.8.5`; the production Docker image must fail if `0.8.5` is absent or `0.3.0` remains. Do not jump to `3.4.1` solely to clear the advisory. Any future Exa upgrade must run runtime/config/tool-list/SearchTask/provider-failure/provenance regression coverage and retain the `3.2.1` rollback path. |"
+          if old_row not in text:
+              raise SystemExit('expected Exa radar row not found')
+          text = text.replace(old_row, new_row, 1)
+
+          anchor = "The same discipline now explicitly covers Exa. Sales Radar currently builds its production backend image with `mcporter@0.12.3` and `exa-mcp-server@3.2.1`. Upstream issue #421 shows the hosted Exa endpoint negotiating `2025-11-25` even when a client proposes `2026-07-28`, and then rejecting a request that incorrectly sends the newer protocol header. This is not a current production regression: the pinned local runtime is healthy and the existing tests exercise Exa runtime configuration. It is an upgrade boundary. Clients must honor the negotiated protocol version rather than assume the newest published spec.\n"
+          addition = anchor + "\nExa issue #407 adds a direct dependency-security boundary for the pinned runtime line: the affected package graph reaches `shelljs@0.3.0` through `whoami@0.0.3`, while GitHub Reviewed GHSA-4rq4-32rv-6wp6 / CVE-2022-0144 marks `shelljs <0.8.5` HIGH and `0.8.5` patched. Sales Radar therefore keeps the proven `exa-mcp-server@3.2.1` semantics but installs it in an isolated npm prefix with an explicit `shelljs@0.8.5` override and image-build assertions that reject the vulnerable version. Upstream `3.4.1` has removed `whoami`, but that broader package/tool change remains a separate regression-gated upgrade rather than an emergency substitution.\n"
+          if anchor not in text:
+              raise SystemExit('expected Exa discipline anchor not found')
+          text = text.replace(anchor, addition, 1)
+
+          scan_anchor = "## Scan record — 2026-08-28\n\n"
+          scan_item = "- Reconciled the Exa MCP transitive ShellJS security finding into the canonical radar. Production remains on the proven `exa-mcp-server@3.2.1` tool contract, but the candidate runtime installs it in an isolated prefix with `shelljs@0.8.5`, rejects any remaining `0.3.0`, and adds a production Docker image build to backend CI. This is a narrow mitigation for GHSA-4rq4-32rv-6wp6/CVE-2022-0144, not an adoption of Exa `3.4.1`; rollback remains the prior global `3.2.1` installation.\n"
+          if scan_anchor not in text:
+              raise SystemExit('scan record anchor not found')
+          text = text.replace(scan_anchor, scan_anchor + scan_item, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Commit canonical radar update and self-remove helper
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/reconcile-pr64-radar.yml
+          git add docs/technology-radar.md
+          git commit -m "docs: reconcile Exa MCP security finding into radar"
+          git push origin HEAD:radar/exa-mcp-shelljs-20260828
