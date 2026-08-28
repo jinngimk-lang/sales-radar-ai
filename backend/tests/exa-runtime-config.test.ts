@@ -26,15 +26,23 @@ describe('production Exa MCP runtime configuration', () => {
     assert.equal(exa?.env?.EXA_API_KEY, '${EXA_API_KEY}')
   })
 
-  it('installs pinned mcporter and Exa MCP packages in the runtime image', () => {
+  it('pins Exa MCP while overriding its vulnerable transitive shelljs runtime', () => {
     const dockerfile = readFileSync(
       join(process.cwd(), 'Dockerfile'),
       'utf8',
     )
 
     assert.match(dockerfile, /mcporter@0\.12\.3/)
-    assert.match(dockerfile, /exa-mcp-server@3\.2\.1/)
+    assert.match(dockerfile, /"exa-mcp-server":"3\.2\.1"/)
+    assert.match(dockerfile, /"shelljs":"0\.8\.5"/)
+    assert.match(dockerfile, /\/opt\/exa-mcp-runtime/)
+    assert.match(dockerfile, /shelljs@0\.8\.5/)
+    assert.match(dockerfile, /shelljs@0\.3\.0/)
     assert.match(dockerfile, /command -v exa-mcp-server/)
+    assert.doesNotMatch(
+      dockerfile,
+      /npm install --global[^\n]*exa-mcp-server@3\.2\.1/,
+    )
     assert.doesNotMatch(dockerfile, /EXA_API_KEY\s*=/)
     assert.doesNotMatch(dockerfile, /RUN\s+mcporter\s+config\s+get/)
   })
