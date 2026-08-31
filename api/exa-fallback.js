@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto'
+import { isIP } from 'node:net'
 
 import { decodeFallbackTask } from './crawl4ai-fallback.js'
 
 const EXA_SEARCH_ENDPOINT = 'https://api.exa.ai/search'
 const DEFAULT_TIMEOUT_MS = 8_000
+const DEFAULT_CRAWL_TIMEOUT_MS = 5_000
+const DEFAULT_CRAWL_MAX_RESULTS = 5
 
 const PLATFORM_DOMAINS = {
   Reddit: ['reddit.com'],
@@ -23,6 +26,40 @@ const REGION_LABELS = {
   China: 'China',
   MiddleEast: 'Middle East',
 }
+
+const LOW_VALUE_DOMAINS = [
+  'wikipedia.org',
+  'wikimedia.org',
+  'britannica.com',
+  'baike.baidu.com',
+  'zhihu.com',
+]
+
+const COMMERCIAL_QUERY_TERMS = [
+  'buyer',
+  'procurement',
+  'purchasing',
+  'sourcing',
+  'RFQ',
+  'tender',
+  'supplier',
+  'manufacturer',
+  'distributor',
+  'importer',
+  'wholesaler',
+  '采购',
+  '求购',
+  '询价',
+  '招标',
+  '买家',
+  '供应商',
+  '经销商',
+].join(' ')
+
+const STRONG_COMMERCIAL_PATTERN = /\b(?:buyer|buying|procurement|purchasing|sourcing|rfq|rfp|tender|bid|quotation|quote|seeking|wanted|demand|importer|distributor|wholesaler|reseller|dealer|supplier|vendor|manufacturer|factory|exporter|supply partner|channel partner)\b|采购|求购|询价|招标|买家|买方|采购商|供应商|厂家|制造商|经销商|代理商|进口商|批发商|渠道商|寻源|采购需求|供应需求/iu
+const TRANSACTION_PATH_PATTERN = /\/(?:procurement|purchasing|sourcing|rfq|rfp|tender|bid|supplier|vendor|distributor|dealer|partner|opportunit|marketplace|buy|sell)(?:\/|[-_?#]|$)/iu
+const GENERIC_REFERENCE_PATTERN = /\b(?:wikipedia|encyclopedia|definition|overview|what is|history of|market report|industry report)\b|百科|词条|是什么|行业报告|市场报告/iu
+const GENERIC_HOME_PATTERN = /\b(?:home|homepage|about us|company profile|welcome to|official site|official website)\b|官网|官方网站|公司简介|关于我们/iu
 
 function sendJson(response, status, payload) {
   response.setHeader('Cache-Control', 'no-store')
@@ -45,7 +82,13 @@ function buildQuery(task) {
     .map((item) => REGION_LABELS[item])
     .filter(Boolean)
     .join(' OR ')
-  return [task.k.trim(), region ? `(${region})` : ''].filter(Boolean).join(' ')
+  return [
+    task.k.trim(),
+    region ? `(${region})` : '',
+    `(${COMMERCIAL_QUERY_TERMS})`,
+  ]
+    .filter(Boolean)
+    .join(' ')
 }
 
 function includeDomainsForTask(task) {
@@ -69,7 +112,9 @@ async function searchExa(task, apiKey, fetcher, timeoutMs) {
     numResults: task.m,
     moderation: true,
     contents: { highlights: true },
-    ...(includeDomains.length > 0 ? { includeDomains } : {}),
+    ...(includeDomains.length > 0
+      ? { includeDomains }
+      : { excludeDomains: LOW_VALUE_DOMAINS }),
   }
 
   try {
@@ -91,6 +136,143 @@ async function searchExa(task, apiKey, fetcher, timeoutMs) {
   } finally {
     clearTimeout(timeout)
   }
+}
+
+function crawlerConfig(env) {
+  const rawBaseUrl = env.CRAWL4AI_BASE_URL?.trim()
+  if (!rawBaseUrl) return null
+  try {
+    const url = new URL(rawBaseUrl)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
+    return {
+      baseUrl: url.toString().replace(/\/+$/, ''),
+      apiToken: env.CRAWL4AI_API_TOKEN?.trim() || null,
+      timeoutMs: positiveInteger(
+        env.CRAWL4AI_TIMEOUT_MS,
+        DEFAULT_CRAWL_TIMEOUT_MS,
+        15_000,
+      ),
+      maxResults: positiveInteger(
+        env.CRAWL4AI_MAX_RESULTS,
+        DEFAULT_CRAWL_MAX_RESULTS,
+        10,
+      ),
+    }
+  } catch {
+    return null
+  }
+}
+
+function isPrivateIpv4(hostname) {
+  const parts = hostname.split('.').map(Number)
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) return false
+  const [a, b] = parts
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  )
+}
+
+function isAllowedCrawlTarget(value) {
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+    if (
+      hostname === 'localhost' ||
+      hostname.endsWith('.localhost') ||
+      hostname.endsWith('.local')
+    ) {
+      return false
+    }
+    const ipVersion = isIP(hostname)
+    if (ipVersion === 4 && isPrivateIpv4(hostname)) return false
+    if (
+      ipVersion === 6 &&
+      (hostname === '::1' ||
+        hostname.startsWith('fc') ||
+        hostname.startsWith('fd') ||
+        hostname.startsWith('fe80:'))
+    ) {
+      return false
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+function record(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : null
+}
+
+function stringValue(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function readText(value, keys) {
+  if (!value) return null
+  for (const key of keys) {
+    const text = stringValue(value[key])
+    if (text) return text
+  }
+  return null
+}
+
+function markdownText(value) {
+  if (typeof value === 'string') return value
+  return readText(record(value), ['fit_markdown', 'raw_markdown', 'markdown'])
+}
+
+async function crawlResult(result, config, fetcher) {
+  const url = safeHttpUrl(result?.url)
+  if (!url || !isAllowedCrawlTarget(url)) return result
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort('crawl4ai-timeout'), config.timeoutMs)
+  try {
+    const response = await fetcher(`${config.baseUrl}/crawl`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(config.apiToken ? { Authorization: `Bearer ${config.apiToken}` } : {}),
+      },
+      body: JSON.stringify({ urls: [url] }),
+      signal: controller.signal,
+    })
+    if (!response.ok) return result
+    const payload = await response.json()
+    const root = record(payload)
+    const crawled = record(Array.isArray(root?.results) ? root.results[0] : null)
+    if (root?.success !== true || crawled?.success !== true) return result
+    const content = markdownText(crawled.markdown) || stringValue(crawled.html)
+    if (!content) return result
+    const metadata = record(crawled.metadata) ?? {}
+    return {
+      ...result,
+      title: readText(metadata, ['title']) || result.title,
+      url: stringValue(crawled.url) || url,
+      crawlContent: content.trim().slice(0, 20_000),
+      crawlStatus: 'ENRICHED',
+    }
+  } catch {
+    return result
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function enrichWithCrawler(results, config, fetcher) {
+  if (!config) return results
+  return Promise.all(
+    results.map((result, index) =>
+      index < config.maxResults ? crawlResult(result, config, fetcher) : result,
+    ),
+  )
 }
 
 function safeHttpUrl(value) {
@@ -171,6 +353,8 @@ function compactText(value) {
 }
 
 function resultEvidence(result) {
+  const crawled = compactText(result.crawlContent)
+  if (crawled) return crawled.slice(0, 1_500)
   const directText = compactText(result.text)
   if (directText) return directText.slice(0, 1_500)
   const highlights = Array.isArray(result.highlights)
@@ -182,6 +366,38 @@ function resultEvidence(result) {
   return compactText(result.title).slice(0, 1_500)
 }
 
+function isLowValueDomain(url) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+    return LOW_VALUE_DOMAINS.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    )
+  } catch {
+    return true
+  }
+}
+
+function commercialIntentScore(result) {
+  const url = safeHttpUrl(result.url)
+  if (!url || isLowValueDomain(url)) return -100
+  const title = compactText(result.title)
+  const evidence = resultEvidence(result)
+  const text = `${title} ${evidence} ${url}`
+  let score = 0
+  if (STRONG_COMMERCIAL_PATTERN.test(text)) score += 4
+  if (TRANSACTION_PATH_PATTERN.test(url)) score += 3
+  if (GENERIC_REFERENCE_PATTERN.test(text)) score -= 4
+  try {
+    const parsed = new URL(url)
+    const homePage = parsed.pathname === '/' || parsed.pathname === ''
+    if (homePage && GENERIC_HOME_PATTERN.test(text)) score -= 3
+    if (homePage && !STRONG_COMMERCIAL_PATTERN.test(text)) score -= 2
+  } catch {
+    score -= 4
+  }
+  return score
+}
+
 function buildLead(result, index, task) {
   const url = safeHttpUrl(result.url)
   if (!url) return null
@@ -189,12 +405,13 @@ function buildLead(result, index, task) {
   const domain = domainForUrl(url)
   const platform = inferPlatform(url)
   const evidence = resultEvidence(result)
+  const intent = commercialIntentScore(result)
   const tags = keywordTags(task.k)
   const idSeed = typeof result.id === 'string' && result.id.trim()
     ? result.id.trim()
     : url
   const id = `fallback_${createHash('sha256').update(`exa:${idSeed}`).digest('hex').slice(0, 20)}`
-  const neutralScore = Math.max(35, 50 - index * 2)
+  const intentScore = Math.min(95, Math.max(55, 68 + intent * 4 - index * 2))
   const publishedAt = typeof result.publishedDate === 'string'
     ? result.publishedDate
     : null
@@ -220,16 +437,19 @@ function buildLead(result, index, task) {
     sourceUrl: url,
     profileUrl: homeUrl(url),
     interestTags: tags,
-    intentScore: neutralScore,
-    recommendedAction: 'monitor',
+    intentScore,
+    recommendedAction: intent >= 4 ? 'research-contact' : 'monitor',
     updatedAt: new Date().toISOString(),
     sourceMetadata: {
       provider: 'exa',
       searchEngine: 'exa',
       providerResultId:
         typeof result.id === 'string' && result.id.trim() ? result.id.trim() : null,
-      leadType: platform === 'Website' ? 'content' : 'person',
-      evidenceKind: 'exa-public-web-content',
+      leadType: platform === 'Website' ? 'commercial-page' : 'person',
+      evidenceKind: result.crawlStatus === 'ENRICHED'
+        ? 'crawler-backed-public-web-content'
+        : 'exa-public-web-content',
+      contentAcquisition: result.crawlStatus === 'ENRICHED' ? 'CRAWL4AI' : 'EXA',
       author:
         typeof result.author === 'string' && result.author.trim()
           ? result.author.trim()
@@ -237,22 +457,24 @@ function buildLead(result, index, task) {
       highlights: Array.isArray(result.highlights)
         ? result.highlights.filter((item) => typeof item === 'string').slice(0, 5)
         : [],
-      commercialIntent: 'unverified',
+      commercialIntent: intent >= 4 ? 'high' : 'medium',
       fallbackRuntime: true,
     },
     identityStatus: 'UNVERIFIED',
     evidenceStatus: 'VALID',
     analysis: {
       id: `${id}_analysis`,
-      intentType: 'Exa 实时网页信号',
-      intentScore: neutralScore,
+      intentType: intent >= 4 ? '买家/卖家商业信号' : '潜在商业信号',
+      intentScore,
       tags,
-      suggestion: '先核验网页中的主体、角色、需求和时间窗口，再决定是否销售触达。',
-      background: `该结果由 Exa 实时网页搜索返回（${domain}），来源链接可直接复核。`,
-      need: evidence || 'Exa 返回了与搜索条件相关的公开网页证据。',
-      purchaseProbability: 'low',
-      salesStrategy: '先验证需求真实性与采购角色，再进入联系人研究和触达。',
-      reasoning: 'Exa 提供真实网页检索与内容证据；当前分数仍只表示搜索相关性，不等同于已确认采购意图。',
+      suggestion: '优先核验采购/供货角色、需求量、时间窗口和公开联系人，再决定是否触达。',
+      background: `该结果来自公开网页检索（${domain}），并按买家/卖家商业意图筛选。`,
+      need: evidence || '发现了与采购、供货、分销或寻源相关的公开商业信号。',
+      purchaseProbability: intent >= 4 ? 'medium' : 'low',
+      salesStrategy: '围绕真实采购、供货、RFQ、招标、渠道或寻源证据推进，不把官网介绍或百科资料当作线索。',
+      reasoning: result.crawlStatus === 'ENRICHED'
+        ? 'Crawl4AI 已抓取候选页面正文，结果通过商业意图规则后才进入列表。'
+        : 'Exa 用于发现候选 URL；结果通过商业意图规则后才进入列表。',
       needKeywords: tags,
       recommendedScript: null,
       contactAdvice: null,
@@ -295,7 +517,17 @@ export async function handleExaSearchResults(
 
   try {
     const rawResults = await searchExa(task, apiKey, fetcher, timeoutMs)
-    const results = rawResults
+    const enrichedResults = await enrichWithCrawler(
+      rawResults,
+      crawlerConfig(env),
+      fetcher,
+    )
+    const rankedResults = enrichedResults
+      .map((result) => ({ result, score: commercialIntentScore(result) }))
+      .filter(({ score }) => score >= 2)
+      .sort((a, b) => b.score - a.score)
+      .map(({ result }) => result)
+    const results = rankedResults
       .map((result, index) => buildLead(result, index, task))
       .filter(Boolean)
     if (results.length === 0) return false
