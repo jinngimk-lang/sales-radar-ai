@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
+import { filterCommercialSearchCandidates } from '../src/providers/search/commercial-search-quality.js'
 import {
   inspectAgentReachOutput,
   parseAgentReachOutput,
@@ -53,6 +54,37 @@ Fori Automation and Kuka Systems support automotive production lines.
     assert.equal(results[0]?.author, undefined)
     assert.equal(results[0]?.publishedAt, '2026-07-24T00:00:00.000Z')
     assert.match(results[0]?.text ?? '', /^Fori Automation/)
+  })
+
+  it('filters encyclopedias and generic official homepages while keeping commercial counterparties', () => {
+    const results = parseAgentReachOutput(
+      JSON.stringify({
+        results: [
+          {
+            title: 'Solar battery - Wikipedia',
+            url: 'https://en.wikipedia.org/wiki/Solar_battery',
+            text: 'A solar battery stores electrical energy.',
+          },
+          {
+            title: 'Battery Corp Official Website',
+            url: 'https://battery.example.com/',
+            text: 'Welcome to Battery Corp. About us and product overview.',
+          },
+          {
+            title: 'Battery storage RFQ',
+            url: 'https://buyer.example.com/procurement/battery-storage',
+            text: 'Procurement team seeks battery suppliers and requests quotations for a new project.',
+          },
+        ],
+      }),
+    )
+
+    const filtered = filterCommercialSearchCandidates(results)
+    assert.equal(filtered.length, 1)
+    assert.equal(
+      filtered[0]?.url,
+      'https://buyer.example.com/procurement/battery-storage',
+    )
   })
 
   it('reports safe response diagnostics without returning raw content', () => {

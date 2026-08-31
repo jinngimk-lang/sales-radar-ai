@@ -5,6 +5,12 @@ const DEFAULT_RESULT_TARGET = 30
 const MAX_RESULT_TARGET = 50
 const MAX_RESULTS_PER_UPSTREAM_CALL = 10
 
+const COMMERCIAL_QUERY_VARIANTS = [
+  'buyer procurement purchasing sourcing RFQ tender 求购 采购 询价 招标',
+  'supplier manufacturer vendor distributor importer wholesaler 供应商 制造商 经销商 进口商',
+  'seeking looking for quotation project procurement sourcing partner 采购需求 供应需求',
+]
+
 export interface AgentReachSearchPlan {
   query: string
   platforms: Platform[]
@@ -34,9 +40,17 @@ export function buildAgentReachSearchPlans(
   )
   const plans: AgentReachSearchPlan[] = []
   let remaining = total
+  let variantIndex = 0
 
   if (websiteRequested && remaining > 0) {
-    plans.push(plan(input.keyword, [Platform.Website], input.regions, remaining))
+    plans.push(
+      plan(
+        commercialQuery(input.keyword, variantIndex++),
+        [Platform.Website],
+        input.regions,
+        remaining,
+      ),
+    )
     remaining -= plans.at(-1)!.maxResults
   }
 
@@ -48,34 +62,39 @@ export function buildAgentReachSearchPlans(
     const groups = splitEvenly(socialPlatforms, desiredBatches)
     for (const group of groups) {
       if (remaining <= 0) break
-      const next = plan(input.keyword, group, input.regions, remaining)
+      const next = plan(
+        commercialQuery(input.keyword, variantIndex++),
+        group,
+        input.regions,
+        remaining,
+      )
       plans.push(next)
       remaining -= next.maxResults
     }
   }
 
-  const websiteQueries = [
-    `${input.keyword} company news expansion hiring investment`,
-    `${input.keyword} procurement leadership contact official website`,
-    `${input.keyword} partners distributors projects market`,
-  ]
-  let variantIndex = 0
   while (remaining > 0) {
     const fallbackPlatforms = websiteRequested
       ? [Platform.Website]
       : socialPlatforms
     const next = plan(
-      websiteQueries[variantIndex % websiteQueries.length]!,
+      commercialQuery(input.keyword, variantIndex++),
       fallbackPlatforms,
       input.regions,
       remaining,
     )
     plans.push(next)
     remaining -= next.maxResults
-    variantIndex += 1
   }
 
   return plans
+}
+
+function commercialQuery(keyword: string, variantIndex: number) {
+  const terms = COMMERCIAL_QUERY_VARIANTS[
+    variantIndex % COMMERCIAL_QUERY_VARIANTS.length
+  ]!
+  return `${keyword.trim()} ${terms}`.trim()
 }
 
 function plan(

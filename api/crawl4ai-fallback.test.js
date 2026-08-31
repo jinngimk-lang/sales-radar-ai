@@ -51,6 +51,11 @@ test('crawler fallback enriches Discover search results with Crawl4AI content', 
     calls.push({ url, init })
 
     if (url.startsWith('https://api.gdeltproject.org/')) {
+      const parsed = new URL(url)
+      assert.match(
+        parsed.searchParams.get('query') ?? '',
+        /buyer|procurement|sourcing|rfq|supplier/i,
+      )
       return jsonResponse({
         articles: [
           {
@@ -111,6 +116,74 @@ test('crawler fallback enriches Discover search results with Crawl4AI content', 
   assert.equal(calls.length, 2)
 })
 
+test('crawler fallback never fills empty commercial search with Wikipedia', async () => {
+  const response = createResponse()
+  const requests = []
+  const handled = await handleCrawlerSearchResults(
+    { method: 'GET', query: {} },
+    response,
+    `search-task/${encodeURIComponent(encodeTask())}/results`,
+    {
+      fetcher: async (input) => {
+        const url = String(input)
+        requests.push(url)
+        if (url.startsWith('https://api.gdeltproject.org/')) {
+          return jsonResponse({ articles: [] })
+        }
+        throw new Error(`reference fallback must not be called: ${url}`)
+      },
+      env: { CRAWL4AI_BASE_URL: 'https://crawler.example' },
+    },
+  )
+
+  assert.equal(handled, false)
+  assert.ok(requests.every((url) => !/wikipedia\.org/i.test(url)))
+})
+
+test('crawler fallback filters generic official or reference pages even when GDELT returns them', async () => {
+  const response = createResponse()
+  const handled = await handleCrawlerSearchResults(
+    { method: 'GET', query: {} },
+    response,
+    `search-task/${encodeURIComponent(encodeTask({ m: 3 }))}/results`,
+    {
+      fetcher: async (input) => {
+        const url = String(input)
+        if (url.startsWith('https://api.gdeltproject.org/')) {
+          return jsonResponse({
+            articles: [
+              {
+                url: 'https://example.com/',
+                title: 'Example Pumps Official Website',
+                summary: 'Welcome to our company website and product overview.',
+              },
+              {
+                url: 'https://example.net/market-report',
+                title: 'Industrial pump market report',
+                summary: 'General market information and industry history.',
+              },
+              {
+                url: 'https://buyer.example.org/rfq/pumps',
+                title: 'RFQ for industrial pumps',
+                summary: 'Buyer procurement team seeks suppliers and quotations for 200 pumps.',
+              },
+            ],
+          })
+        }
+        if (url === 'https://crawler.example/crawl') {
+          return jsonResponse({ success: false, results: [] })
+        }
+        throw new Error(`Unexpected fetch: ${url}`)
+      },
+      env: { CRAWL4AI_BASE_URL: 'https://crawler.example' },
+    },
+  )
+
+  assert.equal(handled, true)
+  assert.equal(response.body.data.length, 1)
+  assert.equal(response.body.data[0].sourceUrl, 'https://buyer.example.org/rfq/pumps')
+})
+
 test('crawler fallback yields to the existing stateless search when Crawl4AI is not configured', async () => {
   const response = createResponse()
   let called = false
@@ -131,7 +204,7 @@ test('crawler fallback yields to the existing stateless search when Crawl4AI is 
   assert.equal(called, false)
 })
 
-test('crawler failure keeps public-search evidence available instead of failing the whole Discover search', async () => {
+test('crawler failure keeps commercial public-search evidence available instead of failing the whole Discover search', async () => {
   const taskId = encodeTask()
   const response = createResponse()
   const fetcher = async (input) => {
@@ -140,11 +213,12 @@ test('crawler failure keeps public-search evidence available instead of failing 
       return jsonResponse({
         articles: [
           {
-            url: 'https://example.com/pump-market',
-            title: 'Industrial pump market update',
+            url: 'https://example.com/rfq/pump-suppliers',
+            title: 'Industrial pump supplier RFQ',
             domain: 'example.com',
             sourcecountry: 'Germany',
             language: 'English',
+            summary: 'Procurement team requests quotations from qualified industrial pump suppliers.',
           },
         ],
       })
@@ -168,7 +242,7 @@ test('crawler failure keeps public-search evidence available instead of failing 
   assert.equal(handled, true)
   assert.equal(response.statusCode, 200)
   assert.equal(response.body.data.length, 1)
-  assert.match(response.body.data[0].postContent, /Industrial pump market update/i)
+  assert.match(response.body.data[0].postContent, /supplier RFQ|requests quotations/i)
   assert.equal(response.body.data[0].sourceMetadata.contentAcquisition, 'FAILED')
   assert.equal(response.body.data[0].evidenceStatus, 'UNKNOWN')
 })

@@ -3,6 +3,7 @@ import {
   buildAgentReachSearchPlans,
   resolveAgentReachResultLimit,
 } from './agent-reach-search-planner.js'
+import { isCommercialSearchResult } from './commercial-search-quality.js'
 import type {
   SearchProvider,
   SearchProviderInput,
@@ -12,6 +13,9 @@ import type {
 /**
  * Orchestrates several bounded Agent Reach calls behind one provider interface.
  * The existing adapter remains responsible for mcporter execution and parsing.
+ * Results must still pass the commercial-search quality gate before becoming
+ * Discover leads: buyer/seller/procurement/sourcing signals are useful;
+ * encyclopedias, generic homepages, and reference-only pages are not.
  */
 export class DeepAgentReachProvider implements SearchProvider {
   readonly name = 'agent-reach' as const
@@ -30,7 +34,7 @@ export class DeepAgentReachProvider implements SearchProvider {
         regions: plan.regions,
         maxResults: plan.maxResults,
       })
-      for (const result of results) {
+      for (const result of results.filter(isCommercialSearchResult)) {
         const key = result.externalId || result.sourceUrl
         if (!unique.has(key)) unique.set(key, result)
         if (unique.size >= target) break
