@@ -23,7 +23,7 @@ jobs:
     env:
       PRODUCTION_BASE_URL: https://sales-radar-ai.vercel.app
     steps:
-      - name: Verify real production search and Agent runtime
+      - name: Verify real production search, Market Radar, and Agent runtime
         shell: bash
         run: |
           node <<'NODE'
@@ -110,12 +110,45 @@ jobs:
           }
           console.log(`Search smoke OK: task=${taskId}, results=${resultCount}`)
 
+          const savedSignals = await request('/api/market-signals')
+          if (!Array.isArray(savedSignals?.data)) {
+            throw new Error(`Market signals endpoint returned an invalid envelope: ${JSON.stringify(savedSignals)}`)
+          }
+
+          const market = await request('/api/market-signals/scan', {
+            method: 'POST',
+            body: JSON.stringify({
+              product: 'battery energy storage',
+              region: 'SoutheastAsia',
+              goal: 'FIND_BUYERS',
+              signalFocus: 'ALL',
+            }),
+          })
+          const session = market?.data
+          const marketSources = Array.isArray(session?.sources) ? session.sources : []
+          if (session?.status !== 'completed' || marketSources.length < 1) {
+            throw new Error(`Market Radar scan returned no verifiable source: ${JSON.stringify(session)}`)
+          }
+          const invalidSource = marketSources.find(
+            (source) =>
+              !source?.url ||
+              !/^https?:\/\//i.test(source.url) ||
+              !source?.title ||
+              !source?.summary,
+          )
+          if (invalidSource) {
+            throw new Error(`Market Radar returned an invalid source: ${JSON.stringify(invalidSource)}`)
+          }
+          console.log(
+            `Market Radar smoke OK: provider=${session.provider}, sources=${marketSources.length}, first=${marketSources[0].url}`,
+          )
+
           const capabilities = await request('/api/health/capabilities')
           const agent = capabilities?.data?.salesAgent
           const verificationStatus = agent?.verification?.status ?? 'unknown'
           if (!agent?.enabled || verificationStatus !== 'ok') {
             console.log(
-              `::warning::Agent runtime is not verified (enabled=${Boolean(agent?.enabled)}, verification=${verificationStatus}, code=${agent?.verification?.errorCode ?? 'n/a'}). Search smoke remains authoritative for this job.`,
+              `::warning::Agent runtime is not verified (enabled=${Boolean(agent?.enabled)}, verification=${verificationStatus}, code=${agent?.verification?.errorCode ?? 'n/a'}). Search and Market Radar smoke remain authoritative for this job.`,
             )
             process.exit(0)
           }

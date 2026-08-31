@@ -1,3 +1,6 @@
+import { handleMarketResearchFallback } from './market-research-fallback.js'
+import { handleExaSearchResults } from './exa-fallback.js'
+import { handleCrawlerSearchResults } from './crawl4ai-fallback.js'
 import { handleServerlessFallback } from './serverless-fallback.js'
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -60,6 +63,27 @@ export default async function handler(request, response) {
   const proxyPath = readProxyPath(request.query.path)
 
   if (!backendOrigin) {
+    const marketHandled = await handleMarketResearchFallback(
+      request,
+      response,
+      proxyPath,
+    )
+    if (marketHandled) return
+
+    const exaHandled = await handleExaSearchResults(
+      request,
+      response,
+      proxyPath,
+    )
+    if (exaHandled) return
+
+    const crawlerHandled = await handleCrawlerSearchResults(
+      request,
+      response,
+      proxyPath,
+    )
+    if (crawlerHandled) return
+
     const handled = await handleServerlessFallback(request, response, proxyPath)
     if (handled) return
 
