@@ -6,15 +6,20 @@ This file is the repository entry point for Codex, GitHub Copilot, Claude Code a
 
 Sales Radar AI turns public market changes into evidence-backed sales opportunities. It helps a salesperson discover, understand and act; it does not create customer truth.
 
+## Delivery gate
+
+This repository uses `PROJECT_WORKFLOW.md` as the delivery and handoff protocol. Normal product work must remain on a clean independent branch until the Owner has locally verified the result and explicitly approved upstream synchronization. Repository-level autonomous authority does not override that delivery gate, and force-pushing the default branch is forbidden.
+
 ## Read before changing code
 
-1. `CONTEXT.md` — current product and architecture context.
-2. `PROJECT_BLUEPRINT.md` — living product direction, buyer/seller workspace plan, autonomous-owner contract, technology-watch policy and context-recovery protocol.
-3. `docs/technology-radar.md` — current external project/provider/runtime watch decisions and adoption status.
-4. `.agent/SKILL_REGISTRY.md` — skill ownership and write boundaries.
-5. `.agent/PROJECT_MEMORY.md` — stable product decisions.
-6. Relevant `.agent/skills/*/SKILL.md` files for the requested domain.
-7. `docs/adr/`, relevant specs and plans for architectural decisions that affect the change.
+1. `PROJECT_WORKFLOW.md` — Owner-verified delivery gate, branch safety, handoff and context-recovery rules.
+2. `CONTEXT.md` — current product and architecture context.
+3. `PROJECT_BLUEPRINT.md` — living product direction, buyer/seller workspace plan, autonomous-owner contract, technology-watch policy and context-recovery protocol.
+4. `docs/technology-radar.md` — current external project/provider/runtime watch decisions and adoption status.
+5. `.agent/SKILL_REGISTRY.md` — skill ownership and write boundaries.
+6. `.agent/PROJECT_MEMORY.md` — stable product decisions.
+7. Relevant `.agent/skills/*/SKILL.md` files for the requested domain.
+8. `docs/adr/`, relevant specs and plans for architectural decisions that affect the change.
 
 When context becomes long or implementation direction changes, re-read `PROJECT_BLUEPRINT.md` and update it when a validated new direction is accepted. Do not let implementation drift become undocumented product strategy.
 
@@ -76,7 +81,9 @@ Providers must remain replaceable. Business services call interfaces or factorie
 
 ## Autonomous owner operating mode
 
-The owner has delegated normal, reversible, evidence-backed repository decisions to the operating agent. Within the permissions actually available to the connected tools, the agent may independently research, create branches/issues/PRs, modify files, run or inspect CI, merge validated changes, coordinate deployments and update repository governance without asking again for each routine decision.
+The owner has delegated normal, reversible, evidence-backed repository decisions to the operating agent. Within the permissions actually available to the connected tools, the agent may independently research, create branches/issues/PRs, modify files, run or inspect CI, coordinate deployments and update repository governance without asking again for each routine decision.
+
+That autonomous authority is exercised inside the delivery gate in `PROJECT_WORKFLOW.md`: implementation may proceed independently on a work branch, but the upstream default branch is not changed until the Owner locally verifies and explicitly approves the delivery.
 
 The autonomous default does **not** cover destructive or irreversible operations, secrets/credential changes, paid-plan changes, legal commitments, sensitive security disclosure or external publication. Those remain subject to the applicable safety and authorization gate.
 
