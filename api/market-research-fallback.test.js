@@ -149,7 +149,7 @@ test('Market Radar scan prefers Exa and returns source-backed research', async (
   assert.equal(response.body.data.sources[0].url, 'https://example.com/procurement/battery-expansion')
   assert.match(response.body.data.sources[0].summary, /expanding battery production/i)
   assert.equal(response.body.data.signals.length, 0)
-  assert.match(response.body.data.summary, /真实公开来源/)
+  assert.match(response.body.data.summary, /真实公开商业来源/)
 })
 
 test('Market Radar scan uses no-secret public web research when Exa is unavailable', async () => {
@@ -229,6 +229,6 @@ test('Market Radar scan returns truthful no-results without falling back to Wiki
   assert.equal(response.statusCode, 201)
   assert.equal(response.body.data.status, 'no_results')
   assert.deepEqual(response.body.data.sources, [])
-  assert.match(response.body.data.summary, /没有找到可验证的相关来源/)
+  assert.match(response.body.data.summary, /没有找到可验证的买家、卖家、采购、供应或渠道商业信号/)
   assert.ok(requests.every((url) => !/wikipedia\.org/i.test(url)))
 })
