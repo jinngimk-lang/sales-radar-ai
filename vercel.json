@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://sales-radar-ai-production.up.railway.app/api/:path*"
+      "destination": "/api/backend-proxy?path=:path*"
     },
     {
       "source": "/:path*",
