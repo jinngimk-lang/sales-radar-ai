@@ -38,17 +38,102 @@ function createResponseRecorder() {
   }
 }
 
-test('returns an explicit 503 when BACKEND_ORIGIN is missing', async () => {
-  delete process.env.BACKEND_ORIGIN
+async function invoke({ path, method = 'GET', body, query = {}, headers = {} }) {
   const response = createResponseRecorder()
-
   await handler(
-    { method: 'GET', headers: {}, query: { path: 'health' } },
+    {
+      method,
+      headers,
+      query: { path, ...query },
+      body,
+    },
     response,
   )
+  return response
+}
 
-  assert.equal(response.statusCode, 503)
-  assert.equal(response.jsonBody.error.code, 'BACKEND_NOT_CONFIGURED')
+test('serves a complete evidence-backed search flow when BACKEND_ORIGIN is missing', async () => {
+  delete process.env.BACKEND_ORIGIN
+
+  globalThis.fetch = async (url) => {
+    const target = String(url)
+    if (!target.startsWith('https://api.gdeltproject.org/api/v2/doc/doc?')) {
+      throw new Error(`Unexpected fallback fetch: ${target}`)
+    }
+
+    return new Response(
+      JSON.stringify({
+        articles: [
+          {
+            url: 'https://example.com/thailand-automation-expansion',
+            title: 'Automation supplier expands industrial operations in Thailand',
+            domain: 'example.com',
+            seendate: '20260830T120000Z',
+            sourcecountry: 'Thailand',
+            language: 'English',
+          },
+        ],
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    )
+  }
+
+  const health = await invoke({ path: 'health' })
+  assert.equal(health.statusCode, 200)
+  assert.equal(health.jsonBody.status, 'ok')
+
+  const provider = await invoke({ path: 'search/providers/health' })
+  assert.equal(provider.statusCode, 200)
+  assert.equal(provider.jsonBody.data.state, 'AVAILABLE')
+  assert.equal(provider.jsonBody.data.provider, 'public-web-evidence')
+
+  const created = await invoke({
+    path: 'search-task',
+    method: 'POST',
+    body: {
+      keyword: 'industrial automation companies Thailand',
+      platforms: ['Website'],
+      regions: ['SoutheastAsia'],
+      includePublicContacts: false,
+      maxResults: 1,
+    },
+  })
+
+  assert.equal(created.statusCode, 202)
+  assert.equal(created.jsonBody.data.status, 'COMPLETED')
+  assert.equal(created.jsonBody.strategy.intent.product, 'industrial automation companies Thailand')
+  assert.equal(created.jsonBody.productContext.source, 'inferred')
+  assert.equal(created.jsonBody.searchIntent.salesIntent, 'customer')
+
+  const taskId = created.jsonBody.data.id
+  assert.ok(taskId)
+
+  const task = await invoke({ path: `search-task/${taskId}` })
+  assert.equal(task.statusCode, 200)
+  assert.equal(task.jsonBody.data.status, 'COMPLETED')
+
+  const results = await invoke({ path: `search-task/${taskId}/results` })
+  assert.equal(results.statusCode, 200)
+  assert.equal(results.jsonBody.meta.total, 1)
+  assert.equal(results.jsonBody.data[0].platform, 'Website')
+  assert.equal(results.jsonBody.data[0].customerType, 'Company')
+  assert.equal(results.jsonBody.data[0].sourceUrl, 'https://example.com/thailand-automation-expansion')
+  assert.match(results.jsonBody.data[0].postContent, /Automation supplier expands/)
+  assert.equal(results.jsonBody.data[0].sourceMetadata.provider, 'gdelt-doc')
+
+  const opportunities = await invoke({ path: `search-task/${taskId}/opportunities` })
+  assert.equal(opportunities.statusCode, 200)
+  assert.deepEqual(opportunities.jsonBody.data, [])
+
+  const radar = await invoke({
+    path: 'radar/assessments',
+    query: { searchTaskId: taskId, includeBlocked: 'true' },
+  })
+  assert.equal(radar.statusCode, 200)
+  assert.deepEqual(radar.jsonBody.data, [])
 })
 
 test('forwards API path, query, headers and JSON body to configured backend', async () => {

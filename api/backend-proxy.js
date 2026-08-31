@@ -1,3 +1,5 @@
+import { handleServerlessFallback } from './serverless-fallback.js'
+
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
   'keep-alive',
@@ -55,17 +57,21 @@ function buildRequestBody(request) {
 
 export default async function handler(request, response) {
   const backendOrigin = normalizeOrigin(process.env.BACKEND_ORIGIN)
+  const proxyPath = readProxyPath(request.query.path)
+
   if (!backendOrigin) {
+    const handled = await handleServerlessFallback(request, response, proxyPath)
+    if (handled) return
+
     response.status(503).json({
       error: {
         code: 'BACKEND_NOT_CONFIGURED',
-        message: 'Backend origin is not configured.',
+        message: 'This API capability requires the full backend runtime.',
       },
     })
     return
   }
 
-  const proxyPath = readProxyPath(request.query.path)
   const target = new URL(`/api/${proxyPath}`, backendOrigin)
 
   for (const [key, value] of Object.entries(request.query)) {
