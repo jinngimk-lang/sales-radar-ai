@@ -1,3 +1,4 @@
+import { handleExaSearchResults } from './exa-fallback.js'
 import { handleCrawlerSearchResults } from './crawl4ai-fallback.js'
 import { handleServerlessFallback } from './serverless-fallback.js'
 
@@ -61,6 +62,13 @@ export default async function handler(request, response) {
   const proxyPath = readProxyPath(request.query.path)
 
   if (!backendOrigin) {
+    const exaHandled = await handleExaSearchResults(
+      request,
+      response,
+      proxyPath,
+    )
+    if (exaHandled) return
+
     const crawlerHandled = await handleCrawlerSearchResults(
       request,
       response,
