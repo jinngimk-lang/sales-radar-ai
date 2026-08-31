@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
+import { filterCommercialSearchCandidates } from '../src/providers/search/commercial-search-quality.js'
 import {
-  filterAgentReachCommercialResults,
   inspectAgentReachOutput,
   parseAgentReachOutput,
 } from '../src/providers/search/agent-reach.provider.js'
@@ -79,7 +79,7 @@ Fori Automation and Kuka Systems support automotive production lines.
       }),
     )
 
-    const filtered = filterAgentReachCommercialResults(results)
+    const filtered = filterCommercialSearchCandidates(results)
     assert.equal(filtered.length, 1)
     assert.equal(
       filtered[0]?.url,
