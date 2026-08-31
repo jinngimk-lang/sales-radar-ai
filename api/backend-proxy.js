@@ -1,3 +1,4 @@
+import { handleCrawlerSearchResults } from './crawl4ai-fallback.js'
 import { handleServerlessFallback } from './serverless-fallback.js'
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -60,6 +61,13 @@ export default async function handler(request, response) {
   const proxyPath = readProxyPath(request.query.path)
 
   if (!backendOrigin) {
+    const crawlerHandled = await handleCrawlerSearchResults(
+      request,
+      response,
+      proxyPath,
+    )
+    if (crawlerHandled) return
+
     const handled = await handleServerlessFallback(request, response, proxyPath)
     if (handled) return
 
