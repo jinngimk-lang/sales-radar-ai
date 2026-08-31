@@ -57,4 +57,4 @@ USER node
 
 EXPOSE 8787
 
-CMD ["node", "dist/server.js"]
+CMD ["sh", "-c", "prisma migrate deploy && node dist/server.js"]
