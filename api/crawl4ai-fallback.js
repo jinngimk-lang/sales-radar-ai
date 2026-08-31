@@ -4,10 +4,44 @@ import { isIP } from 'node:net'
 const TASK_PREFIX = 'sf1_'
 const TASK_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const GDELT_ENDPOINT = 'https://api.gdeltproject.org/api/v2/doc/doc'
-const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php'
 const SEARCH_TIMEOUT_MS = 8_000
 const DEFAULT_CRAWL_TIMEOUT_MS = 5_000
 const DEFAULT_CRAWL_MAX_RESULTS = 5
+
+const COMMERCIAL_QUERY_TERMS = [
+  'buyer',
+  'procurement',
+  'purchasing',
+  'sourcing',
+  'RFQ',
+  'RFP',
+  'tender',
+  'supplier',
+  'manufacturer',
+  'distributor',
+  'importer',
+  'wholesaler',
+  '采购',
+  '求购',
+  '询价',
+  '招标',
+  '买家',
+  '供应商',
+  '经销商',
+].join(' ')
+
+const LOW_VALUE_DOMAINS = [
+  'wikipedia.org',
+  'wikimedia.org',
+  'britannica.com',
+  'baike.baidu.com',
+  'zhihu.com',
+]
+
+const STRONG_COMMERCIAL_PATTERN = /\b(?:buyer|buying|procurement|purchasing|sourcing|rfq|rfp|tender|bid|quotation|quote|seeking|wanted|demand|importer|distributor|wholesaler|reseller|dealer|supplier|vendor|manufacturer|factory|exporter|supply partner|channel partner)\b|采购|求购|询价|招标|买家|买方|采购商|供应商|厂家|制造商|经销商|代理商|进口商|批发商|渠道商|寻源|采购需求|供应需求/iu
+const TRANSACTION_PATH_PATTERN = /\/(?:procurement|purchasing|sourcing|rfq|rfp|tender|bid|supplier|vendor|distributor|dealer|partner|opportunit|marketplace|buy|sell)(?:\/|[-_?#]|$)/iu
+const GENERIC_REFERENCE_PATTERN = /\b(?:wikipedia|encyclopedia|definition|overview|what is|history of|market report|industry report|market update)\b|百科|词条|是什么|行业报告|市场报告|市场概况/iu
+const GENERIC_HOME_PATTERN = /\b(?:home|homepage|about us|company profile|welcome to|official site|official website)\b|官网|官方网站|公司简介|关于我们/iu
 
 function sendJson(response, status, payload) {
   response.setHeader('Cache-Control', 'no-store')
@@ -105,19 +139,16 @@ function isAllowedCrawlTarget(value) {
       hostname === 'localhost' ||
       hostname.endsWith('.localhost') ||
       hostname.endsWith('.local')
-    ) {
-      return false
-    }
+    ) return false
     const ipVersion = isIP(hostname)
     if (ipVersion === 4 && isPrivateIpv4(hostname)) return false
-    if (ipVersion === 6 && (
-      hostname === '::1' ||
-      hostname.startsWith('fc') ||
-      hostname.startsWith('fd') ||
-      hostname.startsWith('fe80:')
-    )) {
-      return false
-    }
+    if (
+      ipVersion === 6 &&
+      (hostname === '::1' ||
+        hostname.startsWith('fc') ||
+        hostname.startsWith('fd') ||
+        hostname.startsWith('fe80:'))
+    ) return false
     return true
   } catch {
     return false
@@ -137,20 +168,22 @@ async function fetchJson(url, fetcher, timeoutMs = SEARCH_TIMEOUT_MS, init = {})
       },
       signal: controller.signal,
     })
-    if (!response.ok) {
-      throw new Error(`request returned HTTP ${response.status}`)
-    }
+    if (!response.ok) throw new Error(`request returned HTTP ${response.status}`)
     return await response.json()
   } finally {
     clearTimeout(timeout)
   }
 }
 
+function buildCommercialQuery(task) {
+  return `${task.k.trim()} ${COMMERCIAL_QUERY_TERMS}`.trim()
+}
+
 async function searchGdelt(task, fetcher) {
   const url = new URL(GDELT_ENDPOINT)
-  url.searchParams.set('query', task.k)
+  url.searchParams.set('query', buildCommercialQuery(task))
   url.searchParams.set('mode', 'artlist')
-  url.searchParams.set('maxrecords', String(Math.min(50, Math.max(task.m, 5))))
+  url.searchParams.set('maxrecords', String(Math.min(50, Math.max(task.m * 3, 10))))
   url.searchParams.set('format', 'json')
   url.searchParams.set('sort', 'hybridrel')
   const payload = await fetchJson(url, fetcher)
@@ -164,61 +197,11 @@ async function searchGdelt(task, fetcher) {
         typeof article.title === 'string' &&
         article.title.trim(),
     )
-    .slice(0, task.m)
     .map((article) => ({ ...article, provider: 'gdelt-doc' }))
 }
 
-function stripHtml(value) {
-  return String(value ?? '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-async function searchWikipedia(task, fetcher) {
-  const url = new URL(WIKIPEDIA_ENDPOINT)
-  url.searchParams.set('action', 'query')
-  url.searchParams.set('list', 'search')
-  url.searchParams.set('srsearch', task.k)
-  url.searchParams.set('utf8', '1')
-  url.searchParams.set('format', 'json')
-  url.searchParams.set('origin', '*')
-  url.searchParams.set('srlimit', String(Math.min(task.m, 20)))
-  const payload = await fetchJson(url, fetcher)
-  const results = Array.isArray(payload?.query?.search) ? payload.query.search : []
-  return results.slice(0, task.m).map((item) => ({
-    provider: 'wikipedia-search',
-    url: `https://en.wikipedia.org/?curid=${encodeURIComponent(String(item.pageid ?? ''))}`,
-    title: stripHtml(item.title),
-    domain: 'en.wikipedia.org',
-    seendate: item.timestamp ?? null,
-    sourcecountry: 'Unknown',
-    language: 'English',
-    snippet: stripHtml(item.snippet),
-  }))
-}
-
 async function searchPublicWeb(task, fetcher) {
-  let firstError = null
-  try {
-    const articles = await searchGdelt(task, fetcher)
-    if (articles.length > 0) return articles
-  } catch (error) {
-    firstError = error
-  }
-
-  try {
-    const articles = await searchWikipedia(task, fetcher)
-    if (articles.length > 0) return articles
-  } catch (error) {
-    if (!firstError) firstError = error
-  }
-
-  if (firstError) throw firstError
-  return []
+  return searchGdelt(task, fetcher)
 }
 
 function record(value) {
@@ -296,6 +279,7 @@ async function crawlArticle(article, config, fetcher) {
     const crawled = parseCrawlPayload(payload, url)
     return {
       ...article,
+      url: crawled.url,
       title: crawled.title || article.title,
       crawlStatus: 'ENRICHED',
       crawlContent: crawled.content,
@@ -325,6 +309,47 @@ async function enrichArticles(articles, config, fetcher) {
       return crawlArticle(article, config, fetcher)
     }),
   )
+}
+
+function compactEvidence(article, title) {
+  const value = article.crawlContent || article.summary || article.snippet || title
+  return String(value)
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 1_500)
+}
+
+function isLowValueDomain(url) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+    return LOW_VALUE_DOMAINS.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    )
+  } catch {
+    return true
+  }
+}
+
+function commercialScore(article) {
+  const url = String(article.url ?? '')
+  if (!url || isLowValueDomain(url)) return -100
+  const title = String(article.title ?? '').trim()
+  const evidence = compactEvidence(article, title)
+  const text = `${title} ${evidence} ${url}`
+  let score = 0
+  if (STRONG_COMMERCIAL_PATTERN.test(text)) score += 4
+  if (TRANSACTION_PATH_PATTERN.test(url)) score += 3
+  if (GENERIC_REFERENCE_PATTERN.test(text)) score -= 4
+  try {
+    const parsed = new URL(url)
+    const homePage = parsed.pathname === '/' || parsed.pathname === ''
+    if (homePage && GENERIC_HOME_PATTERN.test(text)) score -= 3
+    if (homePage && !STRONG_COMMERCIAL_PATTERN.test(text)) score -= 2
+  } catch {
+    score -= 4
+  }
+  return score
 }
 
 function inferIndustry(keyword) {
@@ -388,15 +413,6 @@ function homeUrl(url) {
   }
 }
 
-function compactEvidence(article, title) {
-  const value = article.crawlContent || article.snippet || title
-  return String(value)
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 1_500)
-}
-
 function buildLead(article, index, task) {
   const url = String(article.url ?? '')
   const title = String(article.title ?? '').trim() || url
@@ -406,9 +422,10 @@ function buildLead(article, index, task) {
   const publishedAt = parseSeenDate(article.seendate ?? article.publishedAt)
   const tags = keywordTags(task.k)
   const id = `fallback_${createHash('sha256').update(url || `${title}:${index}`).digest('hex').slice(0, 20)}`
-  const neutralScore = Math.max(30, 45 - index * 2)
   const enriched = article.crawlStatus === 'ENRICHED'
   const evidence = compactEvidence(article, title)
+  const intent = commercialScore(article)
+  const intentScore = Math.min(95, Math.max(55, 66 + intent * 4 - index * 2))
 
   return {
     id,
@@ -431,16 +448,16 @@ function buildLead(article, index, task) {
     sourceUrl: url,
     profileUrl: homeUrl(url),
     interestTags: tags,
-    intentScore: neutralScore,
-    recommendedAction: 'monitor',
+    intentScore,
+    recommendedAction: intent >= 4 ? 'research-contact' : 'monitor',
     updatedAt: new Date().toISOString(),
     sourceMetadata: {
       provider: article.provider ?? 'gdelt-doc',
-      leadType: 'content',
-      evidenceKind: enriched ? 'crawl4ai-public-web-content' : 'public-web-article',
+      leadType: 'commercial-page',
+      evidenceKind: enriched ? 'crawl4ai-commercial-web-content' : 'commercial-public-web-article',
       sourceCountry: sourceCountry || null,
       language,
-      commercialIntent: 'unverified',
+      commercialIntent: intent >= 4 ? 'high' : 'medium',
       fallbackRuntime: true,
       contentAcquisition: article.crawlStatus ?? 'SKIPPED',
       contentAcquisitionProvider: 'crawl4ai',
@@ -452,19 +469,19 @@ function buildLead(article, index, task) {
     evidenceStatus: enriched ? 'VALID' : 'UNKNOWN',
     analysis: {
       id: `${id}_analysis`,
-      intentType: enriched ? '公开网页正文信号' : '公开市场信号',
-      intentScore: neutralScore,
+      intentType: '买家/卖家商业信号',
+      intentScore,
       tags,
-      suggestion: '先核验来源中涉及的商业主体、角色和实际需求，再决定是否联系。',
+      suggestion: '优先核验采购、供应、RFQ、招标、分销或寻源主体，再进入联系人研究。',
       background: enriched
-        ? `该结果由公开检索发现，并由 Crawl4AI 抓取网页正文作为证据（${domain}）。`
-        : `该结果来自公开网页证据（${domain}）；正文抓取未完成，因此不把标题相关性当作采购意图。`,
-      need: evidence || '公开来源与搜索关键词相关，但不能单凭该来源确认采购需求。',
-      purchaseProbability: 'low',
-      salesStrategy: '先完成实体与需求核验，再进行任何销售触达。',
+        ? `公开检索发现候选页，并由 Crawl4AI 抓取正文后通过商业意图筛选（${domain}）。`
+        : `公开来源包含商业意图信号（${domain}）；正文抓取失败或未覆盖，因此证据状态保持 UNKNOWN。`,
+      need: evidence || '发现与采购、供货、分销或寻源相关的公开商业信号。',
+      purchaseProbability: intent >= 4 ? 'medium' : 'low',
+      salesStrategy: '只围绕真实交易意图继续研究，不把百科、官网介绍或泛资料页当作线索。',
       reasoning: enriched
-        ? '已取得网页正文，但评分仍只表示查询相关性；购买意向需要进一步验证。'
-        : '当前评分仅表示公开内容与查询的相关性，不代表已确认的购买意向。',
+        ? '网页正文已抓取并通过商业意图规则；仍需进一步验证主体和需求真实性。'
+        : '公开摘要通过商业意图规则，但尚无成功正文抓取，因此不升级为已确认采购事实。',
       needKeywords: tags,
       recommendedScript: null,
       contactAdvice: null,
@@ -502,23 +519,23 @@ export async function handleCrawlerSearchResults(
   try {
     const articles = await searchPublicWeb(task, fetcher)
     const enrichedArticles = await enrichArticles(articles, config, fetcher)
-    const results = enrichedArticles.map((article, index) =>
+    const rankedArticles = enrichedArticles
+      .map((article) => ({ article, score: commercialScore(article) }))
+      .filter(({ score }) => score >= 2)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, task.m)
+      .map(({ article }) => article)
+    if (rankedArticles.length === 0) return false
+    const results = rankedArticles.map((article, index) =>
       buildLead(article, index, task),
     )
     sendJson(response, 200, { data: results, meta: { total: results.length } })
+    return true
   } catch (error) {
-    sendJson(response, 503, {
-      error: {
-        code: 'SEARCH_PROVIDER_UNAVAILABLE',
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Public web evidence search failed.',
-        provider: 'public-web-evidence+crawl4ai',
-        providerState: 'UNAVAILABLE',
-        retryable: true,
-      },
-    })
+    console.warn(
+      '[crawl4ai-fallback] commercial public-web search failed; yielding to next fallback:',
+      error instanceof Error ? error.message : String(error),
+    )
+    return false
   }
-  return true
 }
