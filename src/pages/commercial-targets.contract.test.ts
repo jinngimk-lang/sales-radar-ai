@@ -18,10 +18,51 @@ test('commercial targets are a first-class persisted workspace surface', async (
   assert.match(page, /createCommercialTarget/)
   assert.match(page, /updateCommercialTarget/)
   assert.match(page, /去市场雷达/)
+  assert.match(page, /去搜索/)
   assert.match(page, /targetId=/)
   assert.match(api, /\/commercial-targets/)
   assert.match(api, /method: 'POST'/)
   assert.match(api, /method: 'PUT'/)
+})
+
+test('saved target cards expose real lifecycle, run progress, edit, close and workflow actions', async () => {
+  const [page, api] = await Promise.all([
+    read('./CommercialTargetsPage.tsx'),
+    read('../services/commercial-targets.ts'),
+  ])
+
+  assert.match(api, /lastRunStatus: CommercialTargetRunStatus \| null/)
+  assert.match(api, /lastRunStartedAt: string \| null/)
+  assert.match(api, /lastRunCompletedAt: string \| null/)
+  assert.match(api, /lastRunSourceCount: number \| null/)
+  assert.match(api, /lastRunSignalCount: number \| null/)
+  assert.match(api, /lastRunErrorCode: string \| null/)
+
+  assert.match(page, /立即运行/)
+  assert.match(page, /查看进度/)
+  assert.match(page, /编辑/)
+  assert.match(page, /关闭/)
+  assert.match(page, /已关闭/)
+  assert.match(page, /runMarketResearch/)
+  assert.match(page, /targetId: target\.id/)
+  assert.match(page, /status:\s*'CLOSED'/)
+  assert.match(page, /lastRunStatus/)
+  assert.match(page, /lastRunSourceCount/)
+  assert.match(page, /lastRunSignalCount/)
+  assert.match(page, /lastRunErrorCode/)
+  assert.doesNotMatch(page, /\b\d+%\b/)
+})
+
+test('inactive targets cannot masquerade as active target context in market or proactive search', async () => {
+  const [market, bridge] = await Promise.all([
+    read('./MarketIntelligenceWorkspacePage.tsx'),
+    read('./TargetAwareDiscoverPage.tsx'),
+  ])
+
+  assert.match(market, /persistedTarget\.status !== 'ACTIVE'/)
+  assert.match(market, /目标已暂停或关闭/)
+  assert.match(bridge, /value\.status !== 'ACTIVE'/)
+  assert.match(bridge, /目标已暂停或关闭/)
 })
 
 test('market radar restores an exact persisted target and delegates run evidence to the backend', async () => {

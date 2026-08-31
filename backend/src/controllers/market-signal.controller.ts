@@ -88,27 +88,81 @@ export function createRunMarketResearchController(
     let exactCommercialTargetId: string | null = null
     if (targetId) {
       const persistedTarget = await commercialTargetService.get(userId, targetId)
+      if (persistedTarget.status !== 'ACTIVE') {
+        throw new AppError(
+          409,
+          'COMMERCIAL_TARGET_INACTIVE',
+          'Commercial target is paused or closed',
+        )
+      }
       if (matchesCommercialTarget(persistedTarget, request.body)) {
         exactCommercialTargetId = targetId
       }
     }
 
-    const session = await service.run(userId, target)
-
     if (exactCommercialTargetId) {
-      await commercialTargetService.recordSuccessfulRun(
+      await commercialTargetService.recordRunStarted(
         userId,
         exactCommercialTargetId,
         new Date(),
       )
     }
 
-    response.status(201).json({ data: session })
+    try {
+      const session = await service.run(userId, target)
+
+      if (exactCommercialTargetId) {
+        const { sources, signals } = readMarketResearchRunCollections(session)
+        await commercialTargetService.recordRunCompleted(
+          userId,
+          exactCommercialTargetId,
+          {
+            completedAt: new Date(),
+            sourceCount: sources.length,
+            signalCount: signals.length,
+          },
+        )
+      }
+
+      response.status(201).json({ data: session })
+    } catch (error) {
+      if (exactCommercialTargetId) {
+        try {
+          await commercialTargetService.recordRunFailed(
+            userId,
+            exactCommercialTargetId,
+            {
+              completedAt: new Date(),
+              errorCode:
+                error instanceof AppError
+                  ? error.code
+                  : 'MARKET_SCAN_UNAVAILABLE',
+            },
+          )
+        } catch (recordError) {
+          console.error(
+            '[MarketRadar] Unable to persist commercial target run failure',
+            recordError,
+          )
+        }
+      }
+      throw error
+    }
   }
 }
 
 export const runMarketResearchController =
   createRunMarketResearchController()
+
+function readMarketResearchRunCollections(value: unknown) {
+  const record =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {}
+  const sources = Array.isArray(record.sources) ? record.sources : []
+  const signals = Array.isArray(record.signals) ? record.signals : []
+  return { sources, signals }
+}
 
 export function matchesCommercialTarget(
   persisted: CommercialTargetRecord,

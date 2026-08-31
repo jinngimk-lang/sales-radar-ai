@@ -4,6 +4,12 @@ import { analyzeLead } from '../services/ai-analysis.service.js'
 import { contactDiscovery } from '../services/contact-discovery.service.js'
 import { contactRanking } from '../services/contact-ranking.service.js'
 import { channelDiscovery } from '../services/channel-discovery.service.js'
+import {
+  communicationEvents,
+  type CommunicationChannel,
+  type CommunicationEventInput,
+  type CommunicationEventType,
+} from '../services/communication-event.service.js'
 import { getLeadById, listLeads } from '../services/lead.service.js'
 import { leadResearch } from '../services/lead-research.service.js'
 import { leadOutcomes } from '../services/lead-outcome.service.js'
@@ -110,33 +116,33 @@ export function createSubmitLeadResearchFeedbackController(
   service: LeadResearchFeedbackSubmitter = leadResearchFeedback,
 ): RequestHandler {
   return async (request, response) => {
-  const rating = request.body?.rating
-  const feedbackType = request.body?.feedbackType
+    const rating = request.body?.rating
+    const feedbackType = request.body?.feedbackType
 
-  if (
-    typeof rating !== 'number' ||
-    typeof feedbackType !== 'string' ||
-    !LEAD_RESEARCH_FEEDBACK_TYPES.includes(
-      feedbackType as LeadResearchFeedbackType,
-    )
-  ) {
-    throw new AppError(
-      400,
-      'VALIDATION_ERROR',
-      'rating and a supported feedbackType are required',
-    )
-  }
+    if (
+      typeof rating !== 'number' ||
+      typeof feedbackType !== 'string' ||
+      !LEAD_RESEARCH_FEEDBACK_TYPES.includes(
+        feedbackType as LeadResearchFeedbackType,
+      )
+    ) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'rating and a supported feedbackType are required',
+      )
+    }
 
-  const feedback = await service.submit(request.params.id, {
-    rating,
-    feedbackType: feedbackType as LeadResearchFeedbackType,
-    comment:
-      typeof request.body?.comment === 'string'
-        ? request.body.comment
-        : undefined,
-  })
+    const feedback = await service.submit(request.params.id, {
+      rating,
+      feedbackType: feedbackType as LeadResearchFeedbackType,
+      comment:
+        typeof request.body?.comment === 'string'
+          ? request.body.comment
+          : undefined,
+    })
 
-  response.status(201).json({ data: feedback })
+    response.status(201).json({ data: feedback })
   }
 }
 
@@ -199,6 +205,134 @@ export const updateLeadOutcomeController: RequestHandler = async (
       readLeadOutcomeInput(request.body),
     ),
   })
+}
+
+const USER_COMMUNICATION_EVENT_TYPES = new Set<CommunicationEventType>([
+  'SENT',
+  'REPLIED',
+  'MEETING',
+  'FAILED',
+])
+
+const COMMUNICATION_CHANNELS = new Set<CommunicationChannel>([
+  'email',
+  'linkedin',
+  'whatsapp',
+  'call',
+  'other',
+])
+
+export function readUserCommunicationEventInput(
+  body: unknown,
+): CommunicationEventInput {
+  const input =
+    body && typeof body === 'object'
+      ? (body as Record<string, unknown>)
+      : {}
+
+  if (
+    typeof input.eventType !== 'string' ||
+    !USER_COMMUNICATION_EVENT_TYPES.has(
+      input.eventType as CommunicationEventType,
+    )
+  ) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'A supported user communication event type is required',
+    )
+  }
+
+  if (
+    typeof input.channel !== 'string' ||
+    !COMMUNICATION_CHANNELS.has(input.channel as CommunicationChannel)
+  ) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'A supported communication channel is required',
+    )
+  }
+
+  const externalEventId = readOptionalText(input.externalEventId, 500)
+  const evidenceUrl = readOptionalText(input.evidenceUrl, 2000)
+  const evidenceNote = readOptionalText(input.evidenceNote, 1000)
+
+  if (!externalEventId && !evidenceUrl) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'An attributable external event id or evidence URL is required',
+    )
+  }
+
+  if (evidenceUrl) {
+    let parsed: URL
+    try {
+      parsed = new URL(evidenceUrl)
+    } catch {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Evidence URL is invalid')
+    }
+    if (
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+      parsed.username ||
+      parsed.password
+    ) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Evidence URL must be an http(s) URL without embedded credentials',
+      )
+    }
+  }
+
+  const occurredAt =
+    input.occurredAt === undefined || input.occurredAt === null || input.occurredAt === ''
+      ? new Date()
+      : new Date(String(input.occurredAt))
+
+  if (Number.isNaN(occurredAt.getTime())) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Communication event time is invalid',
+    )
+  }
+
+  return {
+    eventType: input.eventType as CommunicationEventType,
+    channel: input.channel as CommunicationChannel,
+    externalEventId,
+    evidenceUrl,
+    evidenceNote,
+    occurredAt,
+  }
+}
+
+export const listCommunicationEventsController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const events = await communicationEvents.list(request.params.id)
+  response.json({ data: events, meta: { total: events.length } })
+}
+
+export const createCommunicationEventController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const event = await communicationEvents.createUserEvidence(
+    request.params.id,
+    readUserCommunicationEventInput(request.body),
+  )
+  response.status(201).json({ data: event })
+}
+
+export const getCommunicationSummaryController: RequestHandler = async (
+  request,
+  response,
+) => {
+  response.json({ data: await communicationEvents.summary(request.params.id) })
 }
 
 export const generateOutreachController: RequestHandler = async (

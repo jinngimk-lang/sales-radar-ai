@@ -4,6 +4,7 @@ import { AppError } from '../utils/app-error.js'
 import type { MarketResearchCommercialGoal } from './market-intelligence/commercial-goal.js'
 
 export type CommercialTargetStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'CLOSED'
+export type CommercialTargetRunStatus = 'RUNNING' | 'COMPLETED' | 'FAILED'
 
 export interface CommercialTargetRecord {
   id: string
@@ -17,6 +18,12 @@ export interface CommercialTargetRecord {
   signalFocus: string
   status: CommercialTargetStatus
   lastRunAt: Date | null
+  lastRunStatus: CommercialTargetRunStatus | null
+  lastRunStartedAt: Date | null
+  lastRunCompletedAt: Date | null
+  lastRunSourceCount: number | null
+  lastRunSignalCount: number | null
+  lastRunErrorCode: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -134,27 +141,72 @@ export class CommercialTargetService {
       WHERE "id" = ${id} AND "userId" = ${userId}
       RETURNING *
     `
-    const target = rows[0]
-    if (!target) {
-      throw new AppError(
-        404,
-        'COMMERCIAL_TARGET_NOT_FOUND',
-        'Commercial target was not found',
-      )
-    }
-    return target
+    return this.requireWrittenTarget(rows[0])
   }
 
-  async recordSuccessfulRun(userId: string, id: string, completedAt: Date) {
+  async recordRunStarted(userId: string, id: string, startedAt: Date) {
     const rows = await prisma.$queryRaw<CommercialTargetRecord[]>`
       UPDATE "CommercialTarget"
       SET
-        "lastRunAt" = ${completedAt},
+        "lastRunStatus" = 'RUNNING',
+        "lastRunStartedAt" = ${startedAt},
+        "lastRunCompletedAt" = NULL,
+        "lastRunSourceCount" = NULL,
+        "lastRunSignalCount" = NULL,
+        "lastRunErrorCode" = NULL,
         "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = ${id} AND "userId" = ${userId}
       RETURNING *
     `
-    const target = rows[0]
+    return this.requireWrittenTarget(rows[0])
+  }
+
+  async recordRunCompleted(
+    userId: string,
+    id: string,
+    input: { completedAt: Date; sourceCount: number; signalCount: number },
+  ) {
+    const completedAt = input.completedAt
+    const sourceCount = Math.max(0, Math.trunc(input.sourceCount))
+    const signalCount = Math.max(0, Math.trunc(input.signalCount))
+    const rows = await prisma.$queryRaw<CommercialTargetRecord[]>`
+      UPDATE "CommercialTarget"
+      SET
+        "lastRunStatus" = 'COMPLETED',
+        "lastRunAt" = ${completedAt},
+        "lastRunCompletedAt" = ${completedAt},
+        "lastRunSourceCount" = ${sourceCount},
+        "lastRunSignalCount" = ${signalCount},
+        "lastRunErrorCode" = NULL,
+        "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${id} AND "userId" = ${userId}
+      RETURNING *
+    `
+    return this.requireWrittenTarget(rows[0])
+  }
+
+  async recordRunFailed(
+    userId: string,
+    id: string,
+    input: { completedAt: Date; errorCode: string },
+  ) {
+    const errorCode = input.errorCode.trim().slice(0, 160) || 'MARKET_SCAN_UNAVAILABLE'
+    const rows = await prisma.$queryRaw<CommercialTargetRecord[]>`
+      UPDATE "CommercialTarget"
+      SET
+        "lastRunStatus" = 'FAILED',
+        "lastRunCompletedAt" = ${input.completedAt},
+        "lastRunSourceCount" = NULL,
+        "lastRunSignalCount" = NULL,
+        "lastRunErrorCode" = ${errorCode},
+        "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${id} AND "userId" = ${userId}
+      RETURNING *
+    `
+    return this.requireWrittenTarget(rows[0])
+  }
+
+  private requireWrittenTarget(target: CommercialTargetRecord | undefined) {
     if (!target) {
       throw new AppError(
         404,

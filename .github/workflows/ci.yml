@@ -82,6 +82,8 @@ jobs:
           tests/ai-provider-config.test.ts
           tests/ai-provider-platform.test.ts
           tests/assistant-lead-trust.test.ts
+          tests/communication-event.service.test.ts
+          tests/communication-event.controller.test.ts
           tests/commercial-target-contract.test.ts
           tests/direct-search-enrichment.test.ts
           tests/exa-runtime-config.test.ts

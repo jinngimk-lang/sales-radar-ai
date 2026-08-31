@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
 import { AgentStatusBadge } from '@/components/ui/WorkspaceState'
+import { DiscoveryModeSwitch } from '@/components/discovery/DiscoveryModeSwitch'
 import { MarketScanTarget } from '@/features/market-intelligence/MarketScanTarget'
 import { MarketBrowserWorkspace } from '@/features/market-intelligence/MarketBrowserWorkspace'
 import { SignalTimeline } from '@/features/market-intelligence/SignalTimeline'
@@ -95,6 +96,12 @@ export function MarketIntelligenceWorkspacePage() {
     getCommercialTarget(commercialTargetId)
       .then((persistedTarget) => {
         if (cancelled) return
+        if (persistedTarget.status !== 'ACTIVE') {
+          setPersistedTargetSnapshot(null)
+          setCommercialTargetName(null)
+          setTargetContextError('目标已暂停或关闭，请先在目标页启用后再使用。')
+          return
+        }
         const restoredTarget = commercialTargetToMarketTarget(persistedTarget)
         setTarget(restoredTarget)
         setPersistedTargetSnapshot(restoredTarget)
@@ -209,12 +216,13 @@ export function MarketIntelligenceWorkspacePage() {
       ? 'reviewing'
       : agentState.status
   const showTimeline = signals.length > 0
+  const exactTargetId = commercialTargetId && targetMatchesPersisted ? commercialTargetId : undefined
 
   return (
     <div className="mx-auto w-full max-w-[1180px] px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
       <WorkspaceHeader
-        title="市场雷达"
-        description="设定你要找的交易对象，从公开来源发现变化并继续判断。"
+        title="发现"
+        description="先看推荐信号，再切到主动搜索；两个模式共享同一商业目标。"
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
             {commercialTargetName ? (
@@ -241,6 +249,8 @@ export function MarketIntelligenceWorkspacePage() {
           </div>
         }
       />
+
+      <DiscoveryModeSwitch mode="recommend" targetId={exactTargetId} />
 
       {targetContextError ? (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">

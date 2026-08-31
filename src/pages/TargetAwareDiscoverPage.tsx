@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Loader2, Target } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { DiscoverPage } from '@/pages/DiscoverPage'
+import { DiscoveryModeSwitch } from '@/components/discovery/DiscoveryModeSwitch'
 import {
   commercialTargetToMarketTarget,
   getCommercialTarget,
@@ -49,7 +50,13 @@ export function TargetAwareDiscoverPage() {
     setTargetError(null)
     getCommercialTarget(targetId)
       .then((value) => {
-        if (!cancelled) setTarget(value)
+        if (cancelled) return
+        if (value.status !== 'ACTIVE') {
+          setTarget(null)
+          setTargetError('目标已暂停或关闭，请先在目标页启用后再使用。')
+          return
+        }
+        setTarget(value)
       })
       .catch((error) => {
         if (cancelled) return
@@ -144,6 +151,9 @@ export function TargetAwareDiscoverPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-ink-50">
+      <div className="shrink-0 px-4 pt-4 sm:px-6 lg:px-8">
+        <DiscoveryModeSwitch mode="search" targetId={target?.id ?? null} />
+      </div>
       {target ? (
         <CommercialTargetSearchBanner
           target={target}
@@ -162,7 +172,7 @@ export function TargetAwareDiscoverPage() {
           }}
         />
       ) : targetError ? (
-        <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 sm:px-6 lg:px-8">
+        <div className="shrink-0 border-y border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 sm:px-6 lg:px-8">
           目标上下文未恢复：{targetError}。本次搜索仍可继续，但不会归因到已保存商业目标。
         </div>
       ) : null}
@@ -214,7 +224,7 @@ function CommercialTargetSearchBanner({
   return (
     <section
       data-commercial-target-search-context
-      className="shrink-0 border-b border-brand-100 bg-brand-50/85 px-4 py-3 sm:px-6 lg:px-8"
+      className="shrink-0 border-y border-brand-100 bg-brand-50/85 px-4 py-3 sm:px-6 lg:px-8"
     >
       <div className="mx-auto flex max-w-[1640px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">

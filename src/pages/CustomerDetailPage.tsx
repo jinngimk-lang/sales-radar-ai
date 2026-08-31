@@ -1,194 +1,201 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
+  Building2,
+  CheckCircle2,
+  Copy,
   ExternalLink,
-  MapPin,
-  Clock,
-  Sparkles,
+  Loader2,
   Mail,
   MessageCircle,
-  Linkedin,
-  Copy,
-  Loader2,
-  Building2,
-  Target,
-  TrendingUp,
-  Lightbulb,
-  ShieldCheck,
-  Star,
-  Calendar,
-  Tag as TagIcon,
-  StickyNote,
-  X,
   Phone,
-  Users,
-  Network,
-  ThumbsUp,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Target,
   ThumbsDown,
-  Check,
+  ThumbsUp,
+  Trophy,
+  Users,
+  XCircle,
 } from 'lucide-react'
 import type {
-  ChannelProfile,
-  LeadResearch,
-  LeadOutcome,
-  LeadOutcomeStatus,
-  ProductProfile,
   ContactProfile,
   Customer,
+  LeadOutcome,
+  LeadOutcomeStatus,
+  LeadResearch,
   OutreachChannel,
-  FollowUpStep,
 } from '@/types'
 import {
-  discoverContacts,
-  discoverChannel,
   createLeadOutcome,
-  generateFollowUpPlan,
+  discoverContacts,
   generateOutreach,
-  getRankedContacts,
   getCustomerById,
-  getChannelProfile,
-  getLeadResearch,
   getLeadOutcome,
-  getProductProfiles,
+  getLeadResearch,
+  getRankedContacts,
   rankContacts,
   researchLead,
   submitLeadResearchFeedback,
   updateLeadOutcome,
 } from '@/services/api'
+import { CommunicationEvidencePanel } from '@/components/communication/CommunicationEvidencePanel'
 import { Avatar } from '@/components/ui/Avatar'
-import { PlatformIcon } from '@/components/ui/PlatformIcon'
 import { IntentBadge, IntentScoreBar } from '@/components/ui/IntentBadge'
 import { Modal } from '@/components/ui/Modal'
+import { PlatformIcon } from '@/components/ui/PlatformIcon'
 import {
-  INDUSTRY_META,
   CUSTOMER_TYPE_META,
+  INDUSTRY_META,
   RECOMMENDED_ACTION_META,
 } from '@/data/meta'
-import { scoreToLevel, intentLevelMeta, cn } from '@/lib/utils'
-import { useCrmRecord, useCrmActions } from '@/lib/useCrm'
-import { CRMStatusBar } from '@/components/discover/CRMStatusBar'
+import { cn, intentLevelMeta, scoreToLevel } from '@/lib/utils'
 
 type Channel = OutreachChannel
 
-const CHANNEL_META: Record<Channel, { label: string; icon: typeof Mail; color: string }> = {
-  email: { label: '生成邮件', icon: Mail, color: 'bg-brand-600 hover:bg-brand-700' },
-  whatsapp: { label: 'WhatsApp 消息', icon: MessageCircle, color: 'bg-emerald-600 hover:bg-emerald-700' },
-  linkedin: { label: 'LinkedIn 私信', icon: Linkedin, color: 'bg-[#0A66C2] hover:bg-[#0a4f9a]' },
+const CHANNEL_META: Record<
+  Channel,
+  { label: string; icon: typeof Mail; color: string }
+> = {
+  email: { label: '邮件草稿', icon: Mail, color: 'bg-brand-600 hover:bg-brand-700' },
+  whatsapp: {
+    label: 'WhatsApp 草稿',
+    icon: MessageCircle,
+    color: 'bg-emerald-600 hover:bg-emerald-700',
+  },
+  linkedin: {
+    label: 'LinkedIn 草稿',
+    icon: ExternalLink,
+    color: 'bg-[#0A66C2] hover:bg-[#0a4f9a]',
+  },
   call: { label: '电话话术', icon: Phone, color: 'bg-ink-700 hover:bg-ink-800' },
 }
 
-const PROBABILITY_LABEL: Record<string, string> = {
-  high: '高',
-  medium: '中',
-  low: '低',
-}
-
-const CHANNEL_LABEL: Record<FollowUpStep['channel'], string> = {
-  email: '邮件',
-  whatsapp: 'WhatsApp',
-  linkedin: 'LinkedIn',
-  call: '电话',
-}
-
 const OUTCOME_LABELS: Record<LeadOutcomeStatus, string> = {
-  NEW: '待推进',
-  CONTACTED: '已联系',
-  REPLIED: '已回复',
-  MEETING: '已约会议',
-  QUALIFIED: '已确认机会',
-  PROPOSAL: '已提交方案',
+  NEW: '未记录业务结果',
+  CONTACTED: '历史：已联系',
+  REPLIED: '历史：已回复',
+  MEETING: '历史：已会议',
+  QUALIFIED: '历史：已确认机会',
+  PROPOSAL: '历史：方案阶段',
   WON: '已成交',
-  LOST: '不匹配',
+  LOST: '不匹配 / 已关闭',
 }
 
 const OUTCOME_ACTIONS: Array<{
   status: LeadOutcomeStatus
   label: string
+  icon: typeof Trophy
 }> = [
-  { status: 'CONTACTED', label: '已联系' },
-  { status: 'REPLIED', label: '已回复' },
-  { status: 'MEETING', label: '会议' },
-  { status: 'WON', label: '成交' },
-  { status: 'LOST', label: '不匹配' },
+  { status: 'WON', label: '记录成交', icon: Trophy },
+  { status: 'LOST', label: '记录不匹配', icon: XCircle },
 ]
 
-/** 客户详情页 */
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState<{ channel: Channel; content: string; loading: boolean } | null>(null)
-  const [followUpPlan, setFollowUpPlan] = useState<FollowUpStep[] | null>(null)
-  const [planLoading, setPlanLoading] = useState(false)
   const [contacts, setContacts] = useState<ContactProfile[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [selectedContactId, setSelectedContactId] = useState<string>()
-  const [channelProfile, setChannelProfile] = useState<ChannelProfile | null>(
-    null,
-  )
-  const [channelLoading, setChannelLoading] = useState(false)
-  const [leadResearchResult, setLeadResearchResult] =
-    useState<LeadResearch | null>(null)
-  const [leadResearchLoading, setLeadResearchLoading] = useState(false)
-  const [researchProducts, setResearchProducts] = useState<ProductProfile[]>([])
-  const [researchProductId, setResearchProductId] = useState('')
-  const [researchFeedback, setResearchFeedback] = useState<
-    'useful' | 'not_useful' | null
-  >(null)
-  const [researchFeedbackComment, setResearchFeedbackComment] = useState('')
-  const [researchFeedbackLoading, setResearchFeedbackLoading] = useState(false)
+  const [research, setResearch] = useState<LeadResearch | null>(null)
+  const [researchLoading, setResearchLoading] = useState(false)
+  const [researchFeedback, setResearchFeedback] = useState<'useful' | 'not_useful' | null>(null)
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [leadOutcome, setLeadOutcome] = useState<LeadOutcome | null>(null)
   const [outcomeNote, setOutcomeNote] = useState('')
   const [outcomeLoading, setOutcomeLoading] = useState(false)
+  const [modal, setModal] = useState<{
+    channel: Channel
+    content: string
+    loading: boolean
+  } | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
+    let cancelled = false
     setLoading(true)
-    getCustomerById(id).then((data) => {
-      setCustomer(data || null)
-      setLoading(false)
-    })
-    getRankedContacts(id)
-      .then((ranked) => {
-        setContacts(ranked)
+    setError(null)
+
+    Promise.all([
+      getCustomerById(id),
+      getRankedContacts(id).catch(() => []),
+      getLeadResearch(id).catch(() => null),
+      getLeadOutcome(id).catch(() => null),
+    ])
+      .then(([nextCustomer, nextContacts, nextResearch, nextOutcome]) => {
+        if (cancelled) return
+        setCustomer(nextCustomer || null)
+        setContacts(nextContacts)
         setSelectedContactId(
-          ranked.find(
-            (contact) =>
-              contact.priorityRank === 1 && contact.name !== 'Unknown',
+          nextContacts.find(
+            (contact) => contact.priorityRank === 1 && contact.name !== 'Unknown',
           )?.id,
         )
+        setResearch(nextResearch)
+        setLeadOutcome(nextOutcome)
+        setOutcomeNote(nextOutcome?.note ?? '')
       })
-      .catch(() => setContacts([]))
-    getChannelProfile(id)
-      .then(setChannelProfile)
-      .catch(() => setChannelProfile(null))
-    getLeadResearch(id)
-      .then(setLeadResearchResult)
-      .catch(() => setLeadResearchResult(null))
-    getLeadOutcome(id)
-      .then((outcome) => {
-        setLeadOutcome(outcome)
-        setOutcomeNote(outcome?.note ?? '')
+      .catch((cause) => {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : '对象详情读取失败')
+        }
       })
-      .catch(() => setLeadOutcome(null))
-    getProductProfiles()
-      .then((products) => {
-        setResearchProducts(products)
-        setResearchProductId((current) => current || products[0]?.id || '')
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
-      .catch(() => setResearchProducts([]))
+
+    return () => {
+      cancelled = true
+    }
   }, [id])
+
+  const handleResearch = async () => {
+    if (!customer || researchLoading) return
+    setResearchLoading(true)
+    setError(null)
+    try {
+      setResearch(await researchLead(customer.id))
+      setResearchFeedback(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '客户研究失败')
+    } finally {
+      setResearchLoading(false)
+    }
+  }
+
+  const handleResearchFeedback = async (feedbackType: 'useful' | 'not_useful') => {
+    if (!customer || feedbackLoading) return
+    setFeedbackLoading(true)
+    try {
+      await submitLeadResearchFeedback(customer.id, {
+        rating: feedbackType === 'useful' ? 5 : 2,
+        feedbackType,
+      })
+      setResearchFeedback(feedbackType)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '反馈保存失败')
+    } finally {
+      setFeedbackLoading(false)
+    }
+  }
 
   const handleDiscoverContacts = async () => {
     if (!customer || contactsLoading) return
     setContactsLoading(true)
+    setError(null)
     try {
       const discovered = await discoverContacts(customer.id)
       setContacts(discovered)
-      const firstVerified = discovered.find((contact) => contact.name !== 'Unknown')
-      setSelectedContactId(firstVerified?.id)
+      setSelectedContactId(
+        discovered.find((contact) => contact.name !== 'Unknown')?.id,
+      )
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '公开联系人抓取失败')
     } finally {
       setContactsLoading(false)
     }
@@ -202,100 +209,48 @@ export function CustomerDetailPage() {
       setContacts(ranked)
       setSelectedContactId(
         ranked.find(
-          (contact) =>
-            contact.priorityRank === 1 && contact.name !== 'Unknown',
+          (contact) => contact.priorityRank === 1 && contact.name !== 'Unknown',
         )?.id,
       )
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '联系人排序失败')
     } finally {
       setContactsLoading(false)
-    }
-  }
-
-  const handleDiscoverChannel = async () => {
-    if (!customer || channelLoading) return
-    setChannelLoading(true)
-    try {
-      setChannelProfile(await discoverChannel(customer.id))
-    } finally {
-      setChannelLoading(false)
-    }
-  }
-
-  const handleGenerateChannelOutreach = async () => {
-    if (!customer) return
-    setModal({ channel: 'email', content: '', loading: true })
-    const content = await generateOutreach(
-      customer.id,
-      'email',
-      selectedContactId,
-      'channel',
-    )
-    setModal({ channel: 'email', content, loading: false })
-  }
-
-  const handleLeadResearch = async () => {
-    if (!customer || leadResearchLoading) return
-    setLeadResearchLoading(true)
-    try {
-      setLeadResearchResult(
-        await researchLead(customer.id, researchProductId || undefined),
-      )
-      setResearchFeedback(null)
-      setResearchFeedbackComment('')
-    } finally {
-      setLeadResearchLoading(false)
-    }
-  }
-
-  const handleResearchFeedback = async (
-    feedbackType: 'useful' | 'not_useful',
-  ) => {
-    if (!customer || researchFeedbackLoading) return
-    setResearchFeedbackLoading(true)
-    try {
-      await submitLeadResearchFeedback(customer.id, {
-        rating: feedbackType === 'useful' ? 5 : 2,
-        feedbackType,
-        comment: researchFeedbackComment || undefined,
-      })
-      setResearchFeedback(feedbackType)
-    } finally {
-      setResearchFeedbackLoading(false)
-    }
-  }
-
-  const handleOutcomeChange = async (status: LeadOutcomeStatus) => {
-    if (!customer || outcomeLoading) return
-    setOutcomeLoading(true)
-    try {
-      const input = { status, note: outcomeNote || undefined }
-      const saved = leadOutcome
-        ? await updateLeadOutcome(customer.id, input)
-        : await createLeadOutcome(customer.id, input)
-      setLeadOutcome(saved)
-      setOutcomeNote(saved.note ?? '')
-    } finally {
-      setOutcomeLoading(false)
     }
   }
 
   const handleGenerate = async (channel: Channel) => {
     if (!customer) return
     setModal({ channel, content: '', loading: true })
-    const content = await generateOutreach(
-      customer.id,
-      channel,
-      selectedContactId,
-    )
-    setModal({ channel, content, loading: false })
+    try {
+      const content = await generateOutreach(
+        customer.id,
+        channel,
+        selectedContactId,
+      )
+      setModal({ channel, content, loading: false })
+    } catch (cause) {
+      setModal(null)
+      setError(cause instanceof Error ? cause.message : '话术生成失败')
+    }
   }
 
-  const handleGeneratePlan = async () => {
-    if (!customer || planLoading) return
-    setPlanLoading(true)
-    const plan = await generateFollowUpPlan(customer.id, selectedContactId)
-    setFollowUpPlan(plan)
-    setPlanLoading(false)
+  const handleOutcomeChange = async (status: LeadOutcomeStatus) => {
+    if (!customer || outcomeLoading) return
+    setOutcomeLoading(true)
+    setError(null)
+    try {
+      const input = { status, note: outcomeNote.trim() || undefined }
+      const saved = leadOutcome
+        ? await updateLeadOutcome(customer.id, input)
+        : await createLeadOutcome(customer.id, input)
+      setLeadOutcome(saved)
+      setOutcomeNote(saved.note ?? '')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '业务结果保存失败')
+    } finally {
+      setOutcomeLoading(false)
+    }
   }
 
   if (loading) {
@@ -309,9 +264,9 @@ export function CustomerDetailPage() {
   if (!customer) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-4 text-center">
-        <p className="text-ink-500">未找到该客户</p>
+        <p className="text-ink-500">未找到该对象</p>
         <Link to="/app/discover" className="btn-primary mt-4">
-          返回客户搜索
+          返回发现
         </Link>
       </div>
     )
@@ -319,856 +274,373 @@ export function CustomerDetailPage() {
 
   const analysis = customer.analysis
   const level = scoreToLevel(analysis.intentScore)
-  const probMeta = intentLevelMeta[analysis.purchaseProbability]
-  const actionMeta = customer.recommendedAction ? RECOMMENDED_ACTION_META[customer.recommendedAction] : null
+  const probabilityMeta = intentLevelMeta[analysis.purchaseProbability]
+  const actionMeta = customer.recommendedAction
+    ? RECOMMENDED_ACTION_META[customer.recommendedAction]
+    : null
   const typeMeta = CUSTOMER_TYPE_META[customer.customerType]
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-      {/* 返回 */}
+    <div className="mx-auto w-full max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">
       <button
+        type="button"
         onClick={() => navigate(-1)}
-        className="mb-4 flex items-center gap-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-900"
       >
         <ArrowLeft className="h-4 w-4" />
-        返回结果列表
+        返回
       </button>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        {/* ===== 主列 ===== */}
-        <div className="min-w-0 space-y-6">
-          {/* 客户信息卡 */}
-          <div className="card overflow-hidden">
-            <div className="border-b border-ink-100 p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <Avatar initials={customer.initials} size="lg" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-2xl font-bold text-ink-900">{customer.displayName}</h1>
-                      <PlatformIcon platform={customer.platform} className="h-5 w-5" />
-                    </div>
-                    <p className="mt-1 font-mono text-sm text-ink-500">@{customer.username}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-500">
-                      <span className="flex items-center gap-1">
-                        <PlatformIcon platform={customer.platform} className="h-3.5 w-3.5" />
-                        {customer.platform}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5" />
-                        {customer.country}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Building2 className="h-3.5 w-3.5" />
-                        {INDUSTRY_META[customer.industry].label}
-                      </span>
-                      <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-xs font-medium text-ink-600">
-                        {typeMeta.label}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
+      {error ? (
+        <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="space-y-5">
+        <section className="card overflow-hidden">
+          <div className="flex flex-col gap-5 border-b border-ink-100 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+            <div className="flex min-w-0 items-start gap-4">
+              <Avatar initials={customer.initials} size="lg" />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="truncate text-xl font-bold text-ink-950 sm:text-2xl">
+                    {customer.displayName}
+                  </h1>
+                  <PlatformIcon platform={customer.platform} className="h-5 w-5" />
                   <IntentBadge level={level} />
                 </div>
-              </div>
-
-              {/* AI 推荐行动高亮条 */}
-              {actionMeta && (
-                <div className={cn('mt-4 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm ring-1', actionMeta.color)}>
-                  <Sparkles className="h-4 w-4 shrink-0" />
-                  <span>
-                    <span className="font-semibold">推荐行动 · {actionMeta.label}</span>
-                    <span className="ml-1.5 opacity-75">{actionMeta.desc}</span>
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* 原始内容 */}
-            <div className="p-6">
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-ink-400">
-                <MessageCircle className="h-4 w-4" />
-                原始内容
-              </h2>
-              <div className="mt-3 rounded-xl bg-ink-50 px-5 py-4">
-                <div className="mb-2 flex items-center gap-2 text-xs text-ink-400">
-                  <Clock className="h-3 w-3" />
-                  {customer.postedAt}
-                </div>
-                <p className="leading-relaxed text-ink-800">{customer.postContent}</p>
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <button
-                  onClick={() => window.open(customer.sourceUrl, '_blank')}
-                  className="btn-ghost text-xs"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  查看原始帖子
-                </button>
-                <button
-                  onClick={() => navigator.clipboard?.writeText(customer.postContent)}
-                  className="btn-ghost text-xs"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  复制内容
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* AI 分析区 */}
-          <div className="card overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-ink-100 bg-brand-50/40 px-6 py-4">
-              <Sparkles className="h-5 w-5 text-brand-600" />
-              <h2 className="text-lg font-semibold text-ink-900">AI 深度分析</h2>
-            </div>
-
-            <div className="grid gap-px bg-ink-100 sm:grid-cols-2">
-              <AnalysisCell icon={Building2} label="客户背景" value={analysis.background} />
-              <AnalysisCell icon={Target} label="核心需求" value={analysis.need} />
-              <AnalysisCell
-                icon={TrendingUp}
-                label="购买概率"
-                value={
-                  <span className="flex items-center gap-2">
-                    <span className={cn('h-2 w-2 rounded-full', probMeta.dot)} />
-                    {PROBABILITY_LABEL[analysis.purchaseProbability]} ({analysis.purchaseProbability})
-                  </span>
-                }
-              />
-              <AnalysisCell icon={Lightbulb} label="推荐销售策略" value={analysis.salesStrategy} />
-            </div>
-
-            {/* 意向评分 */}
-            <div className="border-t border-ink-100 p-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">购买意向评分</p>
-              <IntentScoreBar score={analysis.intentScore} className="mt-2 max-w-md" />
-              {analysis.needKeywords && analysis.needKeywords.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">需求关键词</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {analysis.needKeywords.map((kw) => (
-                      <span key={kw} className="chip bg-brand-50 text-brand-700">
-                        {kw}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {analysis.tags.map((tag) => (
-                  <span key={tag} className="chip bg-ink-50 text-ink-600">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 销售触达 + 跟进计划 */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-brand-600" />
-                <h2 className="text-lg font-semibold text-ink-900">
-                  Lead Research
-                </h2>
-              </div>
-              <button
-                onClick={handleLeadResearch}
-                disabled={leadResearchLoading}
-                className="btn-secondary text-xs"
-              >
-                {leadResearchLoading && (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                )}
-                {leadResearchResult?.generatedAt ? '重新研究' : 'AI研究客户'}
-              </button>
-            </div>
-            {researchProducts.length > 0 && (
-              <div className="mt-3 flex items-center gap-2 text-xs text-ink-600">
-                <label htmlFor="lead-research-product" className="font-semibold">
-                  对比产品：
-                </label>
-                <select
-                  id="lead-research-product"
-                  value={researchProductId}
-                  onChange={(event) => setResearchProductId(event.target.value)}
-                  className="rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs text-ink-800 focus:border-brand-400 focus:outline-none"
-                >
-                  {researchProducts.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.productName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {leadResearchResult?.matchScore != null ? (
-              <>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl bg-brand-50/60 p-4 ring-1 ring-brand-100">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
-                    AI匹配评分
-                  </p>
-                  <p className="mt-1 text-2xl font-bold text-brand-700">
-                    {leadResearchResult.matchScore}/100
-                  </p>
-                  <p className="mt-1 text-xs text-ink-500">
-                    购买可能性：{leadResearchResult.purchaseLikelihood ?? 'Unknown'}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-ink-50 p-4">
-                  <p className="text-xs font-semibold text-ink-500">
-                    为什么值得联系
-                  </p>
-                  <p className="mt-1 text-sm leading-relaxed text-ink-700">
-                    {leadResearchResult.contactReason ?? 'Unknown'}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-ink-50 p-4">
-                  <p className="text-xs font-semibold text-ink-500">
-                    推荐销售角度
-                  </p>
-                  <p className="mt-1 text-sm leading-relaxed text-ink-700">
-                    {leadResearchResult.recommendedAngle ?? 'Unknown'}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-amber-50/60 p-4 ring-1 ring-amber-100">
-                  <p className="text-xs font-semibold text-amber-700">
-                    风险提醒
-                  </p>
-                  <ul className="mt-1 space-y-1 text-sm text-amber-900">
-                    {(leadResearchResult.riskFactors?.length
-                      ? leadResearchResult.riskFactors
-                      : ['Unknown']
-                    ).map((risk) => (
-                      <li key={risk}>· {risk}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <div className="mt-4 border-t border-ink-100 pt-4">
-                {researchFeedback ? (
-                  <div className="flex items-center gap-2 text-sm text-emerald-700">
-                    <Check className="h-4 w-4" />
-                    已记录，谢谢你的反馈
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium text-ink-700">
-                      这个判断有帮助吗？
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleResearchFeedback('useful')}
-                        disabled={researchFeedbackLoading}
-                        className="btn-secondary text-xs"
-                      >
-                        <ThumbsUp className="h-3.5 w-3.5" />
-                        有帮助
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleResearchFeedback('not_useful')}
-                        disabled={researchFeedbackLoading}
-                        className="btn-secondary text-xs"
-                      >
-                        <ThumbsDown className="h-3.5 w-3.5" />
-                        需要改进
-                      </button>
-                      {researchFeedbackLoading && (
-                        <Loader2 className="h-4 w-4 animate-spin text-ink-400" />
-                      )}
-                    </div>
-                    <input
-                      value={researchFeedbackComment}
-                      onChange={(event) =>
-                        setResearchFeedbackComment(event.target.value)
-                      }
-                      maxLength={1000}
-                      placeholder="补充说明（可选）"
-                      className="mt-2 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-xs text-ink-700 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none"
-                    />
-                  </>
-                )}
-              </div>
-              </>
-            ) : (
-              <p className="mt-4 rounded-xl bg-ink-50 p-3 text-sm text-ink-400">
-                尚未生成结构化客户研究。AI只会使用现有 Lead 和产品证据。
-              </p>
-            )}
-          </div>
-
-          <div className="card p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-emerald-600" />
-                  <h2 className="text-lg font-semibold text-ink-900">
-                    销售进展
-                  </h2>
-                </div>
                 <p className="mt-1 text-sm text-ink-500">
-                  记录这次判断之后，机会实际推进到了哪里。
+                  {customer.company || customer.username} · {customer.country} · {typeMeta.label}
+                </p>
+                <p className="mt-1 text-xs text-ink-400">
+                  {INDUSTRY_META[customer.industry].label}
+                  {customer.jobTitle ? ` · ${customer.jobTitle}` : ''}
                 </p>
               </div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-ink-50 px-3 py-1.5 text-sm font-semibold text-ink-700">
-                <span className="h-2 w-2 rounded-full bg-amber-400" />
-                {OUTCOME_LABELS[leadOutcome?.status ?? 'NEW']}
-              </span>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {OUTCOME_ACTIONS.map((action) => (
-                <button
-                  key={action.status}
-                  type="button"
-                  onClick={() => handleOutcomeChange(action.status)}
-                  disabled={outcomeLoading}
-                  className={cn(
-                    'rounded-lg border px-3 py-2 text-xs font-semibold transition-colors',
-                    leadOutcome?.status === action.status
-                      ? 'border-brand-200 bg-brand-50 text-brand-700'
-                      : 'border-ink-200 bg-white text-ink-600 hover:border-ink-300 hover:text-ink-900',
-                  )}
-                >
-                  {action.label}
-                </button>
-              ))}
-              {outcomeLoading && (
-                <Loader2 className="h-4 w-4 self-center animate-spin text-ink-400" />
-              )}
-            </div>
-            <input
-              value={outcomeNote}
-              onChange={(event) => setOutcomeNote(event.target.value)}
-              maxLength={2000}
-              placeholder="补充下一步或结果（可选）"
-              className="mt-3 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-700 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none"
-            />
+            <a
+              href={customer.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-ink-200 px-3 text-xs font-semibold text-ink-700 hover:bg-ink-50"
+            >
+              查看原始来源
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
           </div>
 
-          <div className="card p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Network className="h-5 w-5 text-violet-600" />
-                <h2 className="text-lg font-semibold text-ink-900">
-                  企业 / 供应商 / 中介发现
-                </h2>
+          <div className="grid gap-px bg-ink-100 md:grid-cols-[1.25fr_0.75fr]">
+            <div className="bg-white p-5 sm:p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                来源内容
+              </p>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink-700">
+                {customer.postContent}
+              </p>
+            </div>
+            <div className="bg-white p-5 sm:p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                AI 判断（非事实）
+              </p>
+              <div className="mt-3">
+                <IntentScoreBar score={analysis.intentScore} />
               </div>
+              <p className="mt-3 text-xs leading-5 text-ink-600">
+                购买概率：
+                <span className="inline-flex items-center gap-1 font-semibold text-ink-800">
+                  <span className={cn('h-2 w-2 rounded-full', probabilityMeta.dot)} />
+                  {analysis.purchaseProbability}
+                </span>
+              </p>
+              <p className="mt-2 text-xs leading-5 text-ink-500">
+                {analysis.reasoning || analysis.suggestion}
+              </p>
+            </div>
+          </div>
+
+          {actionMeta ? (
+            <div className="border-t border-ink-100 px-5 py-3 text-xs text-ink-600 sm:px-6">
+              <span className="font-semibold text-ink-900">建议下一步：</span>
+              {actionMeta.label} · {actionMeta.desc}
+            </div>
+          ) : null}
+        </section>
+
+        <section className="card p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-brand-600" />
+                <h2 className="text-lg font-semibold text-ink-900">深度研究</h2>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-ink-500">
+                基于当前对象和产品证据判断匹配度；研究分数不会自动变成机会或沟通事实。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleResearch()}
+              disabled={researchLoading}
+              className="btn-secondary text-xs"
+            >
+              {researchLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+              {research?.generatedAt ? '重新研究' : '开始研究'}
+            </button>
+          </div>
+
+          {research?.matchScore != null ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <FactCell label="匹配评分" value={`${research.matchScore}/100`} />
+              <FactCell label="购买可能性" value={research.purchaseLikelihood ?? 'Unknown'} />
+              <FactCell label="为什么值得联系" value={research.contactReason ?? 'Unknown'} />
+              <FactCell label="推荐切入角度" value={research.recommendedAngle ?? 'Unknown'} />
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-ink-200 bg-ink-50/50 px-4 py-6 text-center text-xs text-ink-500">
+              尚未运行深度研究。
+            </div>
+          )}
+
+          {research?.matchScore != null ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">
+              <span className="text-xs text-ink-500">这个判断有帮助吗？</span>
               <button
-                onClick={handleDiscoverChannel}
-                disabled={channelLoading}
+                type="button"
+                onClick={() => void handleResearchFeedback('useful')}
+                disabled={feedbackLoading || Boolean(researchFeedback)}
                 className="btn-secondary text-xs"
               >
-                {channelLoading && (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                )}
-                {channelProfile ? '重新抓取与分析' : '抓取商业主体'}
+                <ThumbsUp className="h-3.5 w-3.5" /> 有帮助
               </button>
+              <button
+                type="button"
+                onClick={() => void handleResearchFeedback('not_useful')}
+                disabled={feedbackLoading || Boolean(researchFeedback)}
+                className="btn-secondary text-xs"
+              >
+                <ThumbsDown className="h-3.5 w-3.5" /> 需要改进
+              </button>
+              {researchFeedback ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> 已记录
+                </span>
+              ) : null}
             </div>
-            {channelProfile ? (
-              <div className="mt-4 rounded-xl border border-ink-100 bg-ink-50/40 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="chip bg-violet-50 text-violet-700">
-                    {channelProfile.channelType}
-                  </span>
-                  <span className="text-sm font-semibold text-ink-900">
-                    渠道评分 {channelProfile.channelScore}/100
-                  </span>
-                  <span className="text-xs text-ink-400">
-                    可信度 {channelProfile.confidence}%
-                  </span>
-                </div>
-                <p className="mt-3 text-sm leading-relaxed text-ink-700">
-                  {channelProfile.recommendationReason}
-                </p>
-                <div className="mt-3 rounded-lg bg-white p-3 text-sm text-ink-600 ring-1 ring-ink-100">
-                  <span className="font-semibold text-ink-800">合作方式：</span>
-                  {channelProfile.cooperationStrategy}
-                </div>
-                {channelProfile.evidence.length > 0 && (
-                  <details className="mt-3 rounded-lg bg-white p-3 ring-1 ring-ink-100">
-                    <summary className="cursor-pointer text-xs font-semibold text-ink-700">
-                      查看公开来源与相关企业（{channelProfile.evidence.length}）
-                    </summary>
-                    <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-ink-500">
-                      {channelProfile.evidence.map((item, index) => (
-                        <li key={`${index}-${item}`} className="break-all">
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-                {channelProfile.channelType !== 'unknown' && (
-                  <button
-                    onClick={handleGenerateChannelOutreach}
-                    className="btn-primary mt-3 text-xs"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    生成渠道合作邀请
-                  </button>
-                )}
-              </div>
-            ) : (
-              <p className="mt-4 rounded-xl bg-ink-50 p-3 text-sm text-ink-400">
-                尚未抓取企业、供应商或中介证据。系统不会虚构代理身份或销售网络。
-              </p>
-            )}
-          </div>
+          ) : null}
+        </section>
 
-          <div className="card p-6">
-            <div className="flex items-center justify-between gap-3">
+        <section className="card p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-brand-600" />
-                <h2 className="text-lg font-semibold text-ink-900">关键联系人</h2>
+                <h2 className="text-lg font-semibold text-ink-900">公开联系人</h2>
               </div>
-              <div className="flex gap-2">
+              <p className="mt-1 text-xs leading-5 text-ink-500">
+                只保存公开观察到的业务联系方式；不会猜测邮箱格式、私人号码或联系人姓名。
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleDiscoverContacts()}
+                disabled={contactsLoading}
+                className="btn-secondary text-xs"
+              >
+                {contactsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                {contacts.length ? '刷新联系人' : '抓取联系人'}
+              </button>
+              {contacts.length > 1 ? (
                 <button
-                  onClick={handleDiscoverContacts}
+                  type="button"
+                  onClick={() => void handleRankContacts()}
                   disabled={contactsLoading}
                   className="btn-secondary text-xs"
                 >
-                  {contactsLoading && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  推荐排序
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {contacts.length ? (
+            <div className="mt-4 divide-y divide-ink-100 overflow-hidden rounded-xl border border-ink-100">
+              {contacts.map((contact) => (
+                <label
+                  key={contact.id}
+                  className={cn(
+                    'flex cursor-pointer gap-3 bg-white p-4 transition hover:bg-ink-50',
+                    selectedContactId === contact.id && 'bg-brand-50/60',
                   )}
-                  {contacts.length > 0 ? '刷新公开联系方式' : '抓取公开联系方式'}
-                </button>
-                {contacts.length > 0 && (
-                  <button
-                    onClick={handleRankContacts}
-                    disabled={contactsLoading}
-                    className="btn-primary text-xs"
-                  >
-                    推荐排序
-                  </button>
-                )}
-              </div>
-            </div>
-            <p className="mt-1 text-sm text-ink-500">
-              抓取公开业务邮箱、电话和社交主页；每个字段保留原始来源，不猜测邮箱格式或私人号码。
-            </p>
-            {contacts.length > 0 ? (
-              <div className="mt-4 space-y-2">
-                {contacts.map((contact) => {
-                  const observedEvidence = contact.evidence.filter(
-                    (item) => typeof item !== 'string',
-                  )
-                  const discoveryNotes = contact.evidence.filter(
-                    (item): item is string => typeof item === 'string',
-                  )
-                  const socialProfiles = [
-                    ...new Set(
-                      observedEvidence
-                        .filter((item) => item.field === 'socialProfile')
-                        .map((item) => item.value),
-                    ),
-                  ]
-                  return (
-                  <div
-                    key={contact.id}
-                    className={cn(
-                      'flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors',
-                      selectedContactId === contact.id
-                        ? 'border-brand-300 bg-brand-50/60'
-                        : 'border-ink-100 bg-ink-50/40 hover:border-ink-200',
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      aria-label={`选择联系人 ${contact.name}`}
-                      name="outreach-contact"
-                      className="mt-1"
-                      checked={selectedContactId === contact.id}
-                      disabled={contact.name === 'Unknown'}
-                      onChange={() => setSelectedContactId(contact.id)}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-2">
-                        {contact.priorityRank != null && (
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
-                            {contact.priorityRank}
-                          </span>
-                        )}
-                        <span className="font-semibold text-ink-900">
-                          {contact.name}
-                        </span>
-                        <span className="chip bg-white text-ink-600 ring-1 ring-ink-200">
-                          {contact.contactRole}
-                        </span>
-                        <span className="text-xs text-ink-400">
-                          可信度 {contact.confidence}%
-                        </span>
-                        {contact.contactScore != null && (
-                          <span className="text-xs font-semibold text-brand-700">
-                            联系评分 {contact.contactScore}
-                          </span>
-                        )}
-                      </span>
-                      <span className="mt-1 block text-sm text-ink-600">
-                        {contact.jobTitle} · {contact.company}
-                      </span>
-                      <span className="mt-1 block truncate text-xs text-ink-400">
-                        来源：{contact.source}
-                      </span>
-                      <span className="mt-2 flex flex-wrap gap-2 text-xs">
-                        {contact.email !== 'Unknown' && (
-                          <a
-                            href={`mailto:${contact.email}`}
-                            onClick={(event) => event.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-brand-700 ring-1 ring-ink-200 hover:ring-brand-300"
-                          >
-                            <Mail className="h-3 w-3" />
-                            {contact.email}
-                          </a>
-                        )}
-                        {contact.phone !== 'Unknown' && (
-                          <a
-                            href={`tel:${contact.phone}`}
-                            onClick={(event) => event.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-ink-700 ring-1 ring-ink-200 hover:ring-brand-300"
-                          >
-                            <Phone className="h-3 w-3" />
-                            {contact.phone}
-                          </a>
-                        )}
-                        {socialProfiles.map((url) => (
-                          <a
-                            key={url}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(event) => event.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[#0A66C2] ring-1 ring-ink-200 hover:ring-brand-300"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            {socialPlatformLabel(url)}
-                          </a>
-                        ))}
-                      </span>
-                      {observedEvidence.length > 0 && (
-                        <details
-                          className="mt-2 rounded-lg bg-white p-2 ring-1 ring-ink-100"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <summary className="cursor-pointer text-xs font-semibold text-ink-600">
-                            字段证据与验证状态（{observedEvidence.length}）
-                          </summary>
-                          <ul className="mt-2 space-y-1.5 text-xs text-ink-500">
-                            {observedEvidence.map((item, index) => (
-                              <li
-                                key={`${item.field}-${item.value}-${index}`}
-                                className="break-all"
-                              >
-                                <span className="font-semibold text-ink-700">
-                                  {item.field}
-                                </span>
-                                ：{item.value} · {item.verificationStatus} ·{' '}
-                                <a
-                                  href={item.sourceUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-brand-700 hover:underline"
-                                >
-                                  来源原文
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
-                      )}
-                      {discoveryNotes.length > 0 && (
-                        <details className="mt-2 rounded-lg bg-white p-2 ring-1 ring-ink-100">
-                          <summary className="cursor-pointer text-xs font-semibold text-ink-600">
-                            抓取说明
-                          </summary>
-                          <ul className="mt-2 space-y-1 text-xs leading-relaxed text-ink-500">
-                            {discoveryNotes.map((note) => (
-                              <li key={note}>{note}</li>
-                            ))}
-                          </ul>
-                        </details>
-                      )}
-                      {contact.recommendationReason && (
-                        <span className="mt-1 block text-xs leading-relaxed text-ink-500">
-                          推荐原因：{contact.recommendationReason}
-                        </span>
-                      )}
+                >
+                  <input
+                    type="radio"
+                    name="selected-contact"
+                    checked={selectedContactId === contact.id}
+                    disabled={contact.name === 'Unknown'}
+                    onChange={() => setSelectedContactId(contact.id)}
+                    className="mt-1"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-ink-900">{contact.name}</span>
+                      {contact.jobTitle !== 'Unknown' ? (
+                        <span className="text-xs text-ink-500">{contact.jobTitle}</span>
+                      ) : null}
+                      <span className="text-[10px] text-ink-400">可信度 {contact.confidence}%</span>
                     </span>
-                  </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="mt-4 rounded-xl bg-ink-50 p-3 text-sm text-ink-400">
-                尚未发现联系人。系统不会根据公司名称猜测姓名或联系方式。
-              </p>
-            )}
+                    <span className="mt-1 block text-[10px] text-ink-400">来源：{contact.source}</span>
+                    <span className="mt-2 flex flex-wrap gap-2 text-xs">
+                      {contact.email !== 'Unknown' ? (
+                        <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 rounded-lg border border-ink-200 px-2 py-1 text-brand-700">
+                          <Mail className="h-3 w-3" /> {contact.email}
+                        </a>
+                      ) : null}
+                      {contact.phone !== 'Unknown' ? (
+                        <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1 rounded-lg border border-ink-200 px-2 py-1 text-ink-700">
+                          <Phone className="h-3 w-3" /> {contact.phone}
+                        </a>
+                      ) : null}
+                      {contact.profileUrl !== 'Unknown' ? (
+                        <a href={contact.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-ink-200 px-2 py-1 text-ink-700">
+                          <ExternalLink className="h-3 w-3" /> 公开主页
+                        </a>
+                      ) : null}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-ink-200 bg-ink-50/50 px-4 py-6 text-center text-xs text-ink-500">
+              尚未发现可归因公开联系人。
+            </div>
+          )}
+        </section>
+
+        <section className="card p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-brand-600" />
+            <h2 className="text-lg font-semibold text-ink-900">沟通准备</h2>
           </div>
-
-          {/* 销售触达 + 跟进计划 */}
-          <div className="card p-6">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-emerald-600" />
-              <h2 className="text-lg font-semibold text-ink-900">一键生成销售触达</h2>
-            </div>
-            <p className="mt-1 text-sm text-ink-500">
-              基于客户背景与需求，AI 自动生成多渠道开发话术
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {(Object.keys(CHANNEL_META) as Channel[]).map((ch) => {
-                const meta = CHANNEL_META[ch]
-                return (
-                  <button
-                    key={ch}
-                    onClick={() => handleGenerate(ch)}
-                    className={cn(
-                      'flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]',
-                      meta.color,
-                    )}
-                  >
-                    <meta.icon className="h-4 w-4" />
-                    {meta.label}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* AI 跟进计划 */}
-            <div className="mt-6 border-t border-ink-100 pt-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-brand-600" />
-                  <h3 className="text-sm font-semibold text-ink-900">AI 跟进计划</h3>
-                </div>
-                <button onClick={handleGeneratePlan} disabled={planLoading} className="btn-secondary text-xs">
-                  {planLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  {followUpPlan ? '重新生成' : '生成计划'}
+          <p className="mt-1 text-xs leading-5 text-ink-500">
+            这里只生成草稿。复制、打开邮箱或生成话术都不会把状态改成“已发送”。
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {(Object.keys(CHANNEL_META) as Channel[]).map((channel) => {
+              const meta = CHANNEL_META[channel]
+              const Icon = meta.icon
+              return (
+                <button
+                  key={channel}
+                  type="button"
+                  onClick={() => void handleGenerate(channel)}
+                  className={cn(
+                    'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3 text-xs font-semibold text-white',
+                    meta.color,
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {meta.label}
                 </button>
-              </div>
-
-              {followUpPlan ? (
-                <ol className="mt-4 space-y-2">
-                  {followUpPlan.map((step, idx) => (
-                    <li key={idx} className="flex items-start gap-3 rounded-xl border border-ink-100 bg-ink-50/40 px-3 py-2.5">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
-                        {step.day}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-ink-400">第 {step.day} 天</span>
-                          <span className="chip bg-white text-ink-600 ring-1 ring-ink-200">
-                            {step.channel === 'call' ? (
-                              <Phone className="h-3 w-3" />
-                            ) : (
-                              (() => {
-                                const Icon = CHANNEL_META[step.channel as Channel]?.icon
-                                return Icon ? <Icon className="h-3 w-3" /> : null
-                              })()
-                            )}
-                            {CHANNEL_LABEL[step.channel]}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm text-ink-700">{step.action}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="mt-3 text-sm text-ink-400">
-                  点击「生成计划」，AI 将基于客户意向等级，制定多渠道、分时间节点的跟进节奏。
-                </p>
-              )}
-            </div>
+              )
+            })}
           </div>
-        </div>
+        </section>
 
-        {/* ===== 侧栏：CRM 面板 ===== */}
-        <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <CrmPanel customerId={customer.id} customerName={customer.displayName} />
-        </aside>
+        <CommunicationEvidencePanel leadId={customer.id} />
+
+        <section className="card p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                <h2 className="text-lg font-semibold text-ink-900">业务结果</h2>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-ink-500">
+                “已发送 / 已回复 / 已约会议”由上面的沟通事实自动推导；这里仅记录独立业务结果。
+              </p>
+            </div>
+            <span className="rounded-full bg-ink-50 px-3 py-1.5 text-xs font-semibold text-ink-700">
+              {OUTCOME_LABELS[leadOutcome?.status ?? 'NEW']}
+            </span>
+          </div>
+
+          <textarea
+            value={outcomeNote}
+            onChange={(event) => setOutcomeNote(event.target.value)}
+            maxLength={2000}
+            rows={3}
+            placeholder="记录成交依据、关闭原因或下一步（可选）"
+            className="mt-4 w-full resize-none rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm text-ink-700 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none"
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {OUTCOME_ACTIONS.map((action) => {
+              const Icon = action.icon
+              return (
+                <button
+                  key={action.status}
+                  type="button"
+                  onClick={() => void handleOutcomeChange(action.status)}
+                  disabled={outcomeLoading}
+                  className={cn(
+                    'inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition',
+                    leadOutcome?.status === action.status
+                      ? 'border-brand-200 bg-brand-50 text-brand-700'
+                      : 'border-ink-200 bg-white text-ink-700 hover:bg-ink-50',
+                  )}
+                >
+                  {outcomeLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
+                  {action.label}
+                </button>
+              )
+            })}
+          </div>
+        </section>
       </div>
 
-      {/* 生成结果弹窗 */}
       <Modal
-        open={!!modal}
+        open={Boolean(modal)}
         onClose={() => setModal(null)}
-        title={modal ? `${CHANNEL_META[modal.channel].label} · 话术草稿` : ''}
+        title={modal ? `${CHANNEL_META[modal.channel].label} · 仅为草稿` : ''}
         description={customer.displayName}
       >
         {modal?.loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
-            <span className="ml-3 text-sm text-ink-500">AI 正在生成...</span>
+            <span className="ml-3 text-sm text-ink-500">AI 正在生成…</span>
           </div>
-        ) : (
-          modal && (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-ink-200 bg-ink-50 p-4">
-                <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-ink-700">
-                  {modal.content}
-                </pre>
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-ink-400">AI 生成内容，发送前请审阅修改</p>
-                <button
-                  onClick={() => navigator.clipboard?.writeText(modal.content)}
-                  className="btn-secondary"
-                >
-                  <Copy className="h-4 w-4" />
-                  复制
-                </button>
-              </div>
+        ) : modal ? (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-ink-200 bg-ink-50 p-4">
+              <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-ink-700">
+                {modal.content}
+              </pre>
             </div>
-          )
-        )}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-ink-400">生成内容不代表已发送；真实发送后请在“沟通事实”提交可归因凭证。</p>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard?.writeText(modal.content)}
+                className="btn-secondary"
+              >
+                <Copy className="h-4 w-4" />
+                复制草稿
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </div>
   )
 }
 
-function socialPlatformLabel(url: string): string {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, '')
-    if (host.includes('linkedin')) return 'LinkedIn'
-    if (host === 'x.com' || host.includes('twitter')) return 'X'
-    if (host.includes('facebook')) return 'Facebook'
-    if (host.includes('instagram')) return 'Instagram'
-    if (host.includes('youtube') || host === 'youtu.be') return 'YouTube'
-    if (host.includes('tiktok')) return 'TikTok'
-    return host
-  } catch {
-    return '社交主页'
-  }
-}
-
-/** 侧栏 CRM 面板：收藏 / 状态 / 标签 / 备注 */
-function CrmPanel({ customerId, customerName }: { customerId: string; customerName: string }) {
-  const crm = useCrmRecord(customerId)
-  const { toggleFav, addTag, removeTag, updateNote } = useCrmActions(customerId)
-  const [tagInput, setTagInput] = useState('')
-  const [noteInput, setNoteInput] = useState(crm.note ?? '')
-
-  useEffect(() => {
-    setNoteInput(crm.note ?? '')
-  }, [crm.note])
-
-  const handleAddTag = () => {
-    if (!tagInput.trim()) return
-    addTag(tagInput)
-    setTagInput('')
-  }
-
+function FactCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card overflow-hidden">
-      <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-          <ShieldCheck className="h-4 w-4 text-brand-600" />
-          CRM 跟进
-        </h3>
-        <button
-          onClick={toggleFav}
-          className={cn(
-            'flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors',
-            crm.isFavorited ? 'bg-amber-50 text-amber-700' : 'text-ink-500 hover:bg-ink-100',
-          )}
-        >
-          <Star className={cn('h-3.5 w-3.5', crm.isFavorited && 'fill-amber-400 text-amber-500')} />
-          {crm.isFavorited ? '已收藏' : '收藏'}
-        </button>
-      </div>
-
-      <div className="space-y-4 p-4">
-        {/* 跟进状态 */}
-        <CRMStatusBar customerId={customerId} variant="full" />
-
-        {/* 自定义标签 */}
-        <div>
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-400">
-            <TagIcon className="h-3.5 w-3.5" />
-            自定义标签
-          </p>
-          {crm.customTags.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {crm.customTags.map((tag) => (
-                <span
-                  key={tag}
-                  className="chip flex items-center gap-1 bg-brand-50 text-brand-700"
-                >
-                  {tag}
-                  <button
-                    onClick={() => removeTag(tag)}
-                    className="text-brand-400 hover:text-brand-700"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-1">
-            <input
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
-              placeholder="添加标签，如「重点客户」"
-              className="flex-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs text-ink-800 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
-            />
-            <button onClick={handleAddTag} className="btn-secondary px-2.5 py-1.5 text-xs">
-              添加
-            </button>
-          </div>
-        </div>
-
-        {/* 备注 */}
-        <div>
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-400">
-            <StickyNote className="h-3.5 w-3.5" />
-            销售备注
-          </p>
-          <textarea
-            value={noteInput}
-            onChange={(e) => setNoteInput(e.target.value)}
-            onBlur={() => updateNote(noteInput)}
-            placeholder={`记录关于 ${customerName} 的沟通要点...`}
-            rows={4}
-            className="w-full resize-none rounded-lg border border-ink-200 bg-white px-3 py-2 text-xs text-ink-800 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
-          />
-          <p className="mt-1 text-[11px] text-ink-400">失焦自动保存</p>
-        </div>
-
-        {/* 时间戳 */}
-        <div className="border-t border-ink-100 pt-3 text-[11px] text-ink-400">
-          {crm.lastContactedAt && (
-            <p>最近联系：{new Date(crm.lastContactedAt).toLocaleString('zh-CN')}</p>
-          )}
-          <p>最后更新：{new Date(crm.updatedAt).toLocaleString('zh-CN')}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function AnalysisCell({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Building2
-  label: string
-  value: React.ReactNode
-}) {
-  return (
-    <div className="bg-white p-5">
-      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-400">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <div className="mt-2 text-sm font-medium text-ink-900">{value}</div>
+    <div className="rounded-xl bg-ink-50 p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">{label}</p>
+      <p className="mt-1 text-xs leading-5 text-ink-700">{value}</p>
     </div>
   )
 }
