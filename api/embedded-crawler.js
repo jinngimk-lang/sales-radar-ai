@@ -6,6 +6,25 @@ const DEFAULT_TIMEOUT_MS = 8_000
 const MAX_HTML_CHARS = 500_000
 const MAX_REDIRECTS = 4
 
+const LOW_VALUE_REFERENCE_DOMAINS = [
+  'wikipedia.org',
+  'wikidata.org',
+  'wiktionary.org',
+  'britannica.com',
+  'baike.baidu.com',
+  'baike.com',
+  'merriam-webster.com',
+  'dictionary.com',
+  'dictionary.cambridge.org',
+  'thefreedictionary.com',
+  'collinsdictionary.com',
+  'vocabulary.com',
+  'yourdictionary.com',
+  'wordnik.com',
+]
+
+const LOW_VALUE_REFERENCE_TEXT = /\b(?:dictionary|definitions?|meaning of|what does .{0,80} mean|encyclop(?:edia|aedia)|wiktionary)\b|百科|词典|字典|释义/iu
+
 function decodeHtml(value) {
   return String(value ?? '')
     .replace(/&amp;/gi, '&')
@@ -33,6 +52,36 @@ function isHttpUrl(value) {
   } catch {
     return false
   }
+}
+
+function isLowValueReferenceResult(result) {
+  try {
+    const hostname = new URL(result.url).hostname.toLowerCase().replace(/^www\./, '')
+    if (
+      LOW_VALUE_REFERENCE_DOMAINS.some(
+        (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+      )
+    ) {
+      return true
+    }
+  } catch {
+    return true
+  }
+
+  const text = `${String(result.title ?? '')} ${String(result.summary ?? '')}`
+  return LOW_VALUE_REFERENCE_TEXT.test(text)
+}
+
+function keepUsefulSearchResults(results) {
+  return results.filter((result) => !isLowValueReferenceResult(result))
+}
+
+function buildCommercialRetryQuery(query) {
+  return [
+    'procurement RFQ tender sourcing buyer supplier',
+    query,
+    '-dictionary -definition -meaning -wikipedia -britannica',
+  ].join(' ')
 }
 
 function unwrapDuckDuckGoUrl(value) {
@@ -139,6 +188,18 @@ async function fetchText(fetcher, url, timeoutMs = DEFAULT_TIMEOUT_MS) {
   }
 }
 
+async function searchOneQuery(fetcher, query, maxResults) {
+  const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`
+  const ddg = await fetchText(fetcher, ddgUrl)
+  let results = keepUsefulSearchResults(parseDuckDuckGoHtml(ddg.text, maxResults))
+  if (results.length > 0) return results
+
+  const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=${Math.min(Math.max(maxResults, 1), 20)}`
+  const bing = await fetchText(fetcher, bingUrl)
+  results = keepUsefulSearchResults(parseBingHtml(bing.text, maxResults))
+  return results
+}
+
 export async function searchEmbeddedHtml({
   keyword,
   regions = [],
@@ -149,14 +210,14 @@ export async function searchEmbeddedHtml({
   const query = `${String(keyword ?? '').trim()}${regionText}`.trim()
   if (!query) return []
 
-  const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`
-  const ddg = await fetchText(fetcher, ddgUrl)
-  let results = parseDuckDuckGoHtml(ddg.text, maxResults)
+  let results = await searchOneQuery(fetcher, query, maxResults)
   if (results.length > 0) return results
 
-  const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=${Math.min(Math.max(maxResults, 1), 20)}`
-  const bing = await fetchText(fetcher, bingUrl)
-  results = parseBingHtml(bing.text, maxResults)
+  results = await searchOneQuery(
+    fetcher,
+    buildCommercialRetryQuery(query),
+    maxResults,
+  )
   return results
 }
 
