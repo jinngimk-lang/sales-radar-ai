@@ -1,3 +1,5 @@
+import { crawlerSearchRuntime } from './crawler-gateway-client.js'
+
 const TASK_PREFIX = 'sf1_'
 const TASK_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -113,9 +115,9 @@ function buildStrategy(task) {
     languages: ['English'],
     targetType: 'buyer',
     salesIntent: 'customer',
-    searchDirections: ['crawler MCP public web evidence'],
+    searchDirections: ['crawler public web evidence'],
     reason:
-      'Crawler/MCP searches public web evidence. Commercial intent must be verified before outreach.',
+      'Crawler search collects public-web evidence. Commercial intent must be verified before outreach.',
   }
 }
 
@@ -127,14 +129,14 @@ function buildPreparation(task, requestedContext) {
       ? requestedContext
       : { product: task.k, region: task.r[0] }
   const productContext = {
-    version: 'serverless-crawler-mcp-v3',
+    version: 'serverless-crawler-v4',
     capturedAt,
     source: requestedContext ? 'request' : 'inferred',
     productProfile: null,
     context,
   }
   const searchIntent = {
-    version: 'serverless-crawler-mcp-v3',
+    version: 'serverless-crawler-v4',
     capturedAt,
     salesIntent: strategy.salesIntent,
     targetType: strategy.targetType,
@@ -147,12 +149,14 @@ function buildPreparation(task, requestedContext) {
   return { strategy, productContext, searchIntent }
 }
 
-function runtimeCapabilities(env = process.env) {
-  const crawlerEnabled = Boolean(env.CRAWLER_GATEWAY_URL?.trim())
+export function runtimeCapabilities(env = process.env) {
+  const crawler = crawlerSearchRuntime(env)
+  const crawlerEnabled = crawler.available
+  const provider = crawlerEnabled ? crawler.provider : null
   return {
     marketResearch: {
       enabled: crawlerEnabled,
-      provider: crawlerEnabled ? 'crawler-gateway' : null,
+      provider,
       model: null,
     },
     salesAI: {
@@ -175,9 +179,9 @@ function runtimeCapabilities(env = process.env) {
       verification: null,
     },
     agentRuntime: {
-      provider: crawlerEnabled ? 'crawler-gateway' : null,
+      provider,
       enabled: crawlerEnabled,
-      transport: 'serverless',
+      transport: crawler.mode === 'embedded' ? 'embedded-serverless' : 'serverless',
     },
     publicContactDiscovery: {
       enabled: false,
@@ -186,7 +190,7 @@ function runtimeCapabilities(env = process.env) {
     },
     salesDiscovery: {
       enabled: crawlerEnabled,
-      provider: crawlerEnabled ? 'crawler-gateway' : null,
+      provider,
       model: null,
     },
   }
