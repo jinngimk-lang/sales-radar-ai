@@ -42,6 +42,13 @@ export interface SalesProviderActionResult<TData = unknown> {
   data?: TData
 }
 
+export interface McpToolSafetyAnnotations {
+  readOnlyHint?: boolean
+  destructiveHint?: boolean
+  idempotentHint?: boolean
+  openWorldHint?: boolean
+}
+
 const APPROVAL_STRICTNESS: Record<SalesProviderApproval, number> = {
   automatic: 0,
   required: 1,
@@ -78,6 +85,28 @@ export function resolveActionApproval(
     APPROVAL_STRICTNESS[defaultApproval]
     ? requestedApproval
     : defaultApproval
+}
+
+/**
+ * MCP annotations are runtime safety evidence, not permission to relax policy.
+ * A destructive provider hint always raises the action to the fail-closed
+ * DESTRUCTIVE class. Read-only/idempotent hints are retained by adapters as
+ * diagnostics, but cannot downgrade a catalog action that Sales Radar already
+ * classifies as WRITE/CREDIT/SEND/DESTRUCTIVE.
+ */
+export function tightenActionDescriptorFromMcpAnnotations(
+  descriptor: SalesProviderActionDescriptor,
+  annotations: McpToolSafetyAnnotations | null | undefined,
+): SalesProviderActionDescriptor {
+  if (annotations?.destructiveHint === true) {
+    return {
+      ...descriptor,
+      risk: 'DESTRUCTIVE',
+      approval: 'blocked',
+    }
+  }
+
+  return { ...descriptor }
 }
 
 export function assertSalesProviderActionAllowed(
