@@ -9,7 +9,7 @@ function encodeTask() {
     k: 'industrial pump buyer',
     p: ['Website'],
     r: [],
-    m: 1,
+    m: 5,
     t: Date.now(),
   }
   return `sf1_${Buffer.from(JSON.stringify(task)).toString('base64url')}`
@@ -38,46 +38,52 @@ function jsonResponse(payload) {
   })
 }
 
-test('direct crawler rejects non-public IPv4 literals before making a page request', async () => {
+test('crawler gateway results reject non-public URL literals before crawl enrichment', async () => {
   const response = createResponse()
-  let nonPublicFetchObserved = false
+  const requests = []
 
   const handled = await handleCrawlerSearchResults(
     { method: 'GET', query: {} },
     response,
     `search-task/${encodeURIComponent(encodeTask())}/results`,
     {
-      env: {},
+      env: {
+        CRAWLER_GATEWAY_URL: 'https://crawler.example',
+        CRAWL4AI_BASE_URL: 'https://crawler.example',
+      },
       fetcher: async (input) => {
         const url = String(input)
-        if (url.startsWith('https://api.gdeltproject.org/')) {
+        requests.push(url)
+        if (url === 'https://crawler.example/search') {
           return jsonResponse({
-            articles: [
+            results: [
+              {
+                url: 'http://127.0.0.1/admin',
+                title: 'Loopback admin',
+              },
               {
                 url: 'http://0.0.0.0/private',
                 title: 'Non-public target',
-                summary: 'This candidate must never be fetched as a public page.',
+              },
+              {
+                url: 'https://public.example/procurement/pumps',
+                title: 'Public procurement page',
+                content: 'Buyer requests quotations from industrial pump suppliers.',
               },
             ],
           })
         }
-        if (url === 'http://0.0.0.0/private') {
-          nonPublicFetchObserved = true
-          return new Response('<html><body>local service</body></html>', {
-            status: 200,
-            headers: { 'content-type': 'text/html' },
-          })
-        }
-        throw new Error(`Unexpected fetch: ${url}`)
+        throw new Error(`Unsafe result must never be crawled: ${url}`)
       },
     },
   )
 
   assert.equal(handled, true)
   assert.equal(response.statusCode, 200)
-  assert.equal(nonPublicFetchObserved, false)
   assert.equal(response.body.data.length, 1)
-  assert.equal(response.body.data[0].sourceMetadata.contentAcquisition, 'SKIPPED')
-  assert.equal(response.body.data[0].sourceMetadata.contentAcquisitionProvider, null)
-  assert.equal(response.body.data[0].evidenceStatus, 'UNKNOWN')
+  assert.equal(
+    response.body.data[0].sourceUrl,
+    'https://public.example/procurement/pumps',
+  )
+  assert.deepEqual(requests, ['https://crawler.example/search'])
 })
