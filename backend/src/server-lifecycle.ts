@@ -9,12 +9,6 @@ import {
   createRevenueLiveLoopWorker,
   type RevenueLiveLoopWorker,
 } from './workers/revenue-live-loop.worker.js'
-import {
-  findAgentReachExecutable,
-  getExaCredentialStatus,
-  getExaMcpRuntimeStatus,
-  resolveAgentReachCommand,
-} from './utils/agent-reach-runtime.js'
 
 export interface ServerLifecycleLogger {
   log(message: string): void
@@ -37,7 +31,7 @@ export function startBackendServer(
   const logger = options.logger ?? console
   const runtimeDiagnostics =
     options.runtimeDiagnostics ??
-    (() => logAgentReachRuntimeDiagnostics(logger))
+    (() => logCrawlerRuntimeDiagnostics(logger))
   const revenueLiveLoop =
     options.revenueLiveLoop ?? createProductionRevenueLiveLoop(logger)
 
@@ -45,14 +39,14 @@ export function startBackendServer(
     const listeningPort = readListeningPort(server, port)
     logger.log(`Sales Radar AI backend listening on port ${listeningPort}`)
 
-    // Provider diagnostics and optional cloud-browser work deliberately remain
-    // outside the healthcheck-critical startup path.
+    // Provider diagnostics and optional legacy revenue-browser reconciliation
+    // deliberately remain outside the healthcheck-critical startup path.
     setImmediate(() => {
       void Promise.resolve()
         .then(runtimeDiagnostics)
         .catch(() => {
           logger.warn(
-            '[runtime] AgentReach diagnostics unavailable; backend remains healthy and the provider will be checked during search.',
+            '[runtime] Crawler diagnostics unavailable; backend remains healthy and the provider will be checked during search.',
           )
         })
       revenueLiveLoop.start()
@@ -80,36 +74,29 @@ export function createProductionRevenueLiveLoop(
   })
 }
 
-export function logAgentReachRuntimeDiagnostics(
+/**
+ * Reports only crawler capability booleans and never emits tokens or endpoint
+ * values. Production search has one active provider: crawler.
+ */
+export function logCrawlerRuntimeDiagnostics(
   logger: ServerLifecycleLogger = console,
   environment: NodeJS.ProcessEnv = process.env,
 ): void {
-  const mcporterCommand = resolveAgentReachCommand(environment)
-  const mcporterPath = findAgentReachExecutable(
-    mcporterCommand,
-    environment,
-  )
-  const exaMcpPath = findAgentReachExecutable(
-    'exa-mcp-server',
-    environment,
-  )
-  const exaCredentialStatus = getExaCredentialStatus(environment)
-  const exaMcpRuntimeStatus = getExaMcpRuntimeStatus(environment)
-
   logger.log(`[runtime] node.version=${process.version}`)
-  logger.log(`[runtime] mcporter.command=${mcporterCommand}`)
-  logger.log(`[runtime] mcporter.path=${mcporterPath ?? 'not-found'}`)
-  logger.log(`[runtime] mcporter.exists=${mcporterPath !== null}`)
-  logger.log(`[runtime] exa-mcp.path=${exaMcpPath ?? 'not-found'}`)
-  logger.log(`[runtime] exa-mcp.exists=${exaMcpPath !== null}`)
+  logger.log('[runtime] search.active-provider=crawler')
   logger.log(
-    `[runtime] mcporter.config=${exaMcpRuntimeStatus.configPath ?? 'auto-discovery'}`,
+    `[runtime] crawler.gateway.configured=${Boolean(environment.CRAWLER_GATEWAY_URL?.trim())}`,
   )
-  logger.log(`[runtime] exa-mcp.transport=${exaMcpRuntimeStatus.transport}`)
-  logger.log('[runtime] exa-mcp.auth=x-api-key')
   logger.log(
-    `[runtime] exa-mcp.credential.configured=${exaCredentialStatus.configured}`,
+    `[runtime] crawler.gateway.token.configured=${Boolean(environment.CRAWLER_GATEWAY_TOKEN?.trim())}`,
   )
+  logger.log(
+    `[runtime] crawl4ai.configured=${Boolean(environment.CRAWL4AI_BASE_URL?.trim())}`,
+  )
+  logger.log(
+    `[runtime] crawl4ai.token.configured=${Boolean(environment.CRAWL4AI_API_TOKEN?.trim())}`,
+  )
+  logger.log('[runtime] crawler.direct-http-fallback=true')
 }
 
 function readListeningPort(server: Server, fallback: number): number {
