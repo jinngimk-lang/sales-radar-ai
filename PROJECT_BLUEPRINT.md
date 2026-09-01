@@ -1,15 +1,13 @@
 # Sales Radar AI Project Blueprint
 
-Last updated: 2026-08-25
-Owner intent: build Sales Radar AI into a two-sided, evidence-first opportunity marketplace and sales operating workspace, operated as a continuously maintained autonomous project within explicit safety boundaries.
+Last updated: 2026-09-01
+Owner intent: build Sales Radar AI into an evidence-first buyer/seller opportunity and sales operating workspace, continuously maintained within explicit safety and truth boundaries.
 
 ## 1. North star
 
-Sales Radar AI helps a seller, buyer, partner-seeker, distributor-seeker, or market researcher define a commercial target, discover relevant public evidence, assess whether a real opportunity exists, find attributable public business contacts, communicate through explicit user-controlled actions, and track revenue evidence.
+Sales Radar AI helps a seller, buyer, partner-seeker, distributor-seeker, or market researcher define a commercial target, search the public web for attributable evidence, assess whether a real opportunity may exist, find verified public business contacts when available, prepare communication through explicit user-controlled actions, and track only verifiable outcomes.
 
-The product should feel as operational and stateful as a modern marketplace: the user always knows which commercial target they are working on, what the system recommends next, which records are new, which require judgment, which have moved into communication, and which outcomes are verified.
-
-The product is not a customer database and does not manufacture intent.
+The product is not a customer database and does not manufacture intent. More results are never obtained by weakening evidence quality.
 
 ## 2. Permanent truth hierarchy
 
@@ -33,51 +31,34 @@ Protected statements:
 - CompanyProfile != Customer.
 - Generated outreach != sent outreach.
 - Opened external channel != sent message.
-- Potential revenue != confirmed revenue != paid revenue.
+- Predicted revenue != confirmed revenue != paid revenue.
 
-Never increase visible counts by weakening these boundaries.
+These truth boundaries remain even though the standalone Revenue workspace has been removed from the active product navigation.
 
 ## 3. Product direction: buyer/seller opportunity workspace
 
-The interaction model is inspired by successful two-sided marketplaces and recruiting products without copying brand trade dress, proprietary assets, or protected UI details.
+The product supports both sides of a commercial market:
 
-### Marketplace translation
+- **FIND_BUYERS** — find likely buyers and buying-side public signals.
+- **FIND_SUPPLIERS** — find suppliers and supply-side public signals.
+- **FIND_PARTNERS** — find partnership opportunities.
+- **FIND_DISTRIBUTORS** — find channel/distribution opportunities.
+- **RESEARCH_COMPETITORS** — research competitors from attributable public evidence.
+- **EXPLORE_MARKET** — gather market intelligence without forcing a lead outcome.
 
-| Marketplace / recruiting pattern | Sales Radar AI equivalent |
-| --- | --- |
-| Position / demand management | Commercial target management |
-| Candidate recommendation | Recommended opportunity / account feed |
-| Talent search | Global evidence-backed search |
-| Chat inbox | Sales communication workspace |
-| Candidate intent | Verified buyer/seller/partner intent signals |
-| Interaction history | Views, saves, research, contact, replies, meetings, outcomes |
-| Candidate profile | Company / public-contact intelligence profile |
-| Hiring funnel | Opportunity -> qualification -> communication -> outcome -> revenue evidence |
-
-### User goal modes
-
-The workspace must support both sides of a commercial market:
-
-- **I sell / FIND_BUYERS**: find likely buyers and buying-side signals.
-- **I buy / FIND_SUPPLIERS**: find suppliers and supply-side signals.
-- **I partner / FIND_PARTNERS**: find partnership opportunities.
-- **I distribute / FIND_DISTRIBUTORS**: find channel/distribution opportunities.
-- **I research / RESEARCH_COMPETITORS or EXPLORE_MARKET**: gather market intelligence without forcing a sales lead outcome.
-
-These modes must change the actual research/search intent sent upstream, not only UI labels.
+These modes must change the actual search intent sent to the crawler/MCP gateway, not only UI labels.
 
 ## 4. Core workspace information architecture
 
-Primary navigation is now:
+Primary navigation is:
 
 1. **AI 工作台** — conversational command center and tool orchestration.
 2. **目标** — persistent commercial targets and their state.
-3. **推荐** — evidence-ranked signals/opportunities for the active target; currently reuses Market Radar.
-4. **搜索** — proactive global search with rich filters and result ranking.
-5. **沟通** — communication preparation and, only when evidence exists, verified communication state.
-6. **意向** — only persisted/attributable outcome states; predictions remain predictions.
-7. **收益** — discover -> assess -> live execute -> settle.
-8. **设置** — providers, models, runtime, data-source state and operator gates.
+3. **推荐** — evidence-ranked signals/sources for the active target; reuses Market Radar.
+4. **搜索** — proactive crawler/MCP public-web search with filters and result ranking.
+5. **沟通** — communication preparation and attributable communication state.
+6. **意向** — persisted/attributable outcomes; predictions remain predictions.
+7. **设置** — providers, models, runtime and data-source state.
 
 Current route mapping:
 
@@ -87,38 +68,42 @@ Current route mapping:
 - `/app/discover` -> 搜索
 - `/app/communication` -> 沟通
 - `/app/intent` -> 意向
-- `/app/revenue` -> 收益
 - `/app/account` -> 设置
+- `/app/revenue` -> compatibility redirect to `/app/market`; Revenue UI is not rendered
 
-## 5. Interaction principles extracted from the reference product
+## 5. Interaction principles
 
 ### A. Persistent target context
 
-The user should not re-describe the same commercial goal on every page. A selected target should carry product/service, buyer/supplier/partner goal, industry, region, entity role and signal focus across recommendation and search workflows.
+A selected Commercial Target carries product/service, buyer/supplier/partner/distributor goal, industry, region, entity role and signal focus across recommendation and search workflows. Manual edits remain authoritative and must not be presented as an exact persisted target once changed.
 
-An exact persisted target may carry `targetId` into proactive search and compile the commercial goal that the existing search form cannot otherwise express into the actual `SearchTask` keyword. Supported industry, region and entity-role dimensions are hydrated into explicit Discover controls before the first search; region also remains a SearchTask region constraint, while industry and entity role enter the SearchTask's structured Product Context and therefore influence search strategy/keyword expansion. Unsupported industry values are shown as unmapped instead of guessed or hidden in free text. If the user edits either the compiled keyword or any structured target filter, the UI must downgrade the search to temporary conditions and treat the user's current selections as authoritative rather than presenting them as the exact saved target.
+### B. Dense source/recommendation cards
 
-### B. Dense recommendation cards
+A result should answer:
 
-A recommendation card should answer, at a glance:
-
-- Who/what is this entity?
+- Who/what is this public entity or page?
 - Why is it relevant to the active target?
-- What changed?
-- Which source proves it?
-- How fresh is the evidence?
+- What did the crawler actually observe?
+- Which URL proves it?
+- How fresh and trustworthy is the evidence?
 - What is known vs inferred?
 - What is the safest next action?
 
-Quick actions must operate on real state: view evidence, continue assessment, save, research, prepare outreach, or enter Live execution when eligible.
+A public page is never automatically a customer or buyer.
 
-### C. Search behaves like an operating tool
+### C. Recommendation shows information immediately
 
-Search must combine a prominent query field with practical filters, sorting, result counts, and lightweight cards. Filters must affect the real query or result selection. Empty and provider-failure states must be explicit.
+Market Radar / Recommendation does **not** automatically launch a remote cloud browser. The selected source immediately shows its webpage visual, honest snapshot, or evidence-backed source information. Browserbase, `REVENUE_OPERATOR_TOKEN`, and a “start Live” unlock are not part of the normal recommendation path.
 
-### D. Communication is a state machine, not a fake chat demo
+A snapshot is labelled as non-interactive. A remote interactive browser may only be described as such if a genuine explicit remote-browser session exists in a future separately authorized workflow.
 
-Communication states should distinguish at minimum:
+### D. Search behaves like an operating tool
+
+Search combines query, target context, filters, ranking, source provenance and explicit failure states. Useful ordinary public pages remain eligible. Commercial scoring changes order and recommendations; it must not silently delete ordinary pages solely because their commercial score is low.
+
+### E. Communication is a state machine, not a fake chat demo
+
+At minimum:
 
 ```text
 DRAFT
@@ -130,223 +115,145 @@ MEETING_VERIFIED
 CLOSED
 ```
 
-Do not render a conversation as sent unless a platform/API/user-confirmed receipt exists. The current `/app/communication` implementation is deliberately a preparation workspace backed by real lead/public-contact records; it does not manufacture send or reply events.
+Do not render a conversation as sent unless a platform/API/user-confirmed receipt exists.
 
-Future communication automation must add a control plane before autonomous channel behavior is enabled:
+### F. Intent and outcomes are evidence views
+
+Predicted intent remains a score/recommendation. Verified workflow outcomes require attributable records. Historical revenue entities may remain in the data model for compatibility/audit, but no Revenue UI is active in the primary workspace.
+
+## 6. Search and backend architecture — 2026-09-01
+
+### Active provider boundary
+
+New search execution has one active business-facing provider:
 
 ```text
-Channel / audience scope
-  -> schedule / availability policy
-  -> explicit user or policy-authorized action
-  -> provider send/call event
-  -> attributable receipt / reply / meeting event
-  -> evidence-backed interaction timeline
+crawler / crawler-gateway
 ```
 
-Templates, agent availability, audience rules and scheduling may improve the operating experience, but they do not weaken send/reply evidence requirements.
+The full backend uses `CrawlerSearchProvider` selected by `SearchProviderFactory`. Historical `agent-reach` metadata may be read as a compatibility alias, but new tasks do not route through Agent Reach or Exa.
 
-### E. Intent and interaction are evidence views
-
-Intent surfaces should be derived from attributable evidence such as replies, saved/contacted state, public buying signals, repeated verified interaction, meetings or explicit user confirmation. Predicted intent must remain a score or recommendation, never a factual event.
-
-The current `/app/intent` implementation reads persisted `LeadOutcome` records and only surfaces `REPLIED`, `MEETING`, `QUALIFIED`, `PROPOSAL`, `WON`, or `LOST` as verified workflow outcomes. Prediction scores are excluded.
-
-## 6. Data and backend evolution
-
-Prefer adapting existing entities before adding new ones.
-
-Existing useful foundations:
-
-- ProductProfile
-- SearchTask
-- SearchEvidence
-- RadarAssessment
-- MarketSignal
-- Opportunity
-- CompanyProfile
-- ContactProfile
-- LeadOutcome
-- OutreachMessage
-- Revenue evidence/state
-- DataSource / IngestionRun / RawSourceDocument
-- CommercialTarget
-
-`CommercialTarget` is now the persisted long-running demand object required by the marketplace workflow.
-
-Current fields:
-
-- id / userId
-- name / product
-- goal: FIND_BUYERS | FIND_SUPPLIERS | FIND_PARTNERS | FIND_DISTRIBUTORS | RESEARCH_COMPETITORS | EXPLORE_MARKET
-- industry / region / customerType
-- signalFocus
-- status: DRAFT | ACTIVE | PAUSED | CLOSED
-- lastRunAt
-- createdAt / updatedAt
-
-`lastRunAt` is **server-owned run evidence**. Generic target create/update clients cannot write it. It is recorded only after a successful Market Research request whose submitted target context exactly matches the persisted target for the same user.
-
-## 7. Crawl, social and agent integration
-
-Crawl4AI, social-source provenance, LiveKit Agent Runtime and direct provider search are enrichment layers, not alternate truth systems.
-
-Required flow:
+### Crawler/MCP gateway contract
 
 ```text
-Commercial target
-  -> Search intent
+Commercial target / Discover query
+  -> search intent
   -> SearchTask
-  -> Provider results
-  -> optional Crawl4AI enrichment
-  -> social/source provenance preservation
-  -> SearchEvidence
+  -> POST CRAWLER_GATEWAY_URL/search
+  -> filter unsafe + encyclopedia/wiki URLs
+  -> keep useful ordinary public pages
+  -> optional POST /crawl for results lacking usable page text
+  -> Source / SearchEvidence
   -> RadarAssessment / MarketSignal
   -> Opportunity integrity path
   -> Company/contact intelligence
-  -> Agent recommendation
+  -> Recommendation
   -> explicit user action
 ```
 
-Agent failure must never invalidate a search chain that independently passed.
+Gateway `/search` accepts:
 
-Realtime-agent adoption has additional privacy and observability gates. Before storing transcripts, recordings or realtime interaction traces, define retention, PII handling/redaction, telemetry destination, user visibility and failure behavior. Provider-side redaction is a useful defense layer but is never the sole privacy boundary.
-
-## 8. Open-source technology watch
-
-Every meaningful product iteration should check for relevant actively maintained open-source projects and recent technical information before introducing a new subsystem. In addition, the project runs a recurring continuous radar so important upstream changes are not dependent on a single feature iteration.
-
-The auditable record is `docs/technology-radar.md`.
-
-### Watch categories
-
-- sales intelligence / CRM
-- marketplace and recommendation UX
-- customer communication inboxes
-- search, reranking and RAG
-- public-web crawling and extraction
-- browser automation
-- social-source ingestion
-- agent orchestration / MCP
-- evaluation, tracing and observability
-- provider/model/runtime changes that can affect production
-- privacy/PII handling for realtime communication
-
-### Adoption rules
-
-1. Verify repository identity, maintenance activity, release recency and license before use.
-2. Apache-2.0 / MIT / BSD-compatible code is preferred.
-3. Copyleft or source-available projects may be studied for product patterns but their code must not be copied into this Apache-2.0 repository unless legal compatibility is explicitly resolved.
-4. Integrate only the smallest files/components/ideas that solve a concrete verified weakness.
-5. Record adopted project, source commit/tag, license, files/ideas used, local modifications and tests.
-6. Do not add a dependency only because it is popular.
-7. New external runtimes remain behind interfaces/factories.
-8. A healthy current runtime is a reason to defer redundant infrastructure until a concrete limitation appears.
-9. Failed experiments are recorded and rolled back; tests/truth boundaries are not weakened to force adoption.
-
-Technology-radar statuses:
-
-```text
-WATCH
-EXPERIMENT
-ADOPTED
-DEFERRED
-REJECTED
+```json
+{
+  "keyword": "...",
+  "platforms": ["Website"],
+  "regions": ["Europe"],
+  "maxResults": 20
+}
 ```
 
-Current watch references:
+and returns provider-neutral public-page records. The gateway may internally compose MCP search tools and Crawl4AI, but business code does not depend on a particular search API or search engine.
 
-- `unclecode/crawl4ai` — Apache-2.0; current observed release `v0.9.2`; already represented through an optional content-provider/enrichment path. Do not add a second crawler simply because the upstream released a new version.
-- `livekit/agents` / `@livekit/agents` — Apache-2.0; current observed package `1.7.0`; strong candidate for realtime communication, subject to PII/retention/observability requirements.
-- `browser-use/browser-use` — MIT; current observed package `0.13.8`; deferred while Browserbase remains the healthy production browser path.
-- `chatwoot/chatwoot` — useful communication-inbox interaction reference. August 2026 updates reinforce template visibility, audience/schedule controls, call timelines and drill-down from metrics to source conversations. Prefer original Sales Radar components unless a small compatible component is demonstrably worth adapting.
+### Explicitly inactive search dependencies
+
+The Vercel/serverless active search path must not invoke Exa or GDELT as hidden fallbacks. Railway has expired and is not a runtime dependency. Missing crawler configuration or crawler failure yields truthful unavailable/no-results behavior rather than switching to encyclopedia, mock or fabricated results.
+
+### Source filtering
+
+Explicit encyclopedia/wiki-style domains such as Wikipedia, Wikidata, Britannica and Baidu Baike are excluded before visible evidence. Ordinary company homepages, reports, news, forums, jobs, procurement pages, government pages, B2B pages and public social pages remain eligible.
+
+Gateway deployments must enforce SSRF protection including DNS-resolved private/loopback/link-local/metadata targets and unsafe redirects. Application code additionally rejects invalid/non-public URL literals before enrichment.
+
+## 7. Commercial Target persistence
+
+`CommercialTarget` remains the long-running demand object. In the stateless Vercel workspace, the frontend service preserves the existing async API but stores versioned targets locally so `/app/targets`, Market Radar target restoration and target-aware Discover remain usable without the expired Railway backend/database runtime.
+
+This local persistence is a product-availability mechanism, not proof of server persistence. If durable multi-device target state is restored later, it must preserve the same service contract and truth boundaries.
+
+## 8. External technology governance
+
+Relevant technologies remain behind replaceable interfaces. `docs/technology-radar.md` records upstream versions, licenses, vulnerabilities and operational risks.
+
+Current architectural decisions:
+
+- **Crawler/MCP gateway** — active provider boundary for public-web search.
+- **Crawl4AI-compatible `/crawl`** — allowed page-acquisition component behind the gateway; self-hosting risks and version/security gates remain applicable.
+- **Exa / Agent Reach** — no longer active serverless search routing; historical code/metadata must not silently reactivate it.
+- **Browserbase** — not part of the normal Recommendation/Market Radar path. Any future remote-browser execution must be explicit and independently verified.
+- **LiveKit Agents** — WATCH for future realtime communication, subject to privacy/observability/runtime gates.
+
+Do not add a dependency because it is popular. Adopt only the smallest replaceable component that solves a verified weakness and passes tests/security/license review.
 
 ## 9. Context recovery protocol
 
-When conversation/context becomes long or a new coding agent starts work, recover project direction in this order:
+When a new agent/window resumes this project, recover direction in this order:
 
 1. `AGENTS.md`
-2. `PROJECT_BLUEPRINT.md`
-3. `docs/technology-radar.md`
+2. `PROJECT_WORKFLOW.md`
+3. `PROJECT_BLUEPRINT.md`
 4. `CONTEXT.md`
-5. `.agent/PROJECT_MEMORY.md`
-6. relevant `.agent/skills/*/SKILL.md`
-7. relevant ADR/spec/plan
-8. current code and open PR/issue/CI/deployment evidence
+5. `docs/technology-radar.md`
+6. `.agent/PROJECT_MEMORY.md`
+7. `.agent/SKILL_REGISTRY.md` and relevant skills
+8. current Sep 1 spec/plan
+9. open PR/CI/Vercel evidence and current code
 
-If implementation reveals a better validated direction, update this blueprint in the same change or immediately after the evidence is accepted. Do not let implementation drift become undocumented product strategy.
+Implementation must not drift away from this blueprint without updating it after evidence supports a better direction.
 
-## 10. Change log discipline
+## 10. Deployment and delivery discipline
 
-For every major direction change, append a dated note containing:
+Vercel builds preview deployments from Git branches. GitHub CI remains the merge gate. Production is considered complete only after:
 
-- what changed;
-- why the previous direction was insufficient;
-- evidence supporting the change;
-- affected routes/models/providers;
-- what remains protected;
-- rollback path.
+- frontend typecheck/tests/build pass;
+- backend typecheck/tests/build and production image pass;
+- Vercel preview/production deployment is healthy;
+- crawler search contracts prove `/search` is used instead of Exa/GDELT;
+- production/runtime configuration truthfully reports crawler availability;
+- protected UI workflow invariants are verified.
 
-For external technology adoption, `docs/technology-radar.md` must additionally record upstream version/date, license, exact problem solved, files/protocols/ideas used, verification and rollback.
+Railway service checks are no longer part of deployment acceptance because Railway is expired and has been removed from the active runtime path.
 
-## 11. Current phase — 2026-08-25
+Per `PROJECT_WORKFLOW.md`, this feature branch must remain separate from `main` until required owner-local verification and explicit approval for the default-branch update are satisfied.
 
-Goal: translate the strongest marketplace/recruiting interaction patterns into an original Sales Radar buyer/seller opportunity workflow while preserving production truth boundaries.
+## 11. Current phase — 2026-09-01: Crawler Gateway B recovery
 
-Implemented in the current delivery slice:
+Current goals:
 
-- Search is a first-class navigation surface.
-- Market research supports buyer/supplier/partner/distributor/competitor/exploration goals that alter real upstream research intent.
-- Commercial targets are persisted and can be restored exactly into Market Radar.
-- Target `lastRunAt` is server-owned successful-run evidence, not client-editable metadata.
-- Exact persisted targets cross from Market Radar into proactive search with `targetId`; the commercial goal is compiled into the actual SearchTask keyword. Supported industry/region/customer-type values hydrate the Discover controls before the first search, region remains an explicit SearchTask constraint, and industry/customer type travel through structured Product Context into search strategy. Unsupported industry values stay explicit as unmapped. Manual keyword or filter edits downgrade the banner to temporary conditions and user selections remain authoritative.
-- Primary navigation follows `AI 工作台 -> 目标 -> 推荐 -> 搜索 -> 沟通 -> 意向 -> 收益 -> 设置`.
-- Communication workspace is backed by real discovered leads/public contacts and does not invent sent/replied state.
-- Intent workspace is backed by persisted `LeadOutcome` records and excludes predicted purchase probability.
-- Existing Market Live fullscreen/viewport semantics and Revenue truth boundaries remain protected.
-- Autonomous owner governance and the continuous technology radar are now part of the project operating model.
+- remove Revenue from active navigation and redirect the legacy route;
+- show recommendation source information/webpage visuals immediately without auto cloud-browser launch;
+- make Commercial Targets usable locally in stateless mode;
+- converge full-backend and Vercel search/research onto crawler/MCP `/search` plus optional `/crawl`;
+- filter encyclopedia/wiki sources while retaining ordinary useful public pages;
+- preserve evidence provenance and never manufacture buyer/customer/contact truth.
 
-Next delivery slices:
+Current delivery branch: `agent/crawler-gateway-b-20260901`, tracked by PR #73.
 
-- real outbound transport/receipt ingestion before `SENT_VERIFIED` can exist;
-- reply/meeting ingestion with attributable evidence;
-- communication control plane for channel scope, audience rules, templates and schedule/availability policy;
-- LiveKit realtime agent evaluation where runtime configuration is valid, including explicit PII/retention/observability design;
-- recommendation learning from explicit feedback and verified outcomes;
-- richer source ingestion, job-platform/public hiring signals and global social evidence;
-- evaluation and ranking benchmarks;
-- safe workflow automation with explicit policy authorization and verifiable outcomes.
+## 12. Dated decision record
 
-## 12. Deployment discipline — 2026-08-25
+### 2026-09-01 — Remove Revenue UI and API-search discovery from the active workspace
 
-Vercel is connected to Git pushes and builds every preview commit. Deliberately RED TDD commits caused noisy preview failure emails even when the failure was expected. For Vercel-connected feature branches, keep TDD locally/CI-isolated where practical and publish atomic implementation + contract commits so the branch does not linger in intentionally broken build states.
+**Changed:** Revenue leaves primary navigation; `/app/revenue` redirects to Market Radar. Recommendation uses immediate source visuals/information instead of automatic Browserbase. Search and Market Radar use the crawler/MCP gateway as the active discovery boundary. Exa/GDELT are removed from active serverless search routing.
 
-This deployment discipline must not weaken tests: GitHub CI remains the merge gate, and production is only considered complete after frontend CI, backend CI, Vercel production, both Railway services, production API semantics, and protected UI workflow invariants are revalidated.
+**Why:** Railway expired; a stateless recovery was necessary. The intermediate recovery still used search APIs for candidate discovery and crawler only for page enrichment, which did not match the desired crawler/MCP architecture and made provider truth ambiguous. Browserbase/Revenue also added workflow chrome that was not required for the core research task.
 
-## 13. Autonomous owner operating contract — 2026-08-25
+**Evidence:** Sep 1 TDD contracts explicitly fail when Discover or Market Radar reaches GDELT/Exa while `CRAWLER_GATEWAY_URL` is configured, and require crawler `/search` plus encyclopedia filtering and useful ordinary-page retention.
 
-The owner delegates normal, reversible, evidence-backed repository decisions to the project operating agent within the actual permissions available through connected tools. This includes research, issues, branches, file changes, pull requests, CI/reverification, validated merges, deployment coordination and repository documentation updates without repeated approval for each routine action.
+**Protected:** Source -> Evidence -> Fact -> Assessment -> Recommendation; no fabricated leads/contacts; communication receipts and outcomes remain attributable; unsafe/private crawl targets remain blocked at application/gateway boundaries.
 
-The autonomous default does not include destructive or irreversible operations, secrets/credential changes, paid-plan changes, legal commitments, sensitive security disclosure, or repository-external publication. Those remain subject to the applicable safety and authorization gate.
+**Rollback:** revert PR #73 branch changes. Do not roll back to expired Railway or silently reactivate Exa/GDELT serverless search; any alternative provider must be an explicit, tested architecture decision.
 
-### Autonomous maintenance loop
+## 13. Autonomous owner operating contract
 
-```text
-Recover authoritative context
-  -> inspect production and open-work evidence
-  -> scan relevant GitHub projects + technical/provider changes
-  -> classify maintenance/activity/license/value/risk
-  -> WATCH / DEFER when there is no concrete gap
-  -> EXPERIMENT when a reversible test can falsify the benefit
-  -> ADOPT only the smallest change that solves a verified weakness
-  -> run tests / CI / deployment verification
-  -> update docs/technology-radar.md
-  -> update PROJECT_BLUEPRINT.md when validated direction changes
-```
+Normal reversible, evidence-backed repository work may proceed autonomously within connected permissions: research, branches, files, tests, PRs, CI/reverification, documentation and deployment coordination. Destructive/irreversible operations, secrets/credential changes, paid-plan changes, legal commitments and sensitive external publication remain separately gated.
 
-### Notification discipline
-
-Routine healthy checks, unchanged release states and non-actionable watch items remain silent. Notify the owner only for a meaningful production regression, blocked integration, quota/plan/credential intervention, destructive-risk decision, or material strategy change that cannot be safely completed under the existing delegation.
-
-### Current radar decision record
-
-The 2026-08-25 scan found relevant active upstream work but no reason to stack a second production crawler or browser runtime today. Crawl4AI stays on the existing adapter/enrichment path; Browser Use remains deferred while Browserbase is healthy; LiveKit Agents remains a high-value realtime candidate with privacy/observability gates; Chatwoot is used as communication-workflow research rather than copied product code.
+Repository-specific owner-local verification and explicit default-branch approval requirements in `PROJECT_WORKFLOW.md` remain authoritative for this delivery.
