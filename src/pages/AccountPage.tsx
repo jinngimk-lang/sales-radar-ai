@@ -110,6 +110,20 @@ export function normalizeRuntimeCapabilities(
   }
 }
 
+function capabilityDescription(
+  capability: RuntimeCapability | undefined,
+  reported: RuntimeCapability,
+) {
+  if (!capability) return '尚未报告运行状态'
+  if (reported.enabled) {
+    return `${reported.provider ?? '已连接'}${reported.model ? ` · ${reported.model}` : ''}`
+  }
+  if (String(reported.reason) === 'full_backend_required') {
+    return '完整后端未连接'
+  }
+  return '尚未配置服务端凭据'
+}
+
 function CapabilityRow({
   title,
   capability,
@@ -123,11 +137,7 @@ function CapabilityRow({
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink-900">{title}</p>
         <p className="mt-0.5 truncate text-xs text-ink-400">
-          {!capability
-            ? '尚未报告运行状态'
-            : reported.enabled
-              ? `${reported.provider ?? '已连接'}${reported.model ? ` · ${reported.model}` : ''}`
-              : '尚未配置服务端凭据'}
+          {capabilityDescription(capability, reported)}
         </p>
       </div>
       <span className={reported.enabled ? 'text-emerald-600' : 'text-amber-500'}>
