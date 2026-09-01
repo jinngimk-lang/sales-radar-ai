@@ -9,6 +9,7 @@ const person = {
   externalId: 'person_1',
   fullName: 'Ada Lovelace',
   email: 'ADA@Example.com',
+  emailVerified: true,
   companyDomain: 'https://www.example.com/about',
   profileUrl: 'https://www.linkedin.com/in/ada-lovelace/?trk=public',
 }
@@ -29,6 +30,14 @@ test('external record linking prefers exact provider ids and normalized verified
       email: 'ada@example.com',
     }),
     { matched: true, confidence: 'exact', reason: 'verified_email' },
+  )
+
+  assert.equal(
+    matchExternalRecord(
+      { ...person, emailVerified: false },
+      { kind: 'person', email: 'ada@example.com' },
+    ).matched,
+    false,
   )
 })
 
