@@ -136,7 +136,9 @@ test('crawler fallback never fills empty search with Wikipedia', async () => {
     },
   )
 
-  assert.equal(handled, false)
+  assert.equal(handled, true)
+  assert.equal(response.statusCode, 200)
+  assert.deepEqual(response.body.data, [])
   assert.ok(requests.every((url) => !/wikipedia\.org/i.test(url)))
 })
 
@@ -199,24 +201,50 @@ test('crawler fallback filters only encyclopedia sources and keeps ordinary publ
   assert.ok(urls.includes('https://buyer.example.org/rfq/pumps'))
 })
 
-test('crawler fallback yields to the existing stateless search when Crawl4AI is not configured', async () => {
+test('crawler fallback directly crawls safe public pages when Crawl4AI is not configured', async () => {
   const response = createResponse()
-  let called = false
+  const calls = []
   const handled = await handleCrawlerSearchResults(
     { method: 'GET', query: {} },
     response,
     `search-task/${encodeURIComponent(encodeTask())}/results`,
     {
-      fetcher: async () => {
-        called = true
-        throw new Error('should not fetch')
+      fetcher: async (input) => {
+        const url = String(input)
+        calls.push(url)
+        if (url.startsWith('https://api.gdeltproject.org/')) {
+          return jsonResponse({
+            articles: [
+              {
+                url: 'https://example.com/pump-market',
+                title: 'Pump market update',
+                summary: 'A public page about industrial pumps.',
+              },
+            ],
+          })
+        }
+        if (url === 'https://example.com/pump-market') {
+          return new Response(
+            '<html><head><title>Pump sourcing update</title></head><body><main>Regional buyers are comparing industrial pump suppliers for 2027 projects.</main></body></html>',
+            {
+              status: 200,
+              headers: { 'content-type': 'text/html; charset=utf-8' },
+            },
+          )
+        }
+        throw new Error(`Unexpected fetch: ${url}`)
       },
       env: {},
     },
   )
 
-  assert.equal(handled, false)
-  assert.equal(called, false)
+  assert.equal(handled, true)
+  assert.equal(response.statusCode, 200)
+  assert.equal(response.body.data.length, 1)
+  assert.match(response.body.data[0].postContent, /Regional buyers are comparing industrial pump suppliers/i)
+  assert.equal(response.body.data[0].sourceMetadata.contentAcquisitionProvider, 'direct-http')
+  assert.equal(response.body.data[0].evidenceStatus, 'VALID')
+  assert.equal(calls.length, 2)
 })
 
 test('crawler failure keeps public-search evidence available instead of failing the whole Discover search', async () => {
