@@ -11,8 +11,8 @@ import {
   type ServerLifecycleLogger,
 } from '../src/server-lifecycle.js'
 
-describe('Railway backend startup lifecycle', () => {
-  it('listens and serves health without EXA_API_KEY', async () => {
+describe('backend startup lifecycle', () => {
+  it('listens and serves health without legacy EXA_API_KEY', async () => {
     await withBackend(
       (logger) =>
         logAgentReachRuntimeDiagnostics(logger, {
@@ -35,7 +35,7 @@ describe('Railway backend startup lifecycle', () => {
     )
   })
 
-  it('keeps health available with an invalid EXA_API_KEY', async () => {
+  it('keeps health available with an invalid legacy EXA_API_KEY', async () => {
     const invalidCredential = 'invalid-test-only-credential'
     await withBackend(
       (logger) =>
@@ -61,7 +61,7 @@ describe('Railway backend startup lifecycle', () => {
     )
   })
 
-  it('keeps health available when mcporter is unavailable', async () => {
+  it('keeps health available when legacy mcporter diagnostics are unavailable', async () => {
     await withBackend(
       (logger) =>
         logAgentReachRuntimeDiagnostics(logger, {
@@ -81,23 +81,24 @@ describe('Railway backend startup lifecycle', () => {
     )
   })
 
-  it('keeps health independent from an explicit search provider failure', async () => {
+  it('keeps health independent from an explicit crawler gateway failure', async () => {
     await withBackend(
       () => undefined,
       async (baseUrl) => {
         await assertHealthy(baseUrl)
 
-        const providerHealth = new ProviderHealthService(async () => {
-          const error = new Error('mcporter not found') as Error & {
-            code: string
-          }
-          error.code = 'ENOENT'
-          throw error
+        const providerHealth = new ProviderHealthService({
+          baseUrl: 'https://crawler.example',
+          fetcher: async () => {
+            throw new Error('crawler gateway unreachable')
+          },
         })
-        const health = await providerHealth.checkAgentReach()
+        const health = await providerHealth.checkCrawler()
 
         assert.equal(health.state, 'UNAVAILABLE')
-        assert.equal(health.code, 'MCPORTER_NOT_FOUND')
+        assert.equal(health.provider, 'crawler')
+        assert.equal(health.dependency, 'crawler-gateway')
+        assert.equal(health.code, 'CRAWLER_GATEWAY_HEALTH_CHECK_FAILED')
       },
     )
   })
