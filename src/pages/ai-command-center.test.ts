@@ -17,9 +17,10 @@ test('workspace defaults to the GPT-style AI home and preserves drill-down route
   assert.match(app, /path="communication"/)
   assert.match(app, /path="intent"/)
   assert.match(app, /path="customer\/:id"/)
+  assert.match(app, /path="revenue" element={<Navigate to="\/app\/market" replace \/>}/)
 })
 
-test('primary navigation follows the marketplace operating sequence', async () => {
+test('primary navigation follows the active marketplace operating sequence', async () => {
   const layout = await readSource('../components/layout/AppLayout.tsx')
 
   for (const label of [
@@ -29,12 +30,11 @@ test('primary navigation follows the marketplace operating sequence', async () =
     '搜索',
     '沟通',
     '意向',
-    '收益',
     '设置',
   ]) {
     assert.match(layout, new RegExp(label))
   }
-  assert.doesNotMatch(layout, /销售机会中心|AI 销售助手/)
+  assert.doesNotMatch(layout, /收益|销售机会中心|AI 销售助手/)
 })
 
 test('AI home keeps a concise profit-first prompt and a black Agent primary action', async () => {
