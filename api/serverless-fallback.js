@@ -160,15 +160,10 @@ export function runtimeCapabilities(env = process.env) {
       model: null,
     },
     salesAI: {
-      enabled: true,
-      provider: 'rule-based',
-      model: 'rules-v1',
-      fallback: {
-        enabled: true,
-        provider: 'rule-based',
-        model: 'rules-v1',
-        cost: 'local-zero-api-cost',
-      },
+      enabled: false,
+      provider: null,
+      model: null,
+      reason: 'full_backend_required',
     },
     salesAgent: {
       enabled: false,
