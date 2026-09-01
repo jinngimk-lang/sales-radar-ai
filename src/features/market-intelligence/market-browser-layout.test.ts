@@ -6,10 +6,6 @@ const browserSource = await readFile(
   new URL('./MarketBrowserWorkspace.tsx', import.meta.url),
   'utf8',
 )
-const liveBrowserSource = await readFile(
-  new URL('./MarketLiveBrowserPanel.tsx', import.meta.url),
-  'utf8',
-)
 const timelineSource = await readFile(
   new URL('./SignalTimeline.tsx', import.meta.url),
   'utf8',
@@ -42,28 +38,24 @@ test('source categories expose real state and do not act like useful controls wh
   assert.match(browserSource, /本次扫描没有该类来源/)
 })
 
-test('market browser clearly separates a static snapshot from an interactive cloud session', () => {
-  assert.match(browserSource, /MarketLiveBrowserPanel/)
-  assert.match(browserSource, /网页快照（不可交互）/)
-  assert.match(liveBrowserSource, /启动 Live/)
-  assert.match(liveBrowserSource, /REVENUE_OPERATOR_TOKEN/)
-  assert.match(liveBrowserSource, /MARKET_LIVE_OPERATOR_TOKEN_KEY/)
-  assert.match(liveBrowserSource, /title="交互式云浏览器"/)
-  assert.doesNotMatch(
-    browserSource,
-    /网页快照已按完整桌面宽度适配；上下滚动查看页面/,
-  )
+test('recommendation browser immediately renders the selected public webpage visual without operator unlock', () => {
+  assert.match(browserSource, /网页画面/)
+  assert.match(browserSource, /<LiveWebPreview/)
+  assert.match(browserSource, /selectedSource/)
+  assert.match(browserSource, /filteredSources\[0\]/)
+  assert.doesNotMatch(browserSource, /MarketLiveBrowserPanel/)
+  assert.doesNotMatch(browserSource, /REVENUE_OPERATOR_TOKEN/)
+  assert.doesNotMatch(browserSource, /启动 Live/)
+  assert.doesNotMatch(browserSource, /Browserbase/i)
 })
 
-test('interactive market Live View uses a viewport-sized frame and supports fullscreen research', () => {
-  assert.doesNotMatch(liveBrowserSource, /h-\[360px\]/)
-  assert.match(liveBrowserSource, /min-h-\[560px\]/)
-  assert.match(liveBrowserSource, /h-\[68vh\]/)
-  assert.match(liveBrowserSource, /Maximize2/)
-  assert.match(liveBrowserSource, /Minimize2/)
-  assert.match(liveBrowserSource, /fixed inset-0 z-\[80\]/)
-  assert.match(liveBrowserSource, /全屏查看/)
-  assert.match(liveBrowserSource, /退出全屏/)
+test('generic page visuals are honest snapshots and can fall back to evidence-backed summaries', () => {
+  assert.match(browserSource, /buildSnapshotUrl\(media\.url\)/)
+  assert.match(browserSource, /media\.type === 'page'/)
+  assert.match(browserSource, /网页快照/)
+  assert.match(browserSource, /onFallbackToSummary/)
+  assert.match(browserSource, /onError={fallBackSilently}/)
+  assert.match(browserSource, /image\.thum\.io\/get\/noanimate/)
 })
 
 test('market signal judgment stays in the current market workspace instead of routing to legacy discover', () => {
@@ -73,16 +65,4 @@ test('market signal judgment stays in the current market workspace instead of ro
   assert.match(assessmentSource, /继续判断当前信号/)
   assert.match(marketPageSource, /id="sales-opportunity-assessment"/)
   assert.match(marketPageSource, /scrollIntoView/)
-})
-
-test('generic cross-origin pages never masquerade as a live browser', () => {
-  assert.match(browserSource, /buildSnapshotUrl\(media\.url\)/)
-  assert.match(browserSource, /media\.type === 'page'/)
-  assert.doesNotMatch(browserSource, /真实云端浏览器.*buildSnapshotUrl/s)
-})
-
-test('snapshot failure falls back to the evidence-backed research summary', () => {
-  assert.match(browserSource, /onFallbackToSummary/)
-  assert.match(browserSource, /onError={fallBackSilently}/)
-  assert.match(browserSource, /image\.thum\.io\/get\/noanimate/)
 })
