@@ -4,7 +4,7 @@ import test from 'node:test'
 
 const read = (path: string) => readFile(new URL(path, import.meta.url), 'utf8')
 
-test('primary workspace follows the marketplace operating sequence', async () => {
+test('primary workspace follows the active marketplace operating sequence', async () => {
   const [app, layout] = await Promise.all([
     read('../App.tsx'),
     read('../components/layout/AppLayout.tsx'),
@@ -16,10 +16,11 @@ test('primary workspace follows the marketplace operating sequence', async () =>
   assert.match(layout, /to: '\/app\/discover', label: '搜索'/)
   assert.match(layout, /to: '\/app\/communication', label: '沟通'/)
   assert.match(layout, /to: '\/app\/intent', label: '意向'/)
-  assert.match(layout, /to: '\/app\/revenue', label: '收益'/)
+  assert.doesNotMatch(layout, /to: '\/app\/revenue'|label: '收益'/)
   assert.match(layout, /to: '\/app\/account', label: '设置'/)
   assert.match(app, /path="communication"/)
   assert.match(app, /path="intent"/)
+  assert.match(app, /path="revenue" element={<Navigate to="\/app\/market" replace \/>}/)
 })
 
 test('communication workspace never manufactures sent or replied state', async () => {
