@@ -116,6 +116,7 @@ jobs:
           tests/external-record-link.test.ts
           tests/sales-provider-orchestrator.test.ts
           tests/communication-receipt.test.ts
+          tests/sales-provider-catalog.test.ts
 
       - name: Build
         run: npm run build
