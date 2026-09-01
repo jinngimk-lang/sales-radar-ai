@@ -4,8 +4,8 @@ import test from 'node:test'
 
 const read = (path: string) => readFile(new URL(path, import.meta.url), 'utf8')
 
-test('commercial targets are a first-class persisted workspace surface', async () => {
-  const [app, layout, page, api] = await Promise.all([
+test('commercial targets are a first-class locally persisted workspace surface', async () => {
+  const [app, layout, page, service] = await Promise.all([
     read('../App.tsx'),
     read('../components/layout/AppLayout.tsx'),
     read('./CommercialTargetsPage.tsx'),
@@ -19,12 +19,14 @@ test('commercial targets are a first-class persisted workspace surface', async (
   assert.match(page, /updateCommercialTarget/)
   assert.match(page, /去市场雷达/)
   assert.match(page, /targetId=/)
-  assert.match(api, /\/commercial-targets/)
-  assert.match(api, /method: 'POST'/)
-  assert.match(api, /method: 'PUT'/)
+  assert.match(service, /sales-radar:commercial-targets:v1/)
+  assert.match(service, /localStorage/)
+  assert.match(service, /crypto\.randomUUID|randomUUID/)
+  assert.doesNotMatch(service, /fetch\(/)
+  assert.doesNotMatch(service, /\/commercial-targets/)
 })
 
-test('market radar restores an exact persisted target and delegates run evidence to the backend', async () => {
+test('market radar restores an exact persisted target through the same service contract', async () => {
   const market = await read('./MarketIntelligenceWorkspacePage.tsx')
 
   assert.match(market, /useSearchParams/)
@@ -38,7 +40,6 @@ test('market radar restores an exact persisted target and delegates run evidence
   )
   assert.match(market, /targetId:/)
   assert.doesNotMatch(market, /lastRunAt: result\.completedAt/)
-  assert.doesNotMatch(market, /updateCommercialTarget\(commercialTargetId/)
 })
 
 test('an exact persisted target crosses from recommendation into target-aware proactive search', async () => {
