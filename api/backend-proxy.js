@@ -1,5 +1,4 @@
 import { handleMarketResearchFallback } from './market-research-fallback.js'
-import { handleExaSearchResults } from './exa-fallback.js'
 import { handleCrawlerSearchResults } from './crawl4ai-fallback.js'
 import { handleServerlessFallback } from './serverless-fallback.js'
 
@@ -69,13 +68,6 @@ export default async function handler(request, response) {
       proxyPath,
     )
     if (marketHandled) return
-
-    const exaHandled = await handleExaSearchResults(
-      request,
-      response,
-      proxyPath,
-    )
-    if (exaHandled) return
 
     const crawlerHandled = await handleCrawlerSearchResults(
       request,
