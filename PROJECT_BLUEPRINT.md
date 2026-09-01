@@ -191,6 +191,43 @@ Current architectural decisions:
 - **Exa / Agent Reach** — no longer active serverless search routing; historical code/metadata must not silently reactivate it.
 - **Browserbase** — not part of the normal Recommendation/Market Radar path. Any future remote-browser execution must be explicit and independently verified.
 - **LiveKit Agents** — WATCH for future realtime communication, subject to privacy/observability/runtime gates.
+- **Sales System Provider layer** — approved provider-neutral boundary for external prospecting, enrichment, CRM and outbound systems. Apollo-style prospect/enrichment/outbound providers and Zoho-style CRM/lifecycle providers must implement or map through the same central action, dedupe and receipt policies rather than becoming UI-specific silos.
+
+### Sales System Provider action policy
+
+External sales actions use one central risk contract:
+
+```text
+READ        -> automatic
+DRAFT       -> automatic
+WRITE       -> explicit approval required
+CREDIT      -> explicit approval required
+SEND        -> explicit approval required
+DESTRUCTIVE -> blocked by default
+```
+
+Provider-specific policy may tighten these defaults but must never weaken them. A caller cannot downgrade an action declared by a provider (for example, sequence enrollment) from `SEND` to `READ`.
+
+The default operating sequence is:
+
+```text
+Sales Radar target/evidence
+  -> provider capability discovery
+  -> exact live schema discovery when required
+  -> search/read before paid enrichment
+  -> deterministic dedupe before external creation
+  -> approval gate for WRITE/CREDIT/SEND
+  -> sender resolution before sequence enrollment
+  -> exactly one selected provider execution
+  -> attributable provider record/receipt
+  -> verified communication/outcome state
+```
+
+Apollo is treated as the prospecting/enrichment/outbound side of this boundary; Zoho CRM is treated as the CRM system-of-record/lifecycle side. These are roles, not hard dependencies: adapters remain replaceable and the business layer does not directly depend on provider-specific tool names.
+
+Cross-system linking is evidence-first. Preferred keys are same-provider external ID, verified normalized email, normalized profile URL, organization domain, then person full-name plus organization domain. Company domain alone is never enough to merge two people. Fuzzy identity similarity is not permission to mutate CRM state.
+
+`SENT_VERIFIED`, `REPLIED_VERIFIED`, and `MEETING_VERIFIED` require an attributable provider receipt/message/thread/event identifier plus an observed timestamp. A generated draft, `accepted`, `queued`, opened provider UI, or sequence request alone is not a verified communication outcome.
 
 Do not add a dependency because it is popular. Adopt only the smallest replaceable component that solves a verified weakness and passes tests/security/license review.
 
@@ -225,7 +262,7 @@ Railway service checks are no longer part of deployment acceptance because Railw
 
 Per `PROJECT_WORKFLOW.md`, this feature branch must remain separate from `main` until required owner-local verification and explicit approval for the default-branch update are satisfied.
 
-## 11. Current phase — 2026-09-01: Crawler Gateway B recovery
+## 11. Current phase — 2026-09-01: Crawler Gateway B recovery + sales-system orchestration
 
 Current goals:
 
@@ -234,11 +271,25 @@ Current goals:
 - make Commercial Targets usable locally in stateless mode;
 - converge full-backend and Vercel search/research onto crawler/MCP `/search` plus optional `/crawl`;
 - filter encyclopedia/wiki sources while retaining ordinary useful public pages;
-- preserve evidence provenance and never manufacture buyer/customer/contact truth.
+- preserve evidence provenance and never manufacture buyer/customer/contact truth;
+- make stateless production capability reporting and missing-backend UI truthful;
+- establish a replaceable Apollo/Zoho-style Sales System Provider contract with approval, dedupe and communication-receipt gates before any live provider adapter is activated.
 
-Current delivery branch: `agent/crawler-gateway-b-20260901`, tracked by PR #73.
+Current delivery branch: `agent/runtime-truth-workspace-smoke-20260901`, tracked by PR #75.
 
 ## 12. Dated decision record
+
+### 2026-09-01 — Add a provider-neutral sales-system orchestration boundary
+
+**Changed:** Sales Radar now defines a central Sales System Provider contract for external prospecting, enrichment, CRM and outbound systems. The first provider roles are Apollo-style prospect/enrichment/sequence operations and Zoho-style CRM/lifecycle/workflow operations. Central policy classifies actions as `READ`, `DRAFT`, `WRITE`, `CREDIT`, `SEND`, or `DESTRUCTIVE`; write/credit/send require explicit approval and destructive actions are blocked by default. Deterministic cross-provider linking and attributable communication receipt rules are part of the boundary.
+
+**Why:** Sales Radar needs richer prospecting and CRM execution without turning external SaaS tools into product silos or letting paid enrichment, record creation, sequence enrollment, workflow activation, drafts or generic API success become unverified customer truth. The provider boundary lets business logic stay replaceable while protecting cost and communication state.
+
+**Evidence:** The connected Zoho CRM MCP exposes explicit discovery -> tool list -> exact schema -> execute interaction and separates drafts/configuration from activation/execution. Apollo's current developer/MCP guidance emphasizes search before enrichment, credit-aware enrichment, deduplication before contact creation, sender-mailbox resolution before sequence enrollment and treating sequence enrollment as real outbound execution. Repository tests enforce the central action gate, evidence-backed record linking, single-provider execution and receipt requirements.
+
+**Protected:** Existing Source -> Evidence -> Fact -> Assessment -> Recommendation boundaries; Lead/Contact quality gates; explicit user action for CRM/external mutations; generated draft != sent; accepted/queued != sent; no silent provider failover after an external write/send begins.
+
+**Rollback:** remove the provider orchestration contracts/services/skill and their tests. No live Apollo or Zoho credential or production adapter is introduced by this contract slice, so rollback does not require migrating provider-owned records.
 
 ### 2026-09-01 — Remove Revenue UI and API-search discovery from the active workspace
 
