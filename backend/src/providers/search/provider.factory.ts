@@ -1,4 +1,4 @@
-import { DeepAgentReachProvider } from './deep-agent-reach.provider.js'
+import { CrawlerSearchProvider } from './crawler-search.provider.js'
 import { MockSearchProvider } from './mock-search.provider.js'
 import type {
   SearchProvider,
@@ -6,50 +6,37 @@ import type {
 } from './search-provider.interface.js'
 
 const mockProvider = new MockSearchProvider()
-const agentReachProvider = new DeepAgentReachProvider()
+const crawlerProvider = new CrawlerSearchProvider()
 
 export class SearchProviderFactory {
-  create(name: SearchProviderName = 'mock'): SearchProvider {
-    switch (name) {
-      case 'mock':
-        return mockProvider
-      case 'agent-reach':
-        return agentReachProvider
-      case 'browser':
-        throw new Error('BrowserProvider is reserved but not implemented')
-    }
+  create(name: SearchProviderName = 'crawler'): SearchProvider {
+    if (name === 'mock') return mockProvider
+
+    // Historical `agent-reach` task metadata is intentionally treated as a
+    // compatibility alias. Production search execution has one active path:
+    // the crawler gateway.
+    return crawlerProvider
   }
 
   resolve(metadata: unknown): SearchProvider {
-    if (
-      metadata === 'mock' ||
-      metadata === 'agent-reach' ||
-      metadata === 'browser'
-    ) {
-      return this.create(metadata)
-    }
-
-    const providerName = this.readProviderName(metadata)
-    return this.create(providerName)
+    return this.create(this.readProviderName(metadata))
   }
 
   private readProviderName(metadata: unknown): SearchProviderName {
+    if (metadata === 'mock') return 'mock'
+    if (metadata === 'crawler' || metadata === 'agent-reach') return 'crawler'
+
     if (
       metadata &&
       typeof metadata === 'object' &&
       'provider' in metadata
     ) {
       const provider = (metadata as { provider?: unknown }).provider
-      if (
-        provider === 'mock' ||
-        provider === 'agent-reach' ||
-        provider === 'browser'
-      ) {
-        return provider
-      }
+      if (provider === 'mock') return 'mock'
+      if (provider === 'crawler' || provider === 'agent-reach') return 'crawler'
     }
 
-    return 'mock'
+    return 'crawler'
   }
 }
 
