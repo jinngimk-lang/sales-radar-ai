@@ -71,6 +71,19 @@ async function bodyText(page) {
   return page.evaluate(() => document.body.innerText)
 }
 
+function stopPreview(preview) {
+  if (!preview.pid) return
+  try {
+    if (process.platform === 'win32') {
+      preview.kill('SIGTERM')
+    } else {
+      process.kill(-preview.pid, 'SIGTERM')
+    }
+  } catch {
+    // The preview may already have exited; cleanup remains best-effort.
+  }
+}
+
 async function main() {
   const preview = spawn(
     'npm',
@@ -78,6 +91,7 @@ async function main() {
     {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, NODE_ENV: 'production' },
+      detached: process.platform !== 'win32',
     },
   )
 
@@ -192,12 +206,13 @@ async function main() {
         2,
       ),
     )
+    console.log('[browser-smoke] checks-complete')
   } catch (error) {
     console.error(previewOutput)
     throw error
   } finally {
     if (browser) await browser.close()
-    preview.kill('SIGTERM')
+    stopPreview(preview)
   }
 }
 
