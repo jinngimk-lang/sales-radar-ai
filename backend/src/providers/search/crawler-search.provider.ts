@@ -38,7 +38,8 @@ export class CrawlerSearchProvider implements SearchProvider {
     this.baseUrl = normalizeBaseUrl(
       options.baseUrl ?? process.env.CRAWLER_GATEWAY_URL ?? '',
     )
-    this.token = options.token ?? process.env.CRAWLER_GATEWAY_TOKEN?.trim() || undefined
+    this.token =
+      options.token ?? (process.env.CRAWLER_GATEWAY_TOKEN?.trim() || undefined)
     this.timeoutMs = normalizeTimeout(
       options.timeoutMs ?? Number(process.env.CRAWLER_GATEWAY_TIMEOUT_MS),
     )
