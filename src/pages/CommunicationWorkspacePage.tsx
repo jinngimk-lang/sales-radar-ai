@@ -10,6 +10,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom'
 import type { ChatSession } from '@/types'
 import { getChatSessions } from '@/services/api'
+import { getUserFacingApiError } from '@/services/api-errors'
 import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
 
 export function CommunicationWorkspacePage() {
@@ -26,7 +27,7 @@ export function CommunicationWorkspacePage() {
       })
       .catch((cause) => {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : '暂时无法读取沟通对象')
+          setError(getUserFacingApiError(cause, '暂时无法读取沟通对象'))
         }
       })
       .finally(() => {
