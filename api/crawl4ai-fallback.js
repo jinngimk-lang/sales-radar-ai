@@ -8,6 +8,8 @@ const SEARCH_TIMEOUT_MS = 8_000
 const DEFAULT_CRAWL_TIMEOUT_MS = 5_000
 const DEFAULT_CRAWL_MAX_RESULTS = 5
 const DIRECT_CRAWL_MAX_BYTES = 120_000
+const DIRECT_CRAWL_MAX_REDIRECTS = 4
+const DIRECT_CRAWL_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
 const COMMERCIAL_QUERY_TERMS = [
   'buyer',
@@ -188,36 +190,61 @@ async function fetchJson(url, fetcher, timeoutMs = SEARCH_TIMEOUT_MS, init = {})
 async function fetchPageText(url, fetcher, timeoutMs = DEFAULT_CRAWL_TIMEOUT_MS) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort('crawl-timeout'), timeoutMs)
+  let currentUrl = url
+
   try {
-    const response = await fetcher(url, {
-      headers: {
-        Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1',
-        'User-Agent': 'SalesRadarAI-Crawler/0.1 (+https://sales-radar-ai.vercel.app)',
-      },
-      redirect: 'follow',
-      signal: controller.signal,
-    })
-    if (!response.ok) throw new Error(`crawl returned HTTP ${response.status}`)
-    const contentType = response.headers.get('content-type') ?? ''
-    if (
-      contentType &&
-      !/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)
-    ) {
-      throw new Error(`unsupported crawl content type: ${contentType}`)
+    for (let redirectCount = 0; redirectCount <= DIRECT_CRAWL_MAX_REDIRECTS; redirectCount += 1) {
+      if (!isAllowedCrawlTarget(currentUrl) || isEncyclopediaUrl(currentUrl)) {
+        throw new Error('unsafe or encyclopedia crawl target')
+      }
+
+      const response = await fetcher(currentUrl, {
+        headers: {
+          Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1',
+          'User-Agent': 'SalesRadarAI-Crawler/0.1 (+https://sales-radar-ai.vercel.app)',
+        },
+        redirect: 'manual',
+        signal: controller.signal,
+      })
+
+      if (DIRECT_CRAWL_REDIRECT_STATUSES.has(response.status)) {
+        if (redirectCount >= DIRECT_CRAWL_MAX_REDIRECTS) {
+          throw new Error('crawl exceeded redirect limit')
+        }
+        const location = response.headers.get('location')
+        if (!location) throw new Error('crawl redirect missing location')
+        const nextUrl = new URL(location, currentUrl).toString()
+        if (!isAllowedCrawlTarget(nextUrl) || isEncyclopediaUrl(nextUrl)) {
+          throw new Error('crawl redirect target is not allowed')
+        }
+        currentUrl = nextUrl
+        continue
+      }
+
+      if (!response.ok) throw new Error(`crawl returned HTTP ${response.status}`)
+      const contentType = response.headers.get('content-type') ?? ''
+      if (
+        contentType &&
+        !/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)
+      ) {
+        throw new Error(`unsupported crawl content type: ${contentType}`)
+      }
+      const raw = (await response.text()).slice(0, DIRECT_CRAWL_MAX_BYTES)
+      const titleMatch = raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+      const title = titleMatch ? compactHtmlText(titleMatch[1], 500) : null
+      const content = compactHtmlText(raw, 20_000)
+      if (!content) throw new Error('direct crawl returned no usable text')
+      return {
+        url: response.url || currentUrl,
+        title,
+        content,
+        metadata: {},
+        statusCode: response.status,
+        contentHash: createHash('sha256').update(content).digest('hex'),
+      }
     }
-    const raw = (await response.text()).slice(0, DIRECT_CRAWL_MAX_BYTES)
-    const titleMatch = raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
-    const title = titleMatch ? compactHtmlText(titleMatch[1], 500) : null
-    const content = compactHtmlText(raw, 20_000)
-    if (!content) throw new Error('direct crawl returned no usable text')
-    return {
-      url: response.url || url,
-      title,
-      content,
-      metadata: {},
-      statusCode: response.status,
-      contentHash: createHash('sha256').update(content).digest('hex'),
-    }
+
+    throw new Error('crawl exceeded redirect limit')
   } finally {
     clearTimeout(timeout)
   }
