@@ -38,6 +38,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Install browser smoke dependency
+        run: npm install --no-save --package-lock=false puppeteer-core@24.16.0
+
+      - name: Virtual Chrome click smoke
+        run: node scripts/browser-smoke.mjs
+
   backend:
     name: Backend
     runs-on: ubuntu-latest
