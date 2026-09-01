@@ -146,6 +146,18 @@ test('serves a complete crawler-MCP search flow when BACKEND_ORIGIN is missing',
   assert.deepEqual(radar.jsonBody.data, [])
 })
 
+test('reports sales AI as unavailable when only the stateless fallback is running', async () => {
+  delete process.env.BACKEND_ORIGIN
+
+  const capabilities = await invoke({ path: 'health/capabilities' })
+
+  assert.equal(capabilities.statusCode, 200)
+  assert.equal(capabilities.jsonBody.data.salesAI.enabled, false)
+  assert.equal(capabilities.jsonBody.data.salesAI.provider, null)
+  assert.equal(capabilities.jsonBody.data.salesAI.model, null)
+  assert.equal(capabilities.jsonBody.data.salesAI.reason, 'full_backend_required')
+})
+
 test('forwards API path, query, headers and JSON body to configured backend', async () => {
   process.env.BACKEND_ORIGIN = 'https://backend.example.com/some-ignored-path'
   let observedUrl
