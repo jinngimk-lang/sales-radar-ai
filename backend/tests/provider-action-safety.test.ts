@@ -5,6 +5,7 @@ import {
   assertSalesProviderActionAllowed,
   defaultApprovalForRisk,
   resolveActionApproval,
+  tightenActionDescriptorFromMcpAnnotations,
   type SalesProviderActionDescriptor,
 } from '../src/contracts/sales-provider-action.contract.js'
 
@@ -74,4 +75,19 @@ test('provider-specific policy may tighten defaults but cannot weaken them', () 
     approval: 'required',
   }
   assert.equal(resolveActionApproval(unsafeDeleteOverride), 'blocked')
+})
+
+test('live MCP annotations can tighten a catalog action but never weaken it', () => {
+  const connectedWorkflow = tightenActionDescriptorFromMcpAnnotations(
+    { action: 'workflow.activate', risk: 'SEND' },
+    { destructiveHint: true, readOnlyHint: false, idempotentHint: true },
+  )
+  assert.equal(connectedWorkflow.risk, 'DESTRUCTIVE')
+  assert.equal(resolveActionApproval(connectedWorkflow), 'blocked')
+
+  const mislabeledReadOnlyWrite = tightenActionDescriptorFromMcpAnnotations(
+    { action: 'lead.convert', risk: 'WRITE' },
+    { readOnlyHint: true, destructiveHint: false, idempotentHint: false },
+  )
+  assert.equal(mislabeledReadOnlyWrite.risk, 'WRITE')
 })
