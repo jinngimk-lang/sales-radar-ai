@@ -10,6 +10,18 @@ const queries = [
   'battery storage procurement supplier Europe',
 ]
 
+const COMMERCIAL_PATTERN = /\b(?:procurement|purchasing|sourcing|rfq|rfp|tender|bid|quotation|buyer|supplier|vendor|manufacturer|distributor|importer|wholesaler|reseller|dealer|project|factory expansion)\b|采购|求购|询价|招标|买家|采购商|供应商|厂家|经销商|代理商|进口商|寻源/iu
+const COMMERCIAL_PATH_PATTERN = /\/(?:procurement|purchasing|sourcing|rfq|rfp|tender|bid|supplier|vendor|distributor|dealer|partner|opportunit|marketplace|buy|sell)(?:\/|[-_?#]|$)/iu
+
+function hasCommercialValue(result) {
+  return (
+    COMMERCIAL_PATH_PATTERN.test(String(result.url ?? '')) ||
+    COMMERCIAL_PATTERN.test(
+      `${String(result.title ?? '')} ${String(result.summary ?? '')} ${String(result.url ?? '')}`,
+    )
+  )
+}
+
 let discovery = null
 let usedQuery = null
 let lastError = null
@@ -23,7 +35,10 @@ for (const keyword of queries) {
       maxResults: 8,
       env: {},
     })
-    if (candidate.configured && candidate.results.length > 0) {
+    if (
+      candidate.configured &&
+      candidate.results.some((result) => hasCommercialValue(result))
+    ) {
       discovery = candidate
       usedQuery = keyword
       break
@@ -35,7 +50,7 @@ for (const keyword of queries) {
 
 if (!discovery || discovery.results.length === 0) {
   throw new Error(
-    `embedded crawler live discovery returned no public results${lastError ? `: ${lastError instanceof Error ? lastError.message : String(lastError)}` : ''}`,
+    `embedded crawler live discovery returned no commercially useful public results${lastError ? `: ${lastError instanceof Error ? lastError.message : String(lastError)}` : ''}`,
   )
 }
 
@@ -48,21 +63,29 @@ if (encyclopedia.length > 0) {
   )
 }
 
+const commercialResults = discovery.results.filter((result) => hasCommercialValue(result))
+if (commercialResults.length === 0) {
+  throw new Error('embedded crawler returned public URLs but none contained commercial buyer/supplier/procurement value')
+}
+
 console.log(
   'embedded-crawler-discovery',
   JSON.stringify({
     query: usedQuery,
     resultCount: discovery.results.length,
-    results: discovery.results.slice(0, 6).map((item) => ({
+    commercialResultCount: commercialResults.length,
+    results: discovery.results.slice(0, 8).map((item) => ({
       url: item.url,
+      title: item.title,
       provider: item.provider,
+      commercial: hasCommercialValue(item),
     })),
   }),
 )
 
 let enriched = null
 const crawlDiagnostics = []
-for (const result of discovery.results.slice(0, 6)) {
+for (const result of commercialResults.slice(0, 6)) {
   const [candidate] = await enrichCrawlerResults([result], { env: {} })
   crawlDiagnostics.push({
     url: result.url,
@@ -81,7 +104,7 @@ for (const result of discovery.results.slice(0, 6)) {
 console.log('embedded-crawler-crawl', JSON.stringify(crawlDiagnostics))
 
 if (!enriched) {
-  throw new Error('embedded crawler discovered URLs but could not crawl usable text from the first six public results')
+  throw new Error('embedded crawler found commercial URLs but could not crawl usable text from the first six commercial results')
 }
 
 console.log(
@@ -89,9 +112,10 @@ console.log(
     {
       ok: true,
       query: usedQuery,
-      discoveryProvider: discovery.results[0]?.provider ?? null,
+      discoveryProvider: commercialResults[0]?.provider ?? null,
       resultCount: discovery.results.length,
-      sampleDomains: discovery.results.slice(0, 5).map((item) => new URL(item.url).hostname),
+      commercialResultCount: commercialResults.length,
+      sampleDomains: commercialResults.slice(0, 5).map((item) => new URL(item.url).hostname),
       crawledDomain: new URL(enriched.url).hostname,
       crawledCharacters: enriched.crawlContent.length,
       crawlProvider: enriched.crawlProvider,
