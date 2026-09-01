@@ -247,6 +247,56 @@ test('crawler fallback directly crawls safe public pages when Crawl4AI is not co
   assert.equal(calls.length, 2)
 })
 
+test('direct crawler does not follow redirects into private networks', async () => {
+  const response = createResponse()
+  let privateFetchObserved = false
+
+  const handled = await handleCrawlerSearchResults(
+    { method: 'GET', query: {} },
+    response,
+    `search-task/${encodeURIComponent(encodeTask())}/results`,
+    {
+      fetcher: async (input, init = {}) => {
+        const url = String(input)
+        if (url.startsWith('https://api.gdeltproject.org/')) {
+          return jsonResponse({
+            articles: [
+              {
+                url: 'https://public.example/redirect',
+                title: 'Public sourcing page',
+                summary: 'A public candidate that redirects.',
+              },
+            ],
+          })
+        }
+        if (url === 'https://public.example/redirect') {
+          assert.equal(init.redirect, 'manual')
+          return new Response(null, {
+            status: 302,
+            headers: { location: 'http://127.0.0.1/admin' },
+          })
+        }
+        if (url === 'http://127.0.0.1/admin') {
+          privateFetchObserved = true
+          return new Response('<html><body>private admin page</body></html>', {
+            status: 200,
+            headers: { 'content-type': 'text/html' },
+          })
+        }
+        throw new Error(`Unexpected fetch: ${url}`)
+      },
+      env: {},
+    },
+  )
+
+  assert.equal(handled, true)
+  assert.equal(response.statusCode, 200)
+  assert.equal(privateFetchObserved, false)
+  assert.equal(response.body.data.length, 1)
+  assert.equal(response.body.data[0].sourceMetadata.contentAcquisitionProvider, null)
+  assert.equal(response.body.data[0].evidenceStatus, 'UNKNOWN')
+})
+
 test('crawler failure keeps public-search evidence available instead of failing the whole Discover search', async () => {
   const taskId = encodeTask()
   const response = createResponse()
