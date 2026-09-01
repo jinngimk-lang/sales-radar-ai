@@ -3,14 +3,20 @@ import { afterEach, test } from 'node:test'
 import handler from './backend-proxy.js'
 
 const originalBackendOrigin = process.env.BACKEND_ORIGIN
+const originalCrawlerGatewayUrl = process.env.CRAWLER_GATEWAY_URL
+const originalCrawlerGatewayToken = process.env.CRAWLER_GATEWAY_TOKEN
 const originalFetch = globalThis.fetch
 
 afterEach(() => {
-  if (originalBackendOrigin === undefined) {
-    delete process.env.BACKEND_ORIGIN
-  } else {
-    process.env.BACKEND_ORIGIN = originalBackendOrigin
-  }
+  if (originalBackendOrigin === undefined) delete process.env.BACKEND_ORIGIN
+  else process.env.BACKEND_ORIGIN = originalBackendOrigin
+
+  if (originalCrawlerGatewayUrl === undefined) delete process.env.CRAWLER_GATEWAY_URL
+  else process.env.CRAWLER_GATEWAY_URL = originalCrawlerGatewayUrl
+
+  if (originalCrawlerGatewayToken === undefined) delete process.env.CRAWLER_GATEWAY_TOKEN
+  else process.env.CRAWLER_GATEWAY_TOKEN = originalCrawlerGatewayToken
+
   globalThis.fetch = originalFetch
 })
 
@@ -52,43 +58,35 @@ async function invoke({ path, method = 'GET', body, query = {}, headers = {} }) 
   return response
 }
 
-test('serves a complete crawler-backed search flow when BACKEND_ORIGIN is missing', async () => {
+test('serves a complete crawler-MCP search flow when BACKEND_ORIGIN is missing', async () => {
   delete process.env.BACKEND_ORIGIN
+  process.env.CRAWLER_GATEWAY_URL = 'https://crawler.example'
+  process.env.CRAWLER_GATEWAY_TOKEN = 'test-token'
 
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, init = {}) => {
     const target = String(url)
-    if (target.startsWith('https://api.gdeltproject.org/api/v2/doc/doc?')) {
-      return new Response(
-        JSON.stringify({
-          articles: [
-            {
-              url: 'https://example.com/thailand-automation-expansion',
-              title: 'Automation supplier expands industrial operations in Thailand',
-              domain: 'example.com',
-              seendate: '20260830T120000Z',
-              sourcecountry: 'Thailand',
-              language: 'English',
-            },
-          ],
-        }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      )
-    }
-
-    if (target === 'https://example.com/thailand-automation-expansion') {
-      return new Response(
-        '<html><head><title>Thailand automation expansion</title></head><body><main>Automation supplier expands industrial operations in Thailand and is evaluating new production partners.</main></body></html>',
-        {
-          status: 200,
-          headers: { 'content-type': 'text/html; charset=utf-8' },
-        },
-      )
-    }
-
-    throw new Error(`Unexpected fallback fetch: ${target}`)
+    assert.equal(target, 'https://crawler.example/search')
+    assert.equal(init.method, 'POST')
+    assert.equal(new Headers(init.headers).get('authorization'), 'Bearer test-token')
+    return new Response(
+      JSON.stringify({
+        results: [
+          {
+            url: 'https://example.com/thailand-automation-expansion',
+            title: 'Automation supplier expands industrial operations in Thailand',
+            content:
+              'Automation supplier expands industrial operations in Thailand and is evaluating new production partners.',
+            country: 'Thailand',
+            region: 'SoutheastAsia',
+            metadata: { searchEngine: 'crawler-mcp' },
+          },
+        ],
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    )
   }
 
   const health = await invoke({ path: 'health' })
@@ -133,7 +131,8 @@ test('serves a complete crawler-backed search flow when BACKEND_ORIGIN is missin
   assert.equal(results.jsonBody.data[0].sourceUrl, 'https://example.com/thailand-automation-expansion')
   assert.match(results.jsonBody.data[0].postContent, /Automation supplier expands/)
   assert.equal(results.jsonBody.data[0].sourceMetadata.provider, 'crawler-gateway')
-  assert.equal(results.jsonBody.data[0].sourceMetadata.contentAcquisitionProvider, 'direct-http')
+  assert.equal(results.jsonBody.data[0].sourceMetadata.discoveryProvider, 'crawler-mcp')
+  assert.equal(results.jsonBody.data[0].sourceMetadata.contentAcquisitionProvider, 'crawler-gateway')
 
   const opportunities = await invoke({ path: `search-task/${taskId}/opportunities` })
   assert.equal(opportunities.statusCode, 200)
