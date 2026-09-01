@@ -35,6 +35,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Live embedded crawler smoke
+        run: node scripts/embedded-crawler-live-smoke.mjs
+
       - name: Build
         run: npm run build
 
