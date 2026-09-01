@@ -52,7 +52,8 @@ test('uses embedded HTML crawler discovery when no external crawler gateway is c
       'https://research.example.com/pump-market',
     ],
   )
-  assert.equal(discovery.results[0].provider, 'embedded-html-crawler')
+  assert.equal(discovery.results[0].provider, 'duckduckgo-html')
+  assert.equal(discovery.results[0].metadata.searchEngine, 'duckduckgo-html')
   assert.match(discovery.results[0].summary, /requests quotations/i)
   assert.equal(requests.length, 1)
 })
@@ -83,6 +84,7 @@ test('embedded crawler falls back to Bing HTML when DuckDuckGo yields no usable 
   assert.equal(discovery.configured, true)
   assert.equal(discovery.results.length, 1)
   assert.equal(discovery.results[0].url, 'https://buyer.example/rfq/storage')
-  assert.equal(discovery.results[0].provider, 'embedded-html-crawler')
+  assert.equal(discovery.results[0].provider, 'bing-html')
+  assert.equal(discovery.results[0].metadata.searchEngine, 'bing-html')
   assert.equal(requests.length, 2)
 })
