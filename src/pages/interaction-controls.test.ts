@@ -44,13 +44,13 @@ test('revenue supervision keeps the full process and interactive Browserbase liv
 })
 
 test('communication and intent translate missing full backend errors instead of exposing raw runtime copy', async () => {
-  const api = await readSource('../services/api.ts')
+  const presenter = await readSource('../services/api-errors.ts')
   const communication = await readSource('./CommunicationWorkspacePage.tsx')
   const intent = await readSource('./VerifiedIntentPage.tsx')
 
-  assert.match(api, /export function getUserFacingApiError/)
-  assert.match(api, /BACKEND_NOT_CONFIGURED/)
-  assert.match(api, /完整后端未连接，当前功能暂不可用/)
+  assert.match(presenter, /export function getUserFacingApiError/)
+  assert.match(presenter, /BACKEND_NOT_CONFIGURED/)
+  assert.match(presenter, /完整后端未连接，当前功能暂不可用/)
   assert.match(communication, /getUserFacingApiError/)
   assert.match(intent, /getUserFacingApiError/)
   assert.doesNotMatch(communication, /cause instanceof Error \? cause\.message/)
