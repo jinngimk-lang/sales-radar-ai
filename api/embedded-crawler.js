@@ -26,6 +26,15 @@ function stripHtml(value) {
     .trim()
 }
 
+function isHttpUrl(value) {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
 function unwrapDuckDuckGoUrl(value) {
   const raw = decodeHtml(value).trim()
   if (!raw) return null
@@ -37,6 +46,30 @@ function unwrapDuckDuckGoUrl(value) {
       return target ? decodeURIComponent(target) : null
     }
     return url.toString()
+  } catch {
+    return null
+  }
+}
+
+function unwrapBingUrl(value) {
+  const raw = decodeHtml(value).trim()
+  if (!raw) return null
+  try {
+    const url = new URL(raw)
+    const hostname = url.hostname.toLowerCase()
+    const isBingTracking =
+      (hostname === 'bing.com' || hostname.endsWith('.bing.com')) &&
+      url.pathname.startsWith('/ck/a')
+
+    if (!isBingTracking) return isHttpUrl(url.toString()) ? url.toString() : null
+
+    const encodedTarget = url.searchParams.get('u')
+    if (!encodedTarget?.startsWith('a1')) return null
+    const decodedTarget = Buffer.from(
+      encodedTarget.slice(2),
+      'base64url',
+    ).toString('utf8')
+    return isHttpUrl(decodedTarget) ? new URL(decodedTarget).toString() : null
   } catch {
     return null
   }
@@ -71,9 +104,11 @@ export function parseBingHtml(html, maxResults = 10) {
   while ((block = blockPattern.exec(source)) && results.length < maxResults) {
     const anchor = block[1].match(/<h2[^>]*>[\s\S]*?<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i)
     if (!anchor) continue
+    const url = unwrapBingUrl(anchor[1])
+    if (!url) continue
     const snippet = block[1].match(/<p[^>]*>([\s\S]*?)<\/p>/i)
     results.push({
-      url: decodeHtml(anchor[1]),
+      url,
       title: stripHtml(anchor[2]),
       summary: stripHtml(snippet?.[1] ?? ''),
       provider: 'embedded-html-crawler',
@@ -163,15 +198,6 @@ async function assertPublicDns(url, resolver) {
   const records = Array.isArray(resolved) ? resolved : [resolved]
   if (records.length === 0 || records.some((entry) => !entry?.address || isNonPublicIp(entry.address))) {
     throw new Error('crawler target resolved to a non-public address')
-  }
-}
-
-function isHttpUrl(value) {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'https:' || url.protocol === 'http:'
-  } catch {
-    return false
   }
 }
 
