@@ -56,7 +56,7 @@ Fori Automation and Kuka Systems support automotive production lines.
     assert.match(results[0]?.text ?? '', /^Fori Automation/)
   })
 
-  it('filters encyclopedias and generic official homepages while keeping commercial counterparties', () => {
+  it('filters encyclopedias but keeps ordinary official pages and reports for review', () => {
     const results = parseAgentReachOutput(
       JSON.stringify({
         results: [
@@ -71,6 +71,11 @@ Fori Automation and Kuka Systems support automotive production lines.
             text: 'Welcome to Battery Corp. About us and product overview.',
           },
           {
+            title: 'Battery storage market report',
+            url: 'https://research.example.com/battery-market-report',
+            text: 'Industry report about battery storage demand.',
+          },
+          {
             title: 'Battery storage RFQ',
             url: 'https://buyer.example.com/procurement/battery-storage',
             text: 'Procurement team seeks battery suppliers and requests quotations for a new project.',
@@ -80,11 +85,18 @@ Fori Automation and Kuka Systems support automotive production lines.
     )
 
     const filtered = filterCommercialSearchCandidates(results)
-    assert.equal(filtered.length, 1)
+    assert.equal(filtered.length, 3)
     assert.equal(
       filtered[0]?.url,
       'https://buyer.example.com/procurement/battery-storage',
     )
+    assert.ok(filtered.some((item) => item.url === 'https://battery.example.com/'))
+    assert.ok(
+      filtered.some(
+        (item) => item.url === 'https://research.example.com/battery-market-report',
+      ),
+    )
+    assert.ok(filtered.every((item) => !/wikipedia\.org/i.test(item.url)))
   })
 
   it('reports safe response diagnostics without returning raw content', () => {
