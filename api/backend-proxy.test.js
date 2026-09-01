@@ -52,33 +52,43 @@ async function invoke({ path, method = 'GET', body, query = {}, headers = {} }) 
   return response
 }
 
-test('serves a complete evidence-backed search flow when BACKEND_ORIGIN is missing', async () => {
+test('serves a complete crawler-backed search flow when BACKEND_ORIGIN is missing', async () => {
   delete process.env.BACKEND_ORIGIN
 
   globalThis.fetch = async (url) => {
     const target = String(url)
-    if (!target.startsWith('https://api.gdeltproject.org/api/v2/doc/doc?')) {
-      throw new Error(`Unexpected fallback fetch: ${target}`)
+    if (target.startsWith('https://api.gdeltproject.org/api/v2/doc/doc?')) {
+      return new Response(
+        JSON.stringify({
+          articles: [
+            {
+              url: 'https://example.com/thailand-automation-expansion',
+              title: 'Automation supplier expands industrial operations in Thailand',
+              domain: 'example.com',
+              seendate: '20260830T120000Z',
+              sourcecountry: 'Thailand',
+              language: 'English',
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      )
     }
 
-    return new Response(
-      JSON.stringify({
-        articles: [
-          {
-            url: 'https://example.com/thailand-automation-expansion',
-            title: 'Automation supplier expands industrial operations in Thailand',
-            domain: 'example.com',
-            seendate: '20260830T120000Z',
-            sourcecountry: 'Thailand',
-            language: 'English',
-          },
-        ],
-      }),
-      {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      },
-    )
+    if (target === 'https://example.com/thailand-automation-expansion') {
+      return new Response(
+        '<html><head><title>Thailand automation expansion</title></head><body><main>Automation supplier expands industrial operations in Thailand and is evaluating new production partners.</main></body></html>',
+        {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        },
+      )
+    }
+
+    throw new Error(`Unexpected fallback fetch: ${target}`)
   }
 
   const health = await invoke({ path: 'health' })
@@ -88,7 +98,7 @@ test('serves a complete evidence-backed search flow when BACKEND_ORIGIN is missi
   const provider = await invoke({ path: 'search/providers/health' })
   assert.equal(provider.statusCode, 200)
   assert.equal(provider.jsonBody.data.state, 'AVAILABLE')
-  assert.equal(provider.jsonBody.data.provider, 'public-web-evidence')
+  assert.equal(provider.jsonBody.data.provider, 'crawler-gateway')
 
   const created = await invoke({
     path: 'search-task',
@@ -122,7 +132,8 @@ test('serves a complete evidence-backed search flow when BACKEND_ORIGIN is missi
   assert.equal(results.jsonBody.data[0].customerType, 'Company')
   assert.equal(results.jsonBody.data[0].sourceUrl, 'https://example.com/thailand-automation-expansion')
   assert.match(results.jsonBody.data[0].postContent, /Automation supplier expands/)
-  assert.equal(results.jsonBody.data[0].sourceMetadata.provider, 'gdelt-doc')
+  assert.equal(results.jsonBody.data[0].sourceMetadata.provider, 'crawler-gateway')
+  assert.equal(results.jsonBody.data[0].sourceMetadata.contentAcquisitionProvider, 'direct-http')
 
   const opportunities = await invoke({ path: `search-task/${taskId}/opportunities` })
   assert.equal(opportunities.statusCode, 200)
