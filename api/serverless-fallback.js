@@ -1,16 +1,6 @@
-import { createHash } from 'node:crypto'
-
 const TASK_PREFIX = 'sf1_'
 const TASK_TTL_MS = 7 * 24 * 60 * 60 * 1000
-const GDELT_ENDPOINT = 'https://api.gdeltproject.org/api/v2/doc/doc'
-const SEARCH_TIMEOUT_MS = 8_000
-const ENCYCLOPEDIA_DOMAINS = [
-  'wikipedia.org',
-  'wikidata.org',
-  'britannica.com',
-  'baike.baidu.com',
-  'baike.com',
-]
+
 const SUPPORTED_PLATFORMS = new Set([
   'Website',
   'Reddit',
@@ -93,7 +83,7 @@ function decodeTask(taskId) {
   }
 }
 
-function taskEnvelope(taskId, task, resultCount = 0) {
+function taskEnvelope(taskId, resultCount = 0) {
   return {
     id: taskId,
     status: 'COMPLETED',
@@ -123,9 +113,9 @@ function buildStrategy(task) {
     languages: ['English'],
     targetType: 'buyer',
     salesIntent: 'customer',
-    searchDirections: ['crawler public web evidence'],
+    searchDirections: ['crawler MCP public web evidence'],
     reason:
-      'Crawler gateway searches public web evidence. Commercial intent must be verified before outreach.',
+      'Crawler/MCP searches public web evidence. Commercial intent must be verified before outreach.',
   }
 }
 
@@ -137,14 +127,14 @@ function buildPreparation(task, requestedContext) {
       ? requestedContext
       : { product: task.k, region: task.r[0] }
   const productContext = {
-    version: 'serverless-crawler-v2',
+    version: 'serverless-crawler-mcp-v3',
     capturedAt,
     source: requestedContext ? 'request' : 'inferred',
     productProfile: null,
     context,
   }
   const searchIntent = {
-    version: 'serverless-crawler-v2',
+    version: 'serverless-crawler-mcp-v3',
     capturedAt,
     salesIntent: strategy.salesIntent,
     targetType: strategy.targetType,
@@ -157,211 +147,12 @@ function buildPreparation(task, requestedContext) {
   return { strategy, productContext, searchIntent }
 }
 
-function inferIndustry(keyword) {
-  const value = keyword.toLowerCase()
-  if (/medical|health|hospital|pharma|biotech/.test(value)) return 'MedicalHealth'
-  if (/software|saas|cloud|cyber|\bai\b|artificial intelligence/.test(value)) return 'SaaSSoftware'
-  if (/electronic|semiconductor|chip|device|hardware/.test(value)) return 'ConsumerElectronics'
-  if (/beauty|cosmetic|skincare|makeup/.test(value)) return 'BeautyIndustry'
-  if (/trade|export|import|logistics|freight|shipping/.test(value)) return 'TradeExport'
-  return 'IndustrialManufacturing'
-}
-
-function inferRegion(task, sourceCountry = '') {
-  if (task.r[0]) return task.r[0]
-  const country = sourceCountry.toLowerCase()
-  if (/china|hong kong|taiwan/.test(country)) return 'China'
-  if (/singapore|thailand|vietnam|malaysia|indonesia|philippines|cambodia|laos|myanmar|brunei/.test(country)) {
-    return 'SoutheastAsia'
-  }
-  if (/united states|usa|america/.test(country)) return 'USA'
-  if (/saudi|emirates|uae|qatar|oman|bahrain|kuwait|israel|jordan/.test(country)) return 'MiddleEast'
-  if (/france|germany|italy|spain|uk|united kingdom|netherlands|belgium|sweden|norway|denmark|finland|poland|austria|switzerland|ireland|portugal/.test(country)) {
-    return 'Europe'
-  }
-  return 'USA'
-}
-
-function keywordTags(keyword) {
-  return [...new Set(keyword.split(/[^\p{L}\p{N}]+/u).map((item) => item.trim()).filter((item) => item.length > 2))].slice(0, 8)
-}
-
-function parseSeenDate(value) {
-  if (typeof value !== 'string' || !value) return null
-  const compact = value.match(/^(\d{4})(\d{2})(\d{2})T?(\d{2})?(\d{2})?(\d{2})?Z?$/)
-  if (!compact) {
-    const parsed = new Date(value)
-    return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null
-  }
-  const [, year, month, day, hour = '00', minute = '00', second = '00'] = compact
-  const parsed = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`)
-  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null
-}
-
-function isEncyclopediaUrl(value) {
-  try {
-    const hostname = new URL(value).hostname.toLowerCase().replace(/^www\./, '')
-    return ENCYCLOPEDIA_DOMAINS.some(
-      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
-    )
-  } catch {
-    return true
-  }
-}
-
-function safeDomain(value, url) {
-  if (typeof value === 'string' && value.trim()) return value.trim().toLowerCase()
-  try {
-    return new URL(url).hostname.toLowerCase()
-  } catch {
-    return 'public-web'
-  }
-}
-
-function homeUrl(url) {
-  try {
-    return new URL('/', url).toString()
-  } catch {
-    return url
-  }
-}
-
-function buildLead(article, index, task) {
-  const url = String(article.url ?? '')
-  const title = String(article.title ?? '').trim() || url
-  const domain = safeDomain(article.domain, url)
-  const sourceCountry = String(article.sourcecountry ?? article.sourceCountry ?? '').trim()
-  const language = String(article.language ?? 'Unknown').trim()
-  const publishedAt = parseSeenDate(article.seendate ?? article.publishedAt)
-  const tags = keywordTags(task.k)
-  const id = `fallback_${createHash('sha256').update(url || `${title}:${index}`).digest('hex').slice(0, 20)}`
-  const neutralScore = Math.max(30, 45 - index * 2)
-
-  return {
-    id,
-    username: domain,
-    displayName: title.slice(0, 180),
-    avatarUrl: null,
-    initials: domain.replace(/^www\./, '').slice(0, 2).toUpperCase() || 'WE',
-    platform: 'Website',
-    customerType: 'Company',
-    postContent: String(article.summary ?? article.snippet ?? title).slice(0, 1_500),
-    postedAt: publishedAt,
-    country: sourceCountry || 'Unknown',
-    region: inferRegion(task, sourceCountry),
-    industry: inferIndustry(task.k),
-    jobTitle: null,
-    company: null,
-    sourceUrl: url,
-    profileUrl: homeUrl(url),
-    interestTags: tags,
-    intentScore: neutralScore,
-    recommendedAction: 'monitor',
-    updatedAt: new Date().toISOString(),
-    sourceMetadata: {
-      provider: 'crawler-gateway',
-      discoveryProvider: article.provider ?? 'gdelt-doc',
-      leadType: 'content',
-      evidenceKind: 'public-web-article',
-      sourceCountry: sourceCountry || null,
-      language,
-      commercialIntent: 'unverified',
-      fallbackRuntime: true,
-    },
-    identityStatus: 'UNVERIFIED',
-    evidenceStatus: 'UNKNOWN',
-    analysis: {
-      id: `${id}_analysis`,
-      intentType: '公开市场信号',
-      intentScore: neutralScore,
-      tags,
-      suggestion: '先核验来源中涉及的商业主体、角色和实际需求，再决定是否联系。',
-      background: `该结果来自爬虫网关公开网页候选（${domain}）。`,
-      need: '公开来源与搜索关键词相关，但不能单凭该来源确认采购需求。',
-      purchaseProbability: 'low',
-      salesStrategy: '先完成实体与需求核验，再进行任何销售触达。',
-      reasoning: '该评分仅表示公开内容与查询的相关性，不代表已确认的购买意向。',
-      needKeywords: tags,
-      recommendedScript: null,
-      contactAdvice: null,
-    },
-    contacts: [],
-  }
-}
-
-async function fetchJson(url) {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort('search-timeout'), SEARCH_TIMEOUT_MS)
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'SalesRadarAI/0.1 (+https://sales-radar-ai.vercel.app)',
-      },
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      throw new Error(`public search returned HTTP ${response.status}`)
-    }
-    return await response.json()
-  } finally {
-    clearTimeout(timeout)
-  }
-}
-
-async function searchGdelt(task) {
-  const url = new URL(GDELT_ENDPOINT)
-  url.searchParams.set('query', task.k)
-  url.searchParams.set('mode', 'artlist')
-  url.searchParams.set('maxrecords', String(Math.min(50, Math.max(task.m, 5))))
-  url.searchParams.set('format', 'json')
-  url.searchParams.set('sort', 'hybridrel')
-  const payload = await fetchJson(url)
-  const articles = Array.isArray(payload?.articles) ? payload.articles : []
-  return articles
-    .filter(
-      (article) =>
-        article &&
-        typeof article.url === 'string' &&
-        article.url &&
-        typeof article.title === 'string' &&
-        article.title.trim() &&
-        !isEncyclopediaUrl(article.url),
-    )
-    .slice(0, task.m)
-    .map((article) => ({ ...article, provider: 'gdelt-doc' }))
-}
-
-async function providerHealth() {
-  const checkedAt = new Date().toISOString()
-  const probe = { v: 1, k: 'business', p: ['Website'], r: [], m: 1, t: Date.now() }
-  try {
-    await searchGdelt(probe)
-    return {
-      provider: 'crawler-gateway',
-      dependency: 'public-index+crawler',
-      state: 'AVAILABLE',
-      code: 'OK',
-      message: 'Crawler gateway public discovery is reachable without Railway.',
-      checkedAt,
-    }
-  } catch (error) {
-    return {
-      provider: 'crawler-gateway',
-      dependency: 'public-index+crawler',
-      state: 'UNAVAILABLE',
-      code: 'CRAWLER_GATEWAY_UNAVAILABLE',
-      message: `Crawler gateway is unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      checkedAt,
-    }
-  }
-}
-
-function runtimeCapabilities() {
+function runtimeCapabilities(env = process.env) {
+  const crawlerEnabled = Boolean(env.CRAWLER_GATEWAY_URL?.trim())
   return {
     marketResearch: {
-      enabled: true,
-      provider: 'crawler-gateway',
+      enabled: crawlerEnabled,
+      provider: crawlerEnabled ? 'crawler-gateway' : null,
       model: null,
     },
     salesAI: {
@@ -384,8 +175,8 @@ function runtimeCapabilities() {
       verification: null,
     },
     agentRuntime: {
-      provider: 'crawler-gateway',
-      enabled: true,
+      provider: crawlerEnabled ? 'crawler-gateway' : null,
+      enabled: crawlerEnabled,
       transport: 'serverless',
     },
     publicContactDiscovery: {
@@ -394,8 +185,8 @@ function runtimeCapabilities() {
       model: null,
     },
     salesDiscovery: {
-      enabled: true,
-      provider: 'crawler-gateway',
+      enabled: crawlerEnabled,
+      provider: crawlerEnabled ? 'crawler-gateway' : null,
       model: null,
     },
   }
@@ -429,11 +220,6 @@ export async function handleServerlessFallback(request, response, path) {
     return true
   }
 
-  if (request.method === 'GET' && path === 'search/providers/health') {
-    sendJson(response, 200, { data: await providerHealth() })
-    return true
-  }
-
   if (request.method === 'POST' && path === 'search/intent') {
     const query = typeof request.body?.query === 'string' ? request.body.query.trim() : ''
     if (!query) {
@@ -461,34 +247,9 @@ export async function handleServerlessFallback(request, response, path) {
     const taskId = encodeTask(task)
     const preparation = buildPreparation(task, request.body?.productContext)
     sendJson(response, 202, {
-      data: taskEnvelope(taskId, task),
+      data: taskEnvelope(taskId),
       ...preparation,
     })
-    return true
-  }
-
-  const resultTaskId = readTaskId(path, 'results')
-  if (request.method === 'GET' && resultTaskId) {
-    const task = decodeTask(resultTaskId)
-    if (!task) {
-      sendTaskNotFound(response)
-      return true
-    }
-    try {
-      const articles = await searchGdelt(task)
-      const results = articles.map((article, index) => buildLead(article, index, task))
-      sendJson(response, 200, { data: results, meta: { total: results.length } })
-    } catch (error) {
-      sendJson(response, 503, {
-        error: {
-          code: 'SEARCH_PROVIDER_UNAVAILABLE',
-          message: error instanceof Error ? error.message : 'Crawler gateway search failed.',
-          provider: 'crawler-gateway',
-          providerState: 'UNAVAILABLE',
-          retryable: true,
-        },
-      })
-    }
     return true
   }
 
@@ -510,7 +271,7 @@ export async function handleServerlessFallback(request, response, path) {
       sendTaskNotFound(response)
       return true
     }
-    sendJson(response, 200, { data: taskEnvelope(taskId, task) })
+    sendJson(response, 200, { data: taskEnvelope(taskId) })
     return true
   }
 
