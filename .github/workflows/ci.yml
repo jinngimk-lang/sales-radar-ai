@@ -112,6 +112,10 @@ jobs:
           tests/revenue-live-loop.test.ts
           tests/server-startup.test.ts
           tests/source-provenance.test.ts
+          tests/provider-action-safety.test.ts
+          tests/external-record-link.test.ts
+          tests/sales-provider-orchestrator.test.ts
+          tests/communication-receipt.test.ts
 
       - name: Build
         run: npm run build
