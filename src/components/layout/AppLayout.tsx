@@ -6,7 +6,6 @@ import {
   Search,
   Settings2,
   Target,
-  WalletCards,
 } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
@@ -19,7 +18,6 @@ const WORKSPACE_ITEMS = [
   { to: '/app/discover', label: '搜索', icon: Search },
   { to: '/app/communication', label: '沟通', icon: MessageSquareText },
   { to: '/app/intent', label: '意向', icon: BadgeCheck },
-  { to: '/app/revenue', label: '收益', icon: WalletCards },
   { to: '/app/account', label: '设置', icon: Settings2 },
 ]
 
