@@ -48,14 +48,37 @@ if (encyclopedia.length > 0) {
   )
 }
 
+console.log(
+  'embedded-crawler-discovery',
+  JSON.stringify({
+    query: usedQuery,
+    resultCount: discovery.results.length,
+    results: discovery.results.slice(0, 6).map((item) => ({
+      url: item.url,
+      provider: item.provider,
+    })),
+  }),
+)
+
 let enriched = null
+const crawlDiagnostics = []
 for (const result of discovery.results.slice(0, 6)) {
   const [candidate] = await enrichCrawlerResults([result], { env: {} })
+  crawlDiagnostics.push({
+    url: result.url,
+    status: candidate?.crawlStatus ?? null,
+    provider: candidate?.crawlProvider ?? null,
+    reason: candidate?.crawlReason ?? null,
+    error: candidate?.crawlError ?? null,
+    contentLength: candidate?.crawlContent?.length ?? 0,
+  })
   if (candidate?.crawlStatus === 'ENRICHED' && candidate.crawlContent?.length >= 120) {
     enriched = candidate
     break
   }
 }
+
+console.log('embedded-crawler-crawl', JSON.stringify(crawlDiagnostics))
 
 if (!enriched) {
   throw new Error('embedded crawler discovered URLs but could not crawl usable text from the first six public results')
