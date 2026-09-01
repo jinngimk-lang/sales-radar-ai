@@ -10,6 +10,11 @@ function htmlResponse(body, status = 200) {
   })
 }
 
+function bingTrackingUrl(target) {
+  const encoded = Buffer.from(target, 'utf8').toString('base64url')
+  return `https://www.bing.com/ck/a?!&&p=fixture&u=a1${encoded}&ntb=1`
+}
+
 test('uses embedded HTML crawler discovery when no external crawler gateway is configured', async () => {
   const requests = []
   const discovery = await searchCrawlerGateway({
@@ -86,5 +91,46 @@ test('embedded crawler falls back to Bing HTML when DuckDuckGo yields no usable 
   assert.equal(discovery.results[0].url, 'https://buyer.example/rfq/storage')
   assert.equal(discovery.results[0].provider, 'bing-html')
   assert.equal(discovery.results[0].metadata.searchEngine, 'bing-html')
+  assert.equal(requests.length, 2)
+})
+
+test('Bing tracking URLs are decoded before encyclopedia filtering and crawl enrichment', async () => {
+  const wikipedia = 'https://en.m.wikipedia.org/wiki/Industrial'
+  const procurement = 'https://buyer.example/procurement/industrial-automation'
+  const requests = []
+
+  const discovery = await searchCrawlerGateway({
+    keyword: 'industrial automation procurement supplier Europe',
+    maxResults: 5,
+    env: {},
+    fetcher: async (input) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.startsWith('https://html.duckduckgo.com/html/')) {
+        return htmlResponse('<html><body>No usable results</body></html>')
+      }
+      if (url.startsWith('https://www.bing.com/search?')) {
+        return htmlResponse(`
+          <ol id="b_results">
+            <li class="b_algo">
+              <h2><a href="${bingTrackingUrl(wikipedia)}">Industrial - Wikipedia</a></h2>
+              <div class="b_caption"><p>Encyclopedia result.</p></div>
+            </li>
+            <li class="b_algo">
+              <h2><a href="${bingTrackingUrl(procurement)}">Industrial automation RFQ</a></h2>
+              <div class="b_caption"><p>Buyer requests quotations from automation suppliers.</p></div>
+            </li>
+          </ol>
+        `)
+      }
+      throw new Error(`unexpected request: ${url}`)
+    },
+  })
+
+  assert.equal(discovery.configured, true)
+  assert.deepEqual(discovery.results.map((item) => item.url), [procurement])
+  assert.equal(discovery.results[0].provider, 'bing-html')
+  assert.equal(discovery.results[0].metadata.searchEngine, 'bing-html')
+  assert.ok(discovery.results.every((item) => !item.url.includes('bing.com/ck/a')))
   assert.equal(requests.length, 2)
 })
