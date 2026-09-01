@@ -14,24 +14,17 @@ const DIRECT_CRAWL_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 const COMMERCIAL_QUERY_TERMS = [
   'buyer',
   'procurement',
-  'purchasing',
   'sourcing',
   'RFQ',
+  'supplier',
+  'purchasing',
   'RFP',
   'tender',
-  'supplier',
   'manufacturer',
   'distributor',
   'importer',
   'wholesaler',
-  '采购',
-  '求购',
-  '询价',
-  '招标',
-  '买家',
-  '供应商',
-  '经销商',
-].join(' ')
+]
 
 const ENCYCLOPEDIA_DOMAINS = [
   'wikipedia.org',
@@ -264,7 +257,7 @@ async function fetchPageText(url, fetcher, timeoutMs = DEFAULT_CRAWL_TIMEOUT_MS)
 }
 
 function buildCommercialQuery(task) {
-  return `${task.k.trim()} ${COMMERCIAL_QUERY_TERMS}`.trim()
+  return `${task.k.trim()} (${COMMERCIAL_QUERY_TERMS.join(' OR ')})`
 }
 
 async function searchGdelt(task, fetcher) {
