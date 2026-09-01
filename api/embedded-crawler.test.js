@@ -50,13 +50,10 @@ test('uses embedded HTML crawler discovery when no external crawler gateway is c
 
   assert.equal(discovery.configured, true)
   assert.equal(discovery.provider, 'crawler-gateway')
-  assert.deepEqual(
-    discovery.results.map((item) => item.url),
-    [
-      'https://buyer.example/procurement/pumps',
-      'https://research.example.com/pump-market',
-    ],
-  )
+  assert.deepEqual(discovery.results.map((item) => item.url), [
+    'https://buyer.example/procurement/pumps',
+    'https://research.example.com/pump-market',
+  ])
   assert.equal(discovery.results[0].provider, 'duckduckgo-html')
   assert.equal(discovery.results[0].metadata.searchEngine, 'duckduckgo-html')
   assert.match(discovery.results[0].summary, /requests quotations/i)
@@ -112,14 +109,8 @@ test('Bing tracking URLs are decoded before encyclopedia filtering and crawl enr
       if (url.startsWith('https://www.bing.com/search?')) {
         return htmlResponse(`
           <ol id="b_results">
-            <li class="b_algo">
-              <h2><a href="${bingTrackingUrl(wikipedia)}">Industrial - Wikipedia</a></h2>
-              <div class="b_caption"><p>Encyclopedia result.</p></div>
-            </li>
-            <li class="b_algo">
-              <h2><a href="${bingTrackingUrl(procurement)}">Industrial automation RFQ</a></h2>
-              <div class="b_caption"><p>Buyer requests quotations from automation suppliers.</p></div>
-            </li>
+            <li class="b_algo"><h2><a href="${bingTrackingUrl(wikipedia)}">Industrial - Wikipedia</a></h2><div class="b_caption"><p>Encyclopedia result.</p></div></li>
+            <li class="b_algo"><h2><a href="${bingTrackingUrl(procurement)}">Industrial automation RFQ</a></h2><div class="b_caption"><p>Buyer requests quotations from automation suppliers.</p></div></li>
           </ol>
         `)
       }
@@ -133,4 +124,44 @@ test('Bing tracking URLs are decoded before encyclopedia filtering and crawl enr
   assert.equal(discovery.results[0].metadata.searchEngine, 'bing-html')
   assert.ok(discovery.results.every((item) => !item.url.includes('bing.com/ck/a')))
   assert.equal(requests.length, 2)
+})
+
+test('embedded crawler retries with commercial intent when initial results are definition/reference noise', async () => {
+  const bingRequests = []
+  const discovery = await searchCrawlerGateway({
+    keyword: 'industrial automation Europe',
+    maxResults: 5,
+    env: {},
+    fetcher: async (input) => {
+      const url = String(input)
+      if (url.startsWith('https://html.duckduckgo.com/html/')) {
+        return htmlResponse('<html><body>No usable results</body></html>')
+      }
+      if (url.startsWith('https://www.bing.com/search?')) {
+        bingRequests.push(url)
+        if (bingRequests.length === 1) {
+          return htmlResponse(`
+            <ol id="b_results">
+              <li class="b_algo"><h2><a href="https://www.merriam-webster.com/dictionary/industrial">Industrial Definition</a></h2><div class="b_caption"><p>Definition and meaning of industrial.</p></div></li>
+              <li class="b_algo"><h2><a href="https://www.cgaa.org/article/what-does-industrial-mean-in-business">What does industrial mean in business?</a></h2><div class="b_caption"><p>A general explanation of the word industrial.</p></div></li>
+            </ol>
+          `)
+        }
+        return htmlResponse(`
+          <ol id="b_results">
+            <li class="b_algo"><h2><a href="https://buyer.example/procurement/automation-rfq">Industrial automation procurement RFQ</a></h2><div class="b_caption"><p>Buyer is sourcing automation suppliers and requests quotations for a new production line.</p></div></li>
+          </ol>
+        `)
+      }
+      throw new Error(`unexpected request: ${url}`)
+    },
+  })
+
+  assert.deepEqual(discovery.results.map((item) => item.url), [
+    'https://buyer.example/procurement/automation-rfq',
+  ])
+  assert.equal(bingRequests.length, 2)
+  const refinedQuery = new URL(bingRequests[1]).searchParams.get('q') || ''
+  assert.match(refinedQuery, /procurement|rfq|tender|sourcing|buyer|supplier/i)
+  assert.match(refinedQuery, /-dictionary|-definition|-meaning/i)
 })
