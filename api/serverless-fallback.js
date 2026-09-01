@@ -3,8 +3,14 @@ import { createHash } from 'node:crypto'
 const TASK_PREFIX = 'sf1_'
 const TASK_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const GDELT_ENDPOINT = 'https://api.gdeltproject.org/api/v2/doc/doc'
-const WIKIPEDIA_ENDPOINT = 'https://en.wikipedia.org/w/api.php'
 const SEARCH_TIMEOUT_MS = 8_000
+const ENCYCLOPEDIA_DOMAINS = [
+  'wikipedia.org',
+  'wikidata.org',
+  'britannica.com',
+  'baike.baidu.com',
+  'baike.com',
+]
 const SUPPORTED_PLATFORMS = new Set([
   'Website',
   'Reddit',
@@ -117,9 +123,9 @@ function buildStrategy(task) {
     languages: ['English'],
     targetType: 'buyer',
     salesIntent: 'customer',
-    searchDirections: ['public web evidence'],
+    searchDirections: ['crawler public web evidence'],
     reason:
-      'No-secret fallback searches public web evidence. Commercial intent must be verified before outreach.',
+      'Crawler gateway searches public web evidence. Commercial intent must be verified before outreach.',
   }
 }
 
@@ -131,14 +137,14 @@ function buildPreparation(task, requestedContext) {
       ? requestedContext
       : { product: task.k, region: task.r[0] }
   const productContext = {
-    version: 'serverless-fallback-v1',
+    version: 'serverless-crawler-v2',
     capturedAt,
     source: requestedContext ? 'request' : 'inferred',
     productProfile: null,
     context,
   }
   const searchIntent = {
-    version: 'serverless-fallback-v1',
+    version: 'serverless-crawler-v2',
     capturedAt,
     salesIntent: strategy.salesIntent,
     targetType: strategy.targetType,
@@ -192,6 +198,17 @@ function parseSeenDate(value) {
   return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null
 }
 
+function isEncyclopediaUrl(value) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase().replace(/^www\./, '')
+    return ENCYCLOPEDIA_DOMAINS.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    )
+  } catch {
+    return true
+  }
+}
+
 function safeDomain(value, url) {
   if (typeof value === 'string' && value.trim()) return value.trim().toLowerCase()
   try {
@@ -224,14 +241,11 @@ function buildLead(article, index, task) {
     id,
     username: domain,
     displayName: title.slice(0, 180),
-    avatarUrl:
-      typeof article.socialimage === 'string' && /^https?:\/\//i.test(article.socialimage)
-        ? article.socialimage
-        : null,
+    avatarUrl: null,
     initials: domain.replace(/^www\./, '').slice(0, 2).toUpperCase() || 'WE',
     platform: 'Website',
     customerType: 'Company',
-    postContent: title,
+    postContent: String(article.summary ?? article.snippet ?? title).slice(0, 1_500),
     postedAt: publishedAt,
     country: sourceCountry || 'Unknown',
     region: inferRegion(task, sourceCountry),
@@ -245,7 +259,8 @@ function buildLead(article, index, task) {
     recommendedAction: 'monitor',
     updatedAt: new Date().toISOString(),
     sourceMetadata: {
-      provider: article.provider ?? 'gdelt-doc',
+      provider: 'crawler-gateway',
+      discoveryProvider: article.provider ?? 'gdelt-doc',
       leadType: 'content',
       evidenceKind: 'public-web-article',
       sourceCountry: sourceCountry || null,
@@ -261,7 +276,7 @@ function buildLead(article, index, task) {
       intentScore: neutralScore,
       tags,
       suggestion: '先核验来源中涉及的商业主体、角色和实际需求，再决定是否联系。',
-      background: `该结果来自公开网页证据（${domain}），未使用私有数据库或付费搜索密钥。`,
+      background: `该结果来自爬虫网关公开网页候选（${domain}）。`,
       need: '公开来源与搜索关键词相关，但不能单凭该来源确认采购需求。',
       purchaseProbability: 'low',
       salesStrategy: '先完成实体与需求核验，再进行任何销售触达。',
@@ -304,84 +319,39 @@ async function searchGdelt(task) {
   const payload = await fetchJson(url)
   const articles = Array.isArray(payload?.articles) ? payload.articles : []
   return articles
-    .filter((article) => article && typeof article.url === 'string' && article.url && typeof article.title === 'string' && article.title.trim())
+    .filter(
+      (article) =>
+        article &&
+        typeof article.url === 'string' &&
+        article.url &&
+        typeof article.title === 'string' &&
+        article.title.trim() &&
+        !isEncyclopediaUrl(article.url),
+    )
     .slice(0, task.m)
     .map((article) => ({ ...article, provider: 'gdelt-doc' }))
-}
-
-function stripHtml(value) {
-  return String(value ?? '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-async function searchWikipedia(task) {
-  const url = new URL(WIKIPEDIA_ENDPOINT)
-  url.searchParams.set('action', 'query')
-  url.searchParams.set('list', 'search')
-  url.searchParams.set('srsearch', task.k)
-  url.searchParams.set('utf8', '1')
-  url.searchParams.set('format', 'json')
-  url.searchParams.set('origin', '*')
-  url.searchParams.set('srlimit', String(Math.min(task.m, 20)))
-  const payload = await fetchJson(url)
-  const results = Array.isArray(payload?.query?.search) ? payload.query.search : []
-  return results.slice(0, task.m).map((item) => ({
-    provider: 'wikipedia-search',
-    url: `https://en.wikipedia.org/?curid=${encodeURIComponent(String(item.pageid ?? ''))}`,
-    title: stripHtml(item.title),
-    domain: 'en.wikipedia.org',
-    seendate: item.timestamp ?? null,
-    sourcecountry: 'Unknown',
-    language: 'English',
-    snippet: stripHtml(item.snippet),
-  }))
-}
-
-async function searchPublicWeb(task) {
-  let gdeltError = null
-  try {
-    const articles = await searchGdelt(task)
-    if (articles.length > 0) return articles
-  } catch (error) {
-    gdeltError = error
-  }
-
-  try {
-    const articles = await searchWikipedia(task)
-    if (articles.length > 0) return articles
-  } catch (error) {
-    if (!gdeltError) gdeltError = error
-  }
-
-  if (gdeltError) throw gdeltError
-  return []
 }
 
 async function providerHealth() {
   const checkedAt = new Date().toISOString()
   const probe = { v: 1, k: 'business', p: ['Website'], r: [], m: 1, t: Date.now() }
   try {
-    await searchPublicWeb(probe)
+    await searchGdelt(probe)
     return {
-      provider: 'public-web-evidence',
-      dependency: 'gdelt-or-wikipedia',
+      provider: 'crawler-gateway',
+      dependency: 'public-index+crawler',
       state: 'AVAILABLE',
       code: 'OK',
-      message: 'Public web evidence search is reachable without a static API key.',
+      message: 'Crawler gateway public discovery is reachable without Railway.',
       checkedAt,
     }
   } catch (error) {
     return {
-      provider: 'public-web-evidence',
-      dependency: 'gdelt-or-wikipedia',
+      provider: 'crawler-gateway',
+      dependency: 'public-index+crawler',
       state: 'UNAVAILABLE',
-      code: 'PUBLIC_WEB_UNAVAILABLE',
-      message: `Public web evidence search is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      code: 'CRAWLER_GATEWAY_UNAVAILABLE',
+      message: `Crawler gateway is unavailable: ${error instanceof Error ? error.message : String(error)}`,
       checkedAt,
     }
   }
@@ -391,7 +361,7 @@ function runtimeCapabilities() {
   return {
     marketResearch: {
       enabled: true,
-      provider: 'public-web-evidence',
+      provider: 'crawler-gateway',
       model: null,
     },
     salesAI: {
@@ -414,9 +384,9 @@ function runtimeCapabilities() {
       verification: null,
     },
     agentRuntime: {
-      provider: 'none',
-      enabled: false,
-      transport: 'in-process',
+      provider: 'crawler-gateway',
+      enabled: true,
+      transport: 'serverless',
     },
     publicContactDiscovery: {
       enabled: false,
@@ -425,7 +395,7 @@ function runtimeCapabilities() {
     },
     salesDiscovery: {
       enabled: true,
-      provider: 'public-web-evidence',
+      provider: 'crawler-gateway',
       model: null,
     },
   }
@@ -505,15 +475,15 @@ export async function handleServerlessFallback(request, response, path) {
       return true
     }
     try {
-      const articles = await searchPublicWeb(task)
+      const articles = await searchGdelt(task)
       const results = articles.map((article, index) => buildLead(article, index, task))
       sendJson(response, 200, { data: results, meta: { total: results.length } })
     } catch (error) {
       sendJson(response, 503, {
         error: {
           code: 'SEARCH_PROVIDER_UNAVAILABLE',
-          message: error instanceof Error ? error.message : 'Public web evidence search failed.',
-          provider: 'public-web-evidence',
+          message: error instanceof Error ? error.message : 'Crawler gateway search failed.',
+          provider: 'crawler-gateway',
           providerState: 'UNAVAILABLE',
           retryable: true,
         },
