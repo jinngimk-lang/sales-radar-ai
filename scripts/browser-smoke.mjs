@@ -59,6 +59,14 @@ async function clickTextLink(page, label, expectedPath) {
   )
 }
 
+async function waitForBodyIncludes(page, expectedText) {
+  await page.waitForFunction(
+    (text) => document.body.innerText.includes(text),
+    { timeout: 8_000 },
+    expectedText,
+  )
+}
+
 async function bodyText(page) {
   return page.evaluate(() => document.body.innerText)
 }
@@ -127,26 +135,16 @@ async function main() {
     })
     if (!saveClicked) throw new Error('Save Target button could not be clicked')
 
-    await page.waitForFunction(
-      (name) => document.body.innerText.includes(name),
-      { timeout: 8_000 },
-      TARGET_NAME,
-    )
+    await waitForBodyIncludes(page, TARGET_NAME)
     await page.reload({ waitUntil: 'networkidle0' })
-    await page.waitForFunction(
-      (name) => document.body.innerText.includes(name),
-      { timeout: 8_000 },
-      TARGET_NAME,
-    )
+    await waitForBodyIncludes(page, TARGET_NAME)
 
     await clickTextLink(page, '去市场雷达', '/app/market')
     if (!new URL(page.url()).searchParams.get('targetId')) {
       throw new Error('targetId was not carried into Market Radar')
     }
+    await waitForBodyIncludes(page, '市场雷达')
     text = await bodyText(page)
-    if (!text.includes('市场雷达')) {
-      throw new Error('Market Radar did not render after target click')
-    }
     for (const forbidden of [
       'Browserbase',
       'REVENUE_OPERATOR_TOKEN',
@@ -159,23 +157,19 @@ async function main() {
     }
 
     await clickTextLink(page, '搜索', '/app/discover')
-    text = await bodyText(page)
-    if (!text.includes('搜索')) {
-      throw new Error('Discover page did not render after navigation click')
-    }
+    await waitForBodyIncludes(page, '搜索')
 
     await clickTextLink(page, '推荐', '/app/market')
+    await waitForBodyIncludes(page, '市场雷达')
     await clickTextLink(page, '目标', '/app/targets')
+    await waitForBodyIncludes(page, '新建商业目标')
 
     await page.goto(`${BASE_URL}/app/revenue`, { waitUntil: 'networkidle0' })
     await page.waitForFunction(
       () => window.location.pathname === '/app/market',
       { timeout: 8_000 },
     )
-    text = await bodyText(page)
-    if (!text.includes('市场雷达')) {
-      throw new Error('legacy Revenue route did not land on Market Radar')
-    }
+    await waitForBodyIncludes(page, '市场雷达')
 
     if (pageErrors.length > 0) {
       throw new Error(`uncaught browser errors: ${pageErrors.join(' | ')}`)
