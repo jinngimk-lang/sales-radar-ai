@@ -1,6 +1,11 @@
 import type { Industry, Platform, Region } from '@prisma/client'
 
-export type SearchProviderName = 'mock' | 'agent-reach' | 'browser'
+/**
+ * `agent-reach` is retained only as a legacy metadata value so historical
+ * tasks remain readable. SearchProviderFactory resolves every non-mock task
+ * through the crawler provider.
+ */
+export type SearchProviderName = 'mock' | 'crawler' | 'agent-reach'
 
 export interface SearchProviderInput {
   keyword: string
