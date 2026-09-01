@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import {
-  crawlerGatewayConfig,
+  crawlerSearchRuntime,
   enrichCrawlerResults,
   searchCrawlerGateway,
 } from './crawler-gateway-client.js'
@@ -207,8 +207,8 @@ function buildLead(result, index, task) {
       tags,
       suggestion: '先核验公开页面中的主体、角色和真实需求，再决定是否进入联系人研究。',
       background: enriched
-        ? `Crawler/MCP 已获取网页正文（${domain}）。`
-        : `Crawler/MCP 发现候选页（${domain}），但正文尚未成功获取。`,
+        ? `Crawler 已获取网页正文（${domain}）。`
+        : `Crawler 发现候选页（${domain}），但正文尚未成功获取。`,
       need: evidence || '发现与当前搜索关键词相关的公开网页内容。',
       purchaseProbability: intent >= 4 ? 'medium' : 'low',
       salesStrategy: '保留普通公开网页，只排除百科类来源；商业意图作为排序而不是隐藏条件。',
@@ -225,23 +225,39 @@ function buildLead(result, index, task) {
 
 function providerHealth(env) {
   const checkedAt = new Date().toISOString()
-  const config = crawlerGatewayConfig(env)
-  if (!config) {
+  const runtime = crawlerSearchRuntime(env)
+
+  if (!runtime.available) {
     return {
       provider: 'crawler-gateway',
-      dependency: 'crawler-mcp-gateway',
+      dependency: 'crawler-search-runtime',
+      mode: runtime.mode,
       state: 'UNAVAILABLE',
-      code: 'CRAWLER_GATEWAY_NOT_CONFIGURED',
-      message: 'Crawler/MCP search gateway is not configured.',
+      code: 'CRAWLER_SEARCH_DISABLED',
+      message: 'Crawler search runtime is disabled.',
       checkedAt,
     }
   }
+
+  if (runtime.mode === 'embedded') {
+    return {
+      provider: 'embedded-html-crawler',
+      dependency: 'public-search-html',
+      mode: 'embedded',
+      state: 'AVAILABLE',
+      code: 'OK',
+      message: 'Embedded public-web crawler is active.',
+      checkedAt,
+    }
+  }
+
   return {
     provider: 'crawler-gateway',
     dependency: 'crawler-mcp-gateway',
+    mode: 'external',
     state: 'AVAILABLE',
     code: 'OK',
-    message: 'Crawler/MCP search gateway is configured.',
+    message: 'External crawler/MCP search gateway is configured.',
     checkedAt,
   }
 }

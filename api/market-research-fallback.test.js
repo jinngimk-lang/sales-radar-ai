@@ -50,21 +50,13 @@ test('Market Radar crawler MCP search keeps useful ordinary pages and removes en
   const handled = await handleMarketResearchFallback(
     {
       method: 'POST',
-      body: {
-        product: '电池',
-        goal: 'FIND_BUYERS',
-        signalFocus: 'ALL',
-        region: 'SoutheastAsia',
-      },
+      body: { product: '电池', goal: 'FIND_BUYERS', signalFocus: 'ALL', region: 'SoutheastAsia' },
       query: {},
     },
     response,
     'market-signals/scan',
     {
-      env: {
-        CRAWLER_GATEWAY_URL: 'https://crawler.example',
-        EXA_API_KEY: 'must-not-be-used',
-      },
+      env: { CRAWLER_GATEWAY_URL: 'https://crawler.example', EXA_API_KEY: 'must-not-be-used' },
       fetcher: async (input, init = {}) => {
         const url = String(input)
         requests.push(url)
@@ -76,31 +68,11 @@ test('Market Radar crawler MCP search keeps useful ordinary pages and removes en
         assert.deepEqual(body.regions, ['SoutheastAsia'])
         return jsonResponse({
           results: [
-            {
-              url: 'https://en.wikipedia.org/wiki/Battery',
-              title: 'Battery - Wikipedia',
-              content: 'Encyclopedia entry.',
-            },
-            {
-              url: 'https://battery.example.com/',
-              title: 'Example Battery Company',
-              content: 'Official company homepage and product catalog.',
-            },
-            {
-              url: 'https://research.example.net/battery-market-report',
-              title: 'Battery market report',
-              content: 'Market overview describing demand and capacity changes.',
-            },
-            {
-              url: 'https://forum.example.net/battery-sourcing',
-              title: 'Battery sourcing discussion',
-              content: 'Industry forum discussion about buyers and suppliers.',
-            },
-            {
-              url: 'https://buyer.example.com/procurement/battery-storage',
-              title: 'Battery storage procurement RFQ',
-              content: 'Procurement team seeks suppliers and quotations for a 2026 project.',
-            },
+            { url: 'https://en.wikipedia.org/wiki/Battery', title: 'Battery - Wikipedia', content: 'Encyclopedia entry.' },
+            { url: 'https://battery.example.com/', title: 'Example Battery Company', content: 'Official company homepage and product catalog.' },
+            { url: 'https://research.example.net/battery-market-report', title: 'Battery market report', content: 'Market overview describing demand and capacity changes.' },
+            { url: 'https://forum.example.net/battery-sourcing', title: 'Battery sourcing discussion', content: 'Industry forum discussion about buyers and suppliers.' },
+            { url: 'https://buyer.example.com/procurement/battery-storage', title: 'Battery storage procurement RFQ', content: 'Procurement team seeks suppliers and quotations for a 2026 project.' },
           ],
         })
       },
@@ -127,51 +99,30 @@ test('Market Radar deep-crawls search results when the MCP search response lacks
   const handled = await handleMarketResearchFallback(
     {
       method: 'POST',
-      body: {
-        product: 'industrial robot',
-        goal: 'FIND_BUYERS',
-        signalFocus: 'FACTORY_EXPANSION',
-      },
+      body: { product: 'industrial robot', goal: 'FIND_BUYERS', signalFocus: 'FACTORY_EXPANSION' },
       query: {},
     },
     response,
     'market-signals/scan',
     {
-      env: {
-        CRAWLER_GATEWAY_URL: 'https://crawler.example',
-        CRAWL4AI_BASE_URL: 'https://crawler.example',
-      },
+      env: { CRAWLER_GATEWAY_URL: 'https://crawler.example', CRAWL4AI_BASE_URL: 'https://crawler.example' },
       fetcher: async (input, init = {}) => {
         const url = String(input)
         requests.push(url)
         if (url === 'https://crawler.example/search') {
-          return jsonResponse({
-            results: [
-              {
-                url: 'https://factory.example.com/news/automation-project',
-                title: 'Factory automation project',
-              },
-            ],
-          })
+          return jsonResponse({ results: [{ url: 'https://factory.example.com/news/automation-project', title: 'Factory automation project' }] })
         }
         if (url === 'https://crawler.example/crawl') {
-          assert.deepEqual(JSON.parse(String(init.body)), {
-            urls: ['https://factory.example.com/news/automation-project'],
-          })
+          assert.deepEqual(JSON.parse(String(init.body)), { urls: ['https://factory.example.com/news/automation-project'] })
           return jsonResponse({
             success: true,
-            results: [
-              {
-                success: true,
-                url: 'https://factory.example.com/news/automation-project',
-                markdown: {
-                  fit_markdown:
-                    'The factory is expanding two production lines and evaluating industrial robot suppliers this quarter.',
-                },
-                metadata: { title: 'Factory automation project' },
-                status_code: 200,
-              },
-            ],
+            results: [{
+              success: true,
+              url: 'https://factory.example.com/news/automation-project',
+              markdown: { fit_markdown: 'The factory is expanding two production lines and evaluating industrial robot suppliers this quarter.' },
+              metadata: { title: 'Factory automation project' },
+              status_code: 200,
+            }],
           })
         }
         throw new Error(`unexpected request ${url}`)
@@ -184,13 +135,10 @@ test('Market Radar deep-crawls search results when the MCP search response lacks
   assert.equal(response.body.data.status, 'completed')
   assert.equal(response.body.data.sources.length, 1)
   assert.match(response.body.data.sources[0].summary, /expanding two production lines/i)
-  assert.deepEqual(requests, [
-    'https://crawler.example/search',
-    'https://crawler.example/crawl',
-  ])
+  assert.deepEqual(requests, ['https://crawler.example/search', 'https://crawler.example/crawl'])
 })
 
-test('Market Radar returns truthful no-results when crawler MCP is not configured', async () => {
+test('Market Radar returns truthful no-results when every crawler runtime is explicitly disabled', async () => {
   const response = createResponse()
   let fetchObserved = false
 
@@ -203,7 +151,7 @@ test('Market Radar returns truthful no-results when crawler MCP is not configure
     response,
     'market-signals/scan',
     {
-      env: {},
+      env: { EMBEDDED_CRAWLER_DISABLED: 'true' },
       fetcher: async () => {
         fetchObserved = true
         throw new Error('network must not be called')
