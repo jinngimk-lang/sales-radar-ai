@@ -43,7 +43,7 @@ test('Market Radar GET /market-signals is safe in stateless mode', async () => {
   assert.deepEqual(response.body, { data: [], meta: { total: 0 } })
 })
 
-test('Market Radar crawler gateway keeps ordinary pages and removes only encyclopedia sources', async () => {
+test('Market Radar crawler MCP search keeps useful ordinary pages and removes encyclopedia sources', async () => {
   const response = createResponse()
   const requests = []
 
@@ -61,49 +61,48 @@ test('Market Radar crawler gateway keeps ordinary pages and removes only encyclo
     response,
     'market-signals/scan',
     {
-      env: { EXA_API_KEY: 'must-not-be-used' },
-      fetcher: async (input) => {
+      env: {
+        CRAWLER_GATEWAY_URL: 'https://crawler.example',
+        EXA_API_KEY: 'must-not-be-used',
+      },
+      fetcher: async (input, init = {}) => {
         const url = String(input)
         requests.push(url)
-        assert.ok(!url.includes('api.exa.ai'))
-        if (url.startsWith('https://api.gdeltproject.org/')) {
-          const parsed = new URL(url)
-          assert.match(parsed.searchParams.get('query') ?? '', /电池/)
-          assert.match(
-            parsed.searchParams.get('query') ?? '',
-            /buyer|procurement|purchasing|sourcing|rfq|tender/i,
-          )
-          return jsonResponse({
-            articles: [
-              {
-                url: 'https://en.wikipedia.org/wiki/Battery',
-                title: 'Battery - Wikipedia',
-                summary: 'Encyclopedia entry.',
-              },
-              {
-                url: 'https://battery.example.com/',
-                title: 'Example Battery Company',
-                summary: 'Official company homepage and product catalog.',
-              },
-              {
-                url: 'https://research.example.net/battery-market-report',
-                title: 'Battery market report',
-                summary: 'Market overview and demand report.',
-              },
-              {
-                url: 'https://forum.example.net/battery-sourcing',
-                title: 'Battery sourcing discussion',
-                summary: 'Industry forum discussion about buyers and suppliers.',
-              },
-              {
-                url: 'https://buyer.example.com/procurement/battery-storage',
-                title: 'Battery storage procurement RFQ',
-                summary: 'Procurement team seeks suppliers and quotations for a 2026 project.',
-              },
-            ],
-          })
-        }
-        throw new Error(`unexpected request ${url}`)
+        assert.equal(url, 'https://crawler.example/search')
+        assert.equal(init.method, 'POST')
+        const body = JSON.parse(String(init.body))
+        assert.match(body.keyword, /电池/)
+        assert.deepEqual(body.platforms, ['Website'])
+        assert.deepEqual(body.regions, ['SoutheastAsia'])
+        return jsonResponse({
+          results: [
+            {
+              url: 'https://en.wikipedia.org/wiki/Battery',
+              title: 'Battery - Wikipedia',
+              content: 'Encyclopedia entry.',
+            },
+            {
+              url: 'https://battery.example.com/',
+              title: 'Example Battery Company',
+              content: 'Official company homepage and product catalog.',
+            },
+            {
+              url: 'https://research.example.net/battery-market-report',
+              title: 'Battery market report',
+              content: 'Market overview describing demand and capacity changes.',
+            },
+            {
+              url: 'https://forum.example.net/battery-sourcing',
+              title: 'Battery sourcing discussion',
+              content: 'Industry forum discussion about buyers and suppliers.',
+            },
+            {
+              url: 'https://buyer.example.com/procurement/battery-storage',
+              title: 'Battery storage procurement RFQ',
+              content: 'Procurement team seeks suppliers and quotations for a 2026 project.',
+            },
+          ],
+        })
       },
     },
   )
@@ -118,10 +117,10 @@ test('Market Radar crawler gateway keeps ordinary pages and removes only encyclo
   assert.ok(urls.includes('https://research.example.net/battery-market-report'))
   assert.ok(urls.includes('https://forum.example.net/battery-sourcing'))
   assert.ok(urls.includes('https://buyer.example.com/procurement/battery-storage'))
-  assert.ok(requests.some((url) => url.includes('api.gdeltproject.org')))
+  assert.deepEqual(requests, ['https://crawler.example/search'])
 })
 
-test('Market Radar scan enriches public results through Crawl4AI when configured', async () => {
+test('Market Radar deep-crawls search results when the MCP search response lacks content', async () => {
   const response = createResponse()
   const requests = []
 
@@ -139,19 +138,18 @@ test('Market Radar scan enriches public results through Crawl4AI when configured
     'market-signals/scan',
     {
       env: {
+        CRAWLER_GATEWAY_URL: 'https://crawler.example',
         CRAWL4AI_BASE_URL: 'https://crawler.example',
-        CRAWL4AI_MAX_RESULTS: '3',
       },
       fetcher: async (input, init = {}) => {
         const url = String(input)
         requests.push(url)
-        if (url.startsWith('https://api.gdeltproject.org/')) {
+        if (url === 'https://crawler.example/search') {
           return jsonResponse({
-            articles: [
+            results: [
               {
                 url: 'https://factory.example.com/news/automation-project',
                 title: 'Factory automation project',
-                summary: 'The company announced an automation project.',
               },
             ],
           })
@@ -183,16 +181,18 @@ test('Market Radar scan enriches public results through Crawl4AI when configured
 
   assert.equal(handled, true)
   assert.equal(response.statusCode, 201)
-  assert.equal(response.body.data.provider, 'crawler-gateway')
   assert.equal(response.body.data.status, 'completed')
   assert.equal(response.body.data.sources.length, 1)
   assert.match(response.body.data.sources[0].summary, /expanding two production lines/i)
-  assert.ok(requests.includes('https://crawler.example/crawl'))
+  assert.deepEqual(requests, [
+    'https://crawler.example/search',
+    'https://crawler.example/crawl',
+  ])
 })
 
-test('Market Radar scan returns truthful no-results without encyclopedia fallback', async () => {
+test('Market Radar returns truthful no-results when crawler MCP is not configured', async () => {
   const response = createResponse()
-  const requests = []
+  let fetchObserved = false
 
   const handled = await handleMarketResearchFallback(
     {
@@ -204,12 +204,9 @@ test('Market Radar scan returns truthful no-results without encyclopedia fallbac
     'market-signals/scan',
     {
       env: {},
-      fetcher: async (input) => {
-        requests.push(String(input))
-        if (String(input).startsWith('https://api.gdeltproject.org/')) {
-          return jsonResponse({ articles: [] })
-        }
-        throw new Error(`reference fallback must not be called: ${String(input)}`)
+      fetcher: async () => {
+        fetchObserved = true
+        throw new Error('network must not be called')
       },
     },
   )
@@ -218,6 +215,6 @@ test('Market Radar scan returns truthful no-results without encyclopedia fallbac
   assert.equal(response.statusCode, 201)
   assert.equal(response.body.data.status, 'no_results')
   assert.deepEqual(response.body.data.sources, [])
-  assert.match(response.body.data.summary, /没有找到可复核的公开来源/)
-  assert.ok(requests.every((url) => !/wikipedia\.org|britannica\.com|baike\.baidu\.com/i.test(url)))
+  assert.match(response.body.data.summary, /Crawler\/MCP 检索没有返回/)
+  assert.equal(fetchObserved, false)
 })
