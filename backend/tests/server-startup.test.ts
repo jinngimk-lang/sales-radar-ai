@@ -2,81 +2,50 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import type { Server } from 'node:http'
 import { describe, it } from 'node:test'
-import { join } from 'node:path'
 import { app } from '../src/app.js'
 import { ProviderHealthService } from '../src/services/provider-health.service.js'
 import {
-  logAgentReachRuntimeDiagnostics,
+  logCrawlerRuntimeDiagnostics,
   startBackendServer,
   type ServerLifecycleLogger,
 } from '../src/server-lifecycle.js'
 
 describe('backend startup lifecycle', () => {
-  it('listens and serves health without legacy EXA_API_KEY', async () => {
+  it('listens and serves health without a configured crawler gateway', async () => {
     await withBackend(
-      (logger) =>
-        logAgentReachRuntimeDiagnostics(logger, {
-          PATH: process.env.PATH,
-          MCPORTER_CONFIG: join(
-            process.cwd(),
-            'config',
-            'mcporter.json',
-          ),
-        }),
+      (logger) => logCrawlerRuntimeDiagnostics(logger, {}),
       async (baseUrl, events) => {
         await assertHealthy(baseUrl)
         await waitForPostListenDiagnostics()
-        assert.ok(
-          events.includes(
-            'log:[runtime] exa-mcp.credential.configured=false',
-          ),
-        )
+        assert.ok(events.includes('log:[runtime] search.active-provider=crawler'))
+        assert.ok(events.includes('log:[runtime] crawler.gateway.configured=false'))
+        assert.ok(events.includes('log:[runtime] crawler.direct-http-fallback=true'))
       },
     )
   })
 
-  it('keeps health available with an invalid legacy EXA_API_KEY', async () => {
-    const invalidCredential = 'invalid-test-only-credential'
+  it('reports configured crawler capabilities without logging credentials or endpoints', async () => {
+    const secretToken = 'crawler-secret-token'
+    const gatewayUrl = 'https://crawler.private.example'
     await withBackend(
       (logger) =>
-        logAgentReachRuntimeDiagnostics(logger, {
-          PATH: process.env.PATH,
-          MCPORTER_CONFIG: join(
-            process.cwd(),
-            'config',
-            'mcporter.json',
-          ),
-          EXA_API_KEY: invalidCredential,
+        logCrawlerRuntimeDiagnostics(logger, {
+          CRAWLER_GATEWAY_URL: gatewayUrl,
+          CRAWLER_GATEWAY_TOKEN: secretToken,
+          CRAWL4AI_BASE_URL: 'https://crawl4ai.private.example',
+          CRAWL4AI_API_TOKEN: 'crawl4ai-secret-token',
         }),
       async (baseUrl, events) => {
         await assertHealthy(baseUrl)
         await waitForPostListenDiagnostics()
-        assert.ok(
-          events.includes(
-            'log:[runtime] exa-mcp.credential.configured=true',
-          ),
-        )
-        assert.equal(events.join('\n').includes(invalidCredential), false)
-      },
-    )
-  })
-
-  it('keeps health available when legacy mcporter diagnostics are unavailable', async () => {
-    await withBackend(
-      (logger) =>
-        logAgentReachRuntimeDiagnostics(logger, {
-          PATH: '',
-          AGENT_REACH_MCPORTER_PATH: 'missing-mcporter-runtime',
-          MCPORTER_CONFIG: join(
-            process.cwd(),
-            'config',
-            'mcporter.json',
-          ),
-        }),
-      async (baseUrl, events) => {
-        await assertHealthy(baseUrl)
-        await waitForPostListenDiagnostics()
-        assert.ok(events.includes('log:[runtime] mcporter.exists=false'))
+        assert.ok(events.includes('log:[runtime] crawler.gateway.configured=true'))
+        assert.ok(events.includes('log:[runtime] crawler.gateway.token.configured=true'))
+        assert.ok(events.includes('log:[runtime] crawl4ai.configured=true'))
+        assert.ok(events.includes('log:[runtime] crawl4ai.token.configured=true'))
+        const joined = events.join('\n')
+        assert.equal(joined.includes(secretToken), false)
+        assert.equal(joined.includes(gatewayUrl), false)
+        assert.equal(joined.includes('crawl4ai-secret-token'), false)
       },
     )
   })
