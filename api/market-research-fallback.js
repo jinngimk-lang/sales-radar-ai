@@ -1,6 +1,5 @@
 import { isIP } from 'node:net'
 
-const EXA_SEARCH_ENDPOINT = 'https://api.exa.ai/search'
 const GDELT_ENDPOINT = 'https://api.gdeltproject.org/api/v2/doc/doc'
 const DEFAULT_TIMEOUT_MS = 8_000
 const DEFAULT_CRAWL_TIMEOUT_MS = 5_000
@@ -53,18 +52,16 @@ const FOCUS_TERMS = {
   INDUSTRY_TREND: 'buyer demand supplier capacity procurement sourcing distribution',
 }
 
-const LOW_VALUE_DOMAINS = [
+const ENCYCLOPEDIA_DOMAINS = [
   'wikipedia.org',
-  'wikimedia.org',
+  'wikidata.org',
   'britannica.com',
   'baike.baidu.com',
-  'zhihu.com',
+  'baike.com',
 ]
 
 const STRONG_COMMERCIAL_PATTERN = /\b(?:buyer|buying|procurement|purchasing|sourcing|rfq|rfp|tender|bid|quotation|quote|seeking|wanted|demand|importer|distributor|wholesaler|reseller|dealer|supplier|vendor|manufacturer|factory|exporter|supply partner|channel partner|customer project)\b|采购|求购|询价|招标|买家|买方|采购商|供应商|厂家|制造商|经销商|代理商|进口商|批发商|渠道商|寻源|采购需求|供应需求/iu
 const TRANSACTION_PATH_PATTERN = /\/(?:procurement|purchasing|sourcing|rfq|rfp|tender|bid|supplier|vendor|distributor|dealer|partner|opportunit|marketplace|buy|sell)(?:\/|[-_?#]|$)/iu
-const GENERIC_REFERENCE_PATTERN = /\b(?:wikipedia|encyclopedia|definition|overview|what is|history of|market report|industry report)\b|百科|词条|是什么|行业报告|市场报告/iu
-const GENERIC_HOME_PATTERN = /\b(?:home|homepage|about us|company profile|welcome to|official site|official website)\b|官网|官方网站|公司简介|关于我们/iu
 
 function sendJson(response, status, payload) {
   response.setHeader('Cache-Control', 'no-store')
@@ -177,6 +174,8 @@ function safeUrl(value) {
 
 function compact(value, maxLength = 2_000) {
   return String(value ?? '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
@@ -188,12 +187,11 @@ function compact(value, maxLength = 2_000) {
 
 function sourceType(url, title) {
   const value = `${url} ${title}`.toLowerCase()
-  if (/rfq|rfp|tender|procurement|purchasing|sourcing|bid/.test(value)) return 'procurement'
-  if (/supplier|vendor|manufacturer|factory|distributor|dealer|importer/.test(value)) return 'supplier'
   if (/career|jobs?|hiring|recruit/.test(value)) return 'jobs'
   if (/invest|funding|financ|acquisition|capital|venture/.test(value)) return 'investment'
-  if (/news|press|announcement|article|media/.test(value)) return 'news'
-  return 'commercial'
+  if (/news|press|announcement|article|media|rfq|rfp|tender|procurement|purchasing|sourcing|bid/.test(value)) return 'news'
+  if (/policy|regulation|government|industry|market|report|research/.test(value)) return 'industry'
+  return 'company'
 }
 
 function resultText(result) {
@@ -210,10 +208,10 @@ function resultText(result) {
   return compact(result?.title)
 }
 
-function isLowValueDomain(url) {
+function isEncyclopediaUrl(value) {
   try {
-    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '')
-    return LOW_VALUE_DOMAINS.some(
+    const hostname = new URL(value).hostname.toLowerCase().replace(/^www\./, '')
+    return ENCYCLOPEDIA_DOMAINS.some(
       (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
     )
   } catch {
@@ -223,28 +221,19 @@ function isLowValueDomain(url) {
 
 function commercialScore(result) {
   const url = safeUrl(result?.url)
-  if (!url || isLowValueDomain(url)) return -100
+  if (!url || isEncyclopediaUrl(url)) return -100
   const title = compact(result?.title, 500)
   const evidence = resultText(result)
   const combined = `${title} ${evidence} ${url}`
   let score = 0
   if (STRONG_COMMERCIAL_PATTERN.test(combined)) score += 4
   if (TRANSACTION_PATH_PATTERN.test(url)) score += 3
-  if (GENERIC_REFERENCE_PATTERN.test(combined)) score -= 4
-  try {
-    const parsed = new URL(url)
-    const homePage = parsed.pathname === '/' || parsed.pathname === ''
-    if (homePage && GENERIC_HOME_PATTERN.test(combined)) score -= 3
-    if (homePage && !STRONG_COMMERCIAL_PATTERN.test(combined)) score -= 2
-  } catch {
-    score -= 4
-  }
   return score
 }
 
 function makeSource(result, index, accessedAt) {
   const normalizedUrl = safeUrl(result?.url)
-  if (!normalizedUrl) return null
+  if (!normalizedUrl || isEncyclopediaUrl(normalizedUrl)) return null
   const normalizedTitle = compact(result?.title, 300) || normalizedUrl
   const normalizedSummary = resultText(result) || normalizedTitle
   return {
@@ -346,7 +335,7 @@ function markdownText(value) {
 
 async function crawlResult(result, config, fetcher) {
   const url = safeUrl(result?.url)
-  if (!url || !isAllowedCrawlTarget(url)) return result
+  if (!url || !isAllowedCrawlTarget(url) || isEncyclopediaUrl(url)) return result
   try {
     const payload = await fetchJson(
       fetcher,
@@ -372,7 +361,7 @@ async function crawlResult(result, config, fetcher) {
       ...result,
       url: stringValue(first.url) || url,
       title: readText(metadata, ['title']) || result.title,
-      crawlContent: content.trim().slice(0, 20_000),
+      crawlContent: compact(content, 20_000),
     }
   } catch {
     return result
@@ -389,48 +378,24 @@ async function enrichResults(results, env, fetcher) {
   )
 }
 
-function selectCommercialSources(results, accessedAt) {
+function selectSources(results, accessedAt) {
   return results
-    .map((result) => ({ result, score: commercialScore(result) }))
-    .filter(({ score }) => score >= 2)
-    .sort((a, b) => b.score - a.score)
+    .filter((result) => {
+      const url = safeUrl(result?.url)
+      return Boolean(url && !isEncyclopediaUrl(url))
+    })
+    .map((result, originalIndex) => ({
+      result,
+      originalIndex,
+      score: commercialScore(result),
+    }))
+    .sort((a, b) => b.score - a.score || a.originalIndex - b.originalIndex)
     .slice(0, MAX_SOURCES)
     .map(({ result }, index) => makeSource(result, index, accessedAt))
     .filter(Boolean)
 }
 
-async function searchExa(target, env, fetcher, accessedAt) {
-  const apiKey = env.EXA_API_KEY?.trim()
-  if (!apiKey) return null
-  const query = buildResearchQuery(target)
-  const payload = await fetchJson(
-    fetcher,
-    EXA_SEARCH_ENDPOINT,
-    {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        query,
-        type: 'fast',
-        numResults: 12,
-        moderation: true,
-        contents: { highlights: true },
-        excludeDomains: LOW_VALUE_DOMAINS,
-      }),
-    },
-    boundedTimeout(env.EXA_SEARCH_TIMEOUT_MS),
-  )
-  const results = Array.isArray(payload?.results) ? payload.results : []
-  const enriched = await enrichResults(results, env, fetcher)
-  const sources = selectCommercialSources(enriched, accessedAt)
-  return { provider: 'exa-web', model: 'exa-search', query, sources }
-}
-
-async function searchPublicWeb(target, env, fetcher, timeoutMs, accessedAt) {
+async function searchCrawlerGateway(target, env, fetcher, timeoutMs, accessedAt) {
   const query = buildResearchQuery(target)
   try {
     const url = new URL(GDELT_ENDPOINT)
@@ -456,30 +421,32 @@ async function searchPublicWeb(target, env, fetcher, timeoutMs, accessedAt) {
       summary: article?.summary || article?.snippet || article?.title,
     }))
     const enriched = await enrichResults(normalized, env, fetcher)
-    const sources = selectCommercialSources(enriched, accessedAt)
+    const sources = selectSources(enriched, accessedAt)
     return {
-      provider: 'public-web',
-      model: sources.length > 0 ? 'gdelt-doc' : 'commercial-search-no-results',
+      provider: 'crawler-gateway',
+      model: crawlerConfig(env) ? 'gdelt-seed+crawl4ai' : 'gdelt-seed',
       query,
       sources,
     }
   } catch (error) {
     console.warn(
-      '[market-research-fallback] public commercial research unavailable:',
+      '[market-research-fallback] crawler gateway unavailable:',
       error instanceof Error ? error.message : String(error),
     )
-    return { provider: 'public-web', model: 'public-search-unavailable', query, sources: [] }
+    return {
+      provider: 'crawler-gateway',
+      model: 'crawler-unavailable',
+      query,
+      sources: [],
+    }
   }
 }
 
 function buildSummary(research) {
   if (research.sources.length === 0) {
-    return '联网检索已完成，但没有找到可验证的买家、卖家、采购、供应或渠道商业信号。系统不会用百科、官网介绍页或模拟数据填充结果。'
+    return '联网检索已完成，但没有找到可复核的公开来源。系统不会用百科或模拟数据填充结果。'
   }
-  if (research.provider === 'exa-web') {
-    return `Exa 发现并筛选出 ${research.sources.length} 个真实公开商业来源；配置 Crawl4AI 时优先抓取页面正文核验。来源相关性仍不等于已确认采购意向。`
-  }
-  return `公开网页检索返回 ${research.sources.length} 个可复核商业来源。结果优先采购、供应、RFQ、招标、分销等信号，不用百科或官网介绍页补数量。`
+  return `爬虫网关返回 ${research.sources.length} 个可复核公开来源。仅排除百科类页面；官网、新闻、报告、论坛、招聘、采购与 B2B 页面都会保留，商业意图只影响排序。`
 }
 
 function buildSession(research, startedAt, completedAt) {
@@ -497,7 +464,7 @@ function buildSession(research, startedAt, completedAt) {
       {
         id: 'trace-1',
         action: 'search',
-        label: `商业信号搜索：${research.query}`,
+        label: `爬虫公开网页搜索：${research.query}`,
         query: research.query,
         url: null,
         status: 'completed',
@@ -532,29 +499,13 @@ export async function handleMarketResearchFallback(
   const fetcher = options.fetcher ?? fetch
   const startedAt = new Date().toISOString()
   const accessedAt = startedAt
-  let research = null
-
-  if (env.EXA_API_KEY?.trim()) {
-    try {
-      research = await searchExa(normalized.target, env, fetcher, accessedAt)
-      if (research && research.sources.length === 0) research = null
-    } catch (error) {
-      console.warn(
-        '[market-research-fallback] Exa unavailable; using commercial public fallback:',
-        error instanceof Error ? error.message : String(error),
-      )
-    }
-  }
-
-  if (!research) {
-    research = await searchPublicWeb(
-      normalized.target,
-      env,
-      fetcher,
-      boundedTimeout(env.MARKET_RESEARCH_TIMEOUT_MS),
-      accessedAt,
-    )
-  }
+  const research = await searchCrawlerGateway(
+    normalized.target,
+    env,
+    fetcher,
+    boundedTimeout(env.MARKET_RESEARCH_TIMEOUT_MS),
+    accessedAt,
+  )
 
   const completedAt = new Date().toISOString()
   sendJson(response, 201, {
