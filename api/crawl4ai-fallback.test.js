@@ -116,7 +116,7 @@ test('crawler fallback enriches Discover search results with Crawl4AI content', 
   assert.equal(calls.length, 2)
 })
 
-test('crawler fallback never fills empty commercial search with Wikipedia', async () => {
+test('crawler fallback never fills empty search with Wikipedia', async () => {
   const response = createResponse()
   const requests = []
   const handled = await handleCrawlerSearchResults(
@@ -140,18 +140,23 @@ test('crawler fallback never fills empty commercial search with Wikipedia', asyn
   assert.ok(requests.every((url) => !/wikipedia\.org/i.test(url)))
 })
 
-test('crawler fallback filters generic official or reference pages even when GDELT returns them', async () => {
+test('crawler fallback filters only encyclopedia sources and keeps ordinary public pages', async () => {
   const response = createResponse()
   const handled = await handleCrawlerSearchResults(
     { method: 'GET', query: {} },
     response,
-    `search-task/${encodeURIComponent(encodeTask({ m: 3 }))}/results`,
+    `search-task/${encodeURIComponent(encodeTask({ m: 5 }))}/results`,
     {
       fetcher: async (input) => {
         const url = String(input)
         if (url.startsWith('https://api.gdeltproject.org/')) {
           return jsonResponse({
             articles: [
+              {
+                url: 'https://en.wikipedia.org/wiki/Pump',
+                title: 'Pump - Wikipedia',
+                summary: 'An encyclopedia article about pumps.',
+              },
               {
                 url: 'https://example.com/',
                 title: 'Example Pumps Official Website',
@@ -161,6 +166,11 @@ test('crawler fallback filters generic official or reference pages even when GDE
                 url: 'https://example.net/market-report',
                 title: 'Industrial pump market report',
                 summary: 'General market information and industry history.',
+              },
+              {
+                url: 'https://forum.example.net/pump-buyers',
+                title: 'Pump buyer discussion',
+                summary: 'Forum discussion about sourcing and supplier experiences.',
               },
               {
                 url: 'https://buyer.example.org/rfq/pumps',
@@ -180,8 +190,13 @@ test('crawler fallback filters generic official or reference pages even when GDE
   )
 
   assert.equal(handled, true)
-  assert.equal(response.body.data.length, 1)
-  assert.equal(response.body.data[0].sourceUrl, 'https://buyer.example.org/rfq/pumps')
+  assert.equal(response.body.data.length, 4)
+  const urls = response.body.data.map((item) => item.sourceUrl)
+  assert.ok(!urls.some((url) => /wikipedia\.org/i.test(url)))
+  assert.ok(urls.includes('https://example.com/'))
+  assert.ok(urls.includes('https://example.net/market-report'))
+  assert.ok(urls.includes('https://forum.example.net/pump-buyers'))
+  assert.ok(urls.includes('https://buyer.example.org/rfq/pumps'))
 })
 
 test('crawler fallback yields to the existing stateless search when Crawl4AI is not configured', async () => {
@@ -204,7 +219,7 @@ test('crawler fallback yields to the existing stateless search when Crawl4AI is 
   assert.equal(called, false)
 })
 
-test('crawler failure keeps commercial public-search evidence available instead of failing the whole Discover search', async () => {
+test('crawler failure keeps public-search evidence available instead of failing the whole Discover search', async () => {
   const taskId = encodeTask()
   const response = createResponse()
   const fetcher = async (input) => {
