@@ -1,4 +1,5 @@
 import { isIP } from 'node:net'
+import { crawlEmbeddedPage, searchEmbeddedHtml } from './embedded-crawler.js'
 
 const DEFAULT_SEARCH_TIMEOUT_MS = 10_000
 const DEFAULT_CRAWL_TIMEOUT_MS = 8_000
@@ -35,10 +36,15 @@ function normalizeBaseUrl(value) {
   }
 }
 
+export function embeddedCrawlerEnabled(env = process.env) {
+  return String(env.EMBEDDED_CRAWLER_DISABLED ?? '').toLowerCase() !== 'true'
+}
+
 export function crawlerGatewayConfig(env = process.env) {
   const baseUrl = normalizeBaseUrl(env.CRAWLER_GATEWAY_URL)
   if (!baseUrl) return null
   return {
+    mode: 'external',
     baseUrl,
     token: env.CRAWLER_GATEWAY_TOKEN?.trim() || null,
     timeoutMs: boundedTimeout(
@@ -48,25 +54,50 @@ export function crawlerGatewayConfig(env = process.env) {
   }
 }
 
+export function crawlerSearchRuntime(env = process.env) {
+  const external = crawlerGatewayConfig(env)
+  if (external) return { available: true, mode: 'external', provider: 'crawler-gateway' }
+  if (embeddedCrawlerEnabled(env)) {
+    return { available: true, mode: 'embedded', provider: 'embedded-html-crawler' }
+  }
+  return { available: false, mode: 'disabled', provider: null }
+}
+
 function crawlerContentConfig(env = process.env) {
   const gateway = crawlerGatewayConfig(env)
-  const baseUrl = normalizeBaseUrl(env.CRAWL4AI_BASE_URL) || gateway?.baseUrl || null
-  if (!baseUrl) return null
+  const explicitCrawlBase = normalizeBaseUrl(env.CRAWL4AI_BASE_URL)
+  if (explicitCrawlBase || gateway?.baseUrl) {
+    return {
+      mode: 'external',
+      baseUrl: explicitCrawlBase || gateway.baseUrl,
+      token:
+        env.CRAWL4AI_API_TOKEN?.trim() ||
+        env.CRAWLER_GATEWAY_TOKEN?.trim() ||
+        null,
+      timeoutMs: boundedTimeout(
+        env.CRAWL4AI_TIMEOUT_MS,
+        DEFAULT_CRAWL_TIMEOUT_MS,
+        20_000,
+      ),
+      maxResults: positiveInteger(
+        env.CRAWL4AI_MAX_RESULTS,
+        DEFAULT_CRAWL_MAX_RESULTS,
+        12,
+      ),
+    }
+  }
+  if (!embeddedCrawlerEnabled(env)) return null
   return {
-    baseUrl,
-    token:
-      env.CRAWL4AI_API_TOKEN?.trim() ||
-      env.CRAWLER_GATEWAY_TOKEN?.trim() ||
-      null,
+    mode: 'embedded',
     timeoutMs: boundedTimeout(
-      env.CRAWL4AI_TIMEOUT_MS,
+      env.EMBEDDED_CRAWLER_TIMEOUT_MS,
       DEFAULT_CRAWL_TIMEOUT_MS,
-      20_000,
+      15_000,
     ),
     maxResults: positiveInteger(
-      env.CRAWL4AI_MAX_RESULTS,
+      env.EMBEDDED_CRAWLER_MAX_RESULTS,
       DEFAULT_CRAWL_MAX_RESULTS,
-      12,
+      10,
     ),
   }
 }
@@ -107,9 +138,7 @@ export function isAllowedPublicUrl(value) {
       hostname === 'localhost' ||
       hostname.endsWith('.localhost') ||
       hostname.endsWith('.local')
-    ) {
-      return false
-    }
+    ) return false
     const ipVersion = isIP(hostname)
     if (ipVersion === 4 && isNonPublicIpv4(hostname)) return false
     if (
@@ -118,9 +147,7 @@ export function isAllowedPublicUrl(value) {
         hostname.startsWith('fc') ||
         hostname.startsWith('fd') ||
         hostname.startsWith('fe80:'))
-    ) {
-      return false
-    }
+    ) return false
     return true
   } catch {
     return false
@@ -170,8 +197,6 @@ function resultContent(result) {
     result?.content ??
       result?.text ??
       result?.markdown ??
-      result?.summary ??
-      result?.snippet ??
       metadata?.content ??
       '',
   )
@@ -217,13 +242,8 @@ async function fetchJson(fetcher, url, init, timeoutMs) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort('crawler-timeout'), timeoutMs)
   try {
-    const response = await fetcher(url, {
-      ...init,
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      throw new Error(`crawler gateway returned HTTP ${response.status}`)
-    }
+    const response = await fetcher(url, { ...init, signal: controller.signal })
+    if (!response.ok) throw new Error(`crawler gateway returned HTTP ${response.status}`)
     return await response.json()
   } finally {
     clearTimeout(timeout)
@@ -240,10 +260,19 @@ export async function searchCrawlerGateway({
 }) {
   const config = crawlerGatewayConfig(env)
   if (!config) {
+    if (!embeddedCrawlerEnabled(env)) {
+      return { configured: false, provider: 'crawler-gateway', results: [] }
+    }
+    const rawResults = await searchEmbeddedHtml({
+      keyword,
+      regions,
+      maxResults: positiveInteger(maxResults, 10, 50),
+      fetcher,
+    })
     return {
-      configured: false,
+      configured: true,
       provider: 'crawler-gateway',
-      results: [],
+      results: rawResults.map(normalizeGatewayResult).filter(Boolean),
     }
   }
 
@@ -272,9 +301,7 @@ export async function searchCrawlerGateway({
   return {
     configured: true,
     provider: 'crawler-gateway',
-    results: rawResults
-      .map(normalizeGatewayResult)
-      .filter(Boolean),
+    results: rawResults.map(normalizeGatewayResult).filter(Boolean),
   }
 }
 
@@ -309,14 +336,28 @@ async function crawlOne(result, config, fetcher) {
   if (result.crawlStatus === 'ENRICHED') return result
   const url = stringValue(result.url)
   if (!url || !isAllowedPublicUrl(url) || isEncyclopediaUrl(url)) {
-    return {
-      ...result,
-      crawlStatus: 'SKIPPED',
-      crawlReason: 'UNSAFE_OR_ENCYCLOPEDIA_URL',
-    }
+    return { ...result, crawlStatus: 'SKIPPED', crawlReason: 'UNSAFE_OR_ENCYCLOPEDIA_URL' }
   }
 
   try {
+    if (config.mode === 'embedded') {
+      const crawled = await crawlEmbeddedPage(url, {
+        fetcher,
+        timeoutMs: config.timeoutMs,
+        allowUrl: (candidate) => isAllowedPublicUrl(candidate) && !isEncyclopediaUrl(candidate),
+      })
+      return {
+        ...result,
+        url: crawled.url,
+        title: crawled.title || result.title,
+        crawlStatus: 'ENRICHED',
+        crawlProvider: 'embedded-html-crawler',
+        crawlContent: crawled.content,
+        crawlMetadata: crawled.metadata,
+        crawlStatusCode: crawled.statusCode,
+      }
+    }
+
     const payload = await fetchJson(
       fetcher,
       `${config.baseUrl}/crawl`,
@@ -333,11 +374,7 @@ async function crawlOne(result, config, fetcher) {
     )
     const crawled = readCrawlContent(payload, url)
     if (!crawled) {
-      return {
-        ...result,
-        crawlStatus: 'FAILED',
-        crawlProvider: 'crawl4ai',
-      }
+      return { ...result, crawlStatus: 'FAILED', crawlProvider: 'crawl4ai' }
     }
     return {
       ...result,
@@ -353,7 +390,7 @@ async function crawlOne(result, config, fetcher) {
     return {
       ...result,
       crawlStatus: 'FAILED',
-      crawlProvider: 'crawl4ai',
+      crawlProvider: config.mode === 'embedded' ? 'embedded-html-crawler' : 'crawl4ai',
       crawlError: error instanceof Error ? error.message : String(error),
     }
   }
