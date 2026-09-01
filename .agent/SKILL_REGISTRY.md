@@ -1,4 +1,4 @@
-# Sales Radar AI Skill Registry v1
+# Sales Radar AI Skill Registry v2
 
 Status: Active Governance Contract  
 Scope: Sales Radar Agent OS skills, permissions, invocation boundaries, trace requirements, and data-write restrictions.
@@ -50,9 +50,10 @@ Global prohibitions:
 - Do not fabricate procurement, budget, project stage, supplier relationship, or purchase timing.
 - Do not use company-name, keyword, domain, or URL similarity to establish an entity relationship.
 - Do not associate entities owned by different users.
-- Do not bypass Evidence Validation, Opportunity Quality, CRM Safety, Lead Quality Gate, Qualification Version, or Assistant Trust Boundary.
+- Do not bypass Evidence Validation, Opportunity Quality, CRM Safety, Lead Quality Gate, Qualification Version, Assistant Trust Boundary, or Sales MCP action policy.
 - Do not present an assessment or recommendation as a fact.
 - Do not automatically promote research output into CRM truth.
+- Do not treat a provider draft, accepted/queued response, opened external UI, or sequence request as verified sent/replied/meeting state.
 
 ## 3. Layer Classification
 
@@ -67,6 +68,7 @@ Skills:
 - `agent-evaluation`
 - `sales-data-quality`
 - `crm-safety`
+- `sales-mcp-orchestration`
 
 Responsibilities:
 
@@ -76,12 +78,14 @@ Responsibilities:
 - Evaluate changes and regressions.
 - Protect data quality and CRM promotion boundaries.
 - Guard Raw Data from being promoted without Evidence Validation.
+- Gate external prospecting/enrichment/CRM/outbound providers by capability, cost, approval, dedupe and receipt policy.
 
 Forbidden:
 
 - Make unsupported commercial judgments.
 - Create customer truth.
 - Bypass domain services or quality gates.
+- Weaken an external provider action risk declared by central policy.
 
 ### 3.2 Intelligence Layer
 
@@ -261,11 +265,12 @@ Forbidden:
 | `research-trace` | Existing trusted entities | User-facing explanation | Action layer | Write domain data |
 | `agent-trace` | Agent execution references | Execution trace | Evaluation and audit | Expose secrets or create facts |
 | `sales-reasoning` | Facts and Product Context | Commercial assessment and verification advice | Opportunity or Action layer | Present inference as fact |
-| `contact-intelligence` | CompanyProfile, verified source, user action | Contact direction or verified public contact candidate | `sales-action-planning` | Guess a person or contact detail |
-| `sales-action-planning` | Trusted research | Recommended actions and questions | `sales-copilot` | Execute actions automatically |
-| `sales-copilot` | Qualified Lead or high-confidence Opportunity | Sales-assistance drafts | User review only | Send messages or create CRM records |
+| `contact-intelligence` | CompanyProfile, verified source, user action | Contact direction or verified public contact candidate | `sales-action-planning`, `sales-mcp-orchestration` | Guess a person or contact detail |
+| `sales-action-planning` | Trusted research | Recommended actions and questions | `sales-copilot`, `sales-mcp-orchestration` | Execute actions automatically |
+| `sales-copilot` | Qualified Lead or high-confidence Opportunity | Sales-assistance drafts | User review or `sales-mcp-orchestration` after approval | Send messages or create CRM records |
 | `sales-data-quality` | Proposed or stored sales data | PASS/NEEDS_REVIEW/REJECTED | Existing quality gates | Mutate business data |
-| `crm-safety` | Proposed CRM promotion | Allow/block/review decision | Existing Lead Quality Gate and user confirmation | Promote research automatically |
+| `crm-safety` | Proposed CRM promotion | Allow/block/review decision | Existing Lead Quality Gate, `sales-mcp-orchestration`, user confirmation | Promote research automatically |
+| `sales-mcp-orchestration` | Approved provider action, owned references, evidence/qualification context | Provider selection, gated execution result, external IDs/receipts | `agent-trace`, existing domain services for verified state updates | Guess schemas, bypass approval, silently fail over after execution, manufacture provider outcomes |
 | `agent-orchestration` | Task, IDs, permissions, state | Routed workflow | Only allowed transitions | Make commercial decisions |
 | `agent-evaluation` | Agent or policy change | Regression results | Release decision | Modify production data |
 
@@ -315,11 +320,32 @@ Contact Intelligence
 Sales Action Planning
 ```
 
+External sales-system action branch:
+
+```text
+Trusted research / verified contact / approved CRM proposal
+        ↓
+CRM Safety and applicable quality gate
+        ↓
+Sales MCP Orchestration
+        ↓
+Provider capability + exact schema discovery
+        ↓
+READ/DRAFT automatic or explicit WRITE/CREDIT/SEND approval
+        ↓
+One selected provider execution
+        ↓
+Attributable external record / receipt
+        ↓
+Authorized domain-service state update
+```
+
 Quality controls apply across the workflow:
 
 ```text
 Sales Data Quality
 CRM Safety
+Sales MCP Orchestration
 Agent Evaluation
 Agent Trace
 Agent Orchestration
@@ -342,6 +368,10 @@ CompanyProfile → Customer
 CompanyProfile → Contact
 Contact direction → fabricated person
 Sales recommendation → automatic outreach
+Provider draft → SENT_VERIFIED
+Provider accepted/queued → SENT_VERIFIED
+Sequence enrollment → REPLIED_VERIFIED
+Provider/domain similarity → CRM merge
 ```
 
 Required protections:
@@ -349,7 +379,9 @@ Required protections:
 - Opportunity persistence must remain independent from Lead qualification.
 - Contact creation requires verified public contact data and explicit user action.
 - CRM promotion requires Evidence, the existing quality gate, and user confirmation.
-- Supervisor routing cannot override domain permissions.
+- External `WRITE`, `CREDIT`, and `SEND` actions require explicit approval; `DESTRUCTIVE` is blocked by default.
+- Verified sent/replied/meeting states require attributable provider receipt/message/thread/event evidence and observed time.
+- Supervisor routing cannot override domain permissions or the provider action policy.
 
 ## 7. Data Write Permission Matrix
 
@@ -370,6 +402,7 @@ Legend:
 | Company Intelligence | ❌ | ❌ | ❌ | ⚠️ | ❌ | ⚠️ Company snapshot/source through domain service |
 | Contact Intelligence | ❌ | ⚠️ | ❌ | ❌ | ❌ | — |
 | Action Layer | ❌ | ❌ | ❌ | ❌ | ❌ | — |
+| Sales MCP Orchestration | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ External provider execution trace/receipt only; internal state through authorized domain service |
 | Research Trace | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ Read-only view; execution trace only if authorized |
 | Quality and Safety | ❌ | ❌ | ❌ | ❌ | ❌ | Quality result only |
 | Agent Orchestration | ❌ | ❌ | ❌ | ❌ | ❌ | Workflow state only |
@@ -381,7 +414,9 @@ Every `⚠️` requires:
 3. An authorized domain service.
 4. Applicable quality gate.
 5. Idempotency and versioning.
-6. Explicit user action when CRM or Contact data is involved.
+6. Explicit user action when CRM, Contact, provider credit, or outbound execution is involved.
+
+External provider mutation is additionally governed by `sales-mcp-orchestration`: provider schema/capability discovery, deterministic dedupe, authoritative risk classification, explicit approval where required, single-provider execution and receipt preservation.
 
 ## 8. Trace Contract
 
@@ -414,7 +449,8 @@ Rules:
 - ASSESSMENT requires reasoning.
 - RECOMMENDATION requires advisory language.
 - `NEEDS_REVIEW` requires verification questions.
-- Never expose Prompt content, API keys, credentials, model internals, or another user's IDs.
+- Provider execution traces must retain provider/action/risk/approval reference and attributable external IDs/receipts when available.
+- Never expose Prompt content, API keys, OAuth tokens, credentials, model internals, or another user's IDs.
 
 Research Trace presents user-facing reasoning. Agent Trace records operational execution. Neither may create business truth.
 
@@ -425,7 +461,7 @@ The Supervisor may:
 - Select an allowed Skill.
 - Pass explicit IDs.
 - Enforce user ownership.
-- Manage retries and state.
+- Manage retries and state before an externally consequential provider action begins.
 - Record versions.
 - Stop a workflow on quality failure.
 
@@ -433,9 +469,10 @@ The Supervisor must not:
 
 - Create an entity relationship.
 - Rewrite a FACT.
-- Override `NEEDS_REVIEW`, `QUALITY_BLOCK`, or CRM Safety.
+- Override `NEEDS_REVIEW`, `QUALITY_BLOCK`, CRM Safety, or Sales MCP action policy.
 - Promote a Signal, Opportunity, CompanyProfile, or Contact candidate.
 - Perform commercial reasoning itself.
+- Retry an external write/credit/send through a second provider after execution begins unless a new plan/approval explicitly authorizes it.
 
 Every workflow change must run `agent-evaluation`.
 
@@ -452,3 +489,5 @@ Before adding or changing a Skill:
 7. Update this registry version.
 
 Do not add a Skill when an existing Skill already owns the responsibility. Prefer extending the registry, contracts, adapters, or evaluations over creating overlapping Skills.
+
+` sales-mcp-orchestration` is intentionally narrow: it owns external sales-system provider capability/schema discovery and execution safety, while `crm-safety` remains the CRM promotion gate, `contact-intelligence` remains the contact truth owner, `sales-action-planning` remains advisory, and `agent-orchestration` remains the general workflow router.
