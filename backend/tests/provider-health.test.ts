@@ -1,59 +1,78 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import {
-  ProviderHealthService,
-  type ProviderHealthCommand,
-} from '../src/services/provider-health.service.js'
+import { ProviderHealthService } from '../src/services/provider-health.service.js'
 import { AppError } from '../src/utils/app-error.js'
 
+function jsonResponse(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
 describe('ProviderHealthService', () => {
-  it('reports AgentReach and Exa as available', async () => {
-    const command: ProviderHealthCommand = async () => ({
-      stdout: JSON.stringify({
-        servers: [
-          { name: 'unrelated', status: 'offline' },
-          { name: 'exa', status: 'connected' },
-        ],
-      }),
+  it('reports the crawler gateway as available', async () => {
+    let requestedUrl = ''
+    const service = new ProviderHealthService({
+      baseUrl: 'https://crawler.example',
+      fetcher: async (input) => {
+        requestedUrl = String(input)
+        return jsonResponse({ status: 'ok' })
+      },
     })
-    const service = new ProviderHealthService(command, 'mcporter')
 
-    const health = await service.checkAgentReach()
+    const health = await service.checkCrawler()
 
+    assert.equal(requestedUrl, 'https://crawler.example/health')
+    assert.equal(health.provider, 'crawler')
+    assert.equal(health.dependency, 'crawler-gateway')
     assert.equal(health.state, 'AVAILABLE')
     assert.equal(health.code, 'OK')
   })
 
-  it('blocks search with a structured error when Exa is unavailable', async () => {
-    const command: ProviderHealthCommand = async () => ({
-      stdout: JSON.stringify({
-        servers: [{ name: 'exa', status: 'offline' }],
-      }),
+  it('keeps historical AgentReach health calls as a crawler compatibility alias', async () => {
+    const service = new ProviderHealthService({
+      baseUrl: 'https://crawler.example',
+      fetcher: async () => jsonResponse({ status: 'ok' }),
     })
-    const service = new ProviderHealthService(command, 'mcporter')
+
+    const health = await service.checkAgentReach()
+
+    assert.equal(health.provider, 'crawler')
+    assert.equal(health.state, 'AVAILABLE')
+  })
+
+  it('blocks search with a structured error when the crawler gateway is unavailable', async () => {
+    const service = new ProviderHealthService({ baseUrl: '' })
 
     await assert.rejects(
-      () => service.requireAgentReach(),
+      () => service.requireCrawler(),
       (error: unknown) =>
         error instanceof AppError &&
         error.statusCode === 503 &&
         error.code === 'SEARCH_PROVIDER_UNAVAILABLE' &&
-        error.details?.providerState === 'DEGRADED' &&
-        error.details?.dependency === 'exa',
+        error.details?.providerState === 'UNAVAILABLE' &&
+        error.details?.dependency === 'crawler-gateway',
     )
   })
 
-  it('reports a missing runtime as unavailable', async () => {
-    const command: ProviderHealthCommand = async () => {
-      const error = new Error('mcporter not found') as Error & { code: string }
-      error.code = 'ENOENT'
-      throw error
-    }
-    const service = new ProviderHealthService(command, 'mcporter')
+  it('reports gateway authentication failures without leaking credentials', async () => {
+    const service = new ProviderHealthService({
+      baseUrl: 'https://crawler.example',
+      token: 'secret-token',
+      fetcher: async (_input, init) => {
+        assert.equal(
+          new Headers(init?.headers).get('authorization'),
+          'Bearer secret-token',
+        )
+        return jsonResponse({ error: 'unauthorized' }, 401)
+      },
+    })
 
-    const health = await service.checkAgentReach()
+    const health = await service.checkCrawler()
 
     assert.equal(health.state, 'UNAVAILABLE')
-    assert.equal(health.code, 'MCPORTER_NOT_FOUND')
+    assert.equal(health.code, 'CRAWLER_GATEWAY_AUTH_ERROR')
+    assert.doesNotMatch(health.message, /secret-token/)
   })
 })
