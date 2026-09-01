@@ -47,11 +47,6 @@ const MarketIntelligenceWorkspacePage = lazy(() =>
     default: module.MarketIntelligenceWorkspacePage,
   })),
 )
-const RevenueOperationsPage = lazy(() =>
-  import('@/pages/RevenueOperationsPage').then((module) => ({
-    default: module.RevenueOperationsPage,
-  })),
-)
 const AccountPage = lazy(() =>
   import('@/pages/AccountPage').then((module) => ({
     default: module.AccountPage,
@@ -140,14 +135,7 @@ export default function App() {
             </Suspense>
           }
         />
-        <Route
-          path="revenue"
-          element={
-            <Suspense fallback={<PageFallback />}>
-              <RevenueOperationsPage />
-            </Suspense>
-          }
-        />
+        <Route path="revenue" element={<Navigate to="/app/market" replace />} />
         <Route
           path="account"
           element={
