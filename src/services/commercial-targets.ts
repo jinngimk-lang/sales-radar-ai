@@ -36,50 +36,124 @@ export interface CommercialTargetInput {
 
 export type CommercialTargetUpdate = Partial<CommercialTargetInput>
 
-interface ApiEnvelope<T> {
-  data: T
-}
+const STORAGE_KEY = 'sales-radar:commercial-targets:v1'
+const LOCAL_USER_ID = 'local-workspace-user'
 
-const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL)
+const GOALS = new Set<CommercialGoal>([
+  'FIND_BUYERS',
+  'FIND_SUPPLIERS',
+  'FIND_PARTNERS',
+  'FIND_DISTRIBUTORS',
+  'RESEARCH_COMPETITORS',
+  'EXPLORE_MARKET',
+])
+const SIGNAL_FOCUSES = new Set<SignalFocus>([
+  'ALL',
+  'FACTORY_EXPANSION',
+  'INVESTMENT',
+  'DIGITAL_TRANSFORMATION',
+  'HIRING_SIGNAL',
+  'POLICY_CHANGE',
+  'INDUSTRY_TREND',
+])
+const STATUSES = new Set<CommercialTargetStatus>([
+  'DRAFT',
+  'ACTIVE',
+  'PAUSED',
+  'CLOSED',
+])
+const REGIONS = new Set<Region>([
+  'USA',
+  'Europe',
+  'SoutheastAsia',
+  'China',
+  'MiddleEast',
+])
+const CUSTOMER_TYPES = new Set<CustomerType>([
+  'Buyer',
+  'Agent',
+  'Company',
+  'Individual',
+])
 
 export async function listCommercialTargets(): Promise<CommercialTarget[]> {
-  const response = await request<ApiEnvelope<CommercialTarget[]>>('/commercial-targets')
-  return response.data
+  return readTargets().sort((left, right) =>
+    right.createdAt.localeCompare(left.createdAt),
+  )
 }
 
 export async function getCommercialTarget(id: string): Promise<CommercialTarget> {
-  const response = await request<ApiEnvelope<CommercialTarget>>(
-    `/commercial-targets/${encodeURIComponent(id)}`,
-  )
-  return response.data
+  const target = readTargets().find((item) => item.id === id)
+  if (!target) throw new Error('目标不存在或已被删除')
+  return target
 }
 
 export async function createCommercialTarget(
   input: CommercialTargetInput,
 ): Promise<CommercialTarget> {
-  const response = await request<ApiEnvelope<CommercialTarget>>('/commercial-targets', {
-    method: 'POST',
-    body: JSON.stringify({
-      ...input,
-      signalFocus: input.signalFocus ?? 'ALL',
-      status: input.status ?? 'ACTIVE',
-    }),
-  })
-  return response.data
+  const name = input.name.trim()
+  const product = input.product.trim()
+  if (name.length < 2 || product.length < 2) {
+    throw new Error('目标名称和产品 / 服务至少需要 2 个字符')
+  }
+
+  const now = new Date().toISOString()
+  const target: CommercialTarget = {
+    id: createLocalId(),
+    userId: LOCAL_USER_ID,
+    name,
+    product,
+    industry: normalizeOptionalString(input.industry),
+    region: input.region ?? null,
+    customerType: input.customerType ?? null,
+    goal: input.goal,
+    signalFocus: input.signalFocus ?? 'ALL',
+    status: input.status ?? 'ACTIVE',
+    lastRunAt: null,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  const targets = readTargets()
+  writeTargets([target, ...targets])
+  return target
 }
 
 export async function updateCommercialTarget(
   id: string,
   input: CommercialTargetUpdate,
 ): Promise<CommercialTarget> {
-  const response = await request<ApiEnvelope<CommercialTarget>>(
-    `/commercial-targets/${encodeURIComponent(id)}`,
-    {
-      method: 'PUT',
-      body: JSON.stringify(input),
-    },
-  )
-  return response.data
+  const targets = readTargets()
+  const index = targets.findIndex((item) => item.id === id)
+  if (index < 0) throw new Error('目标不存在或已被删除')
+
+  const current = targets[index]
+  const next: CommercialTarget = {
+    ...current,
+    name:
+      input.name === undefined ? current.name : requireText(input.name, '目标名称'),
+    product:
+      input.product === undefined
+        ? current.product
+        : requireText(input.product, '产品 / 服务'),
+    industry:
+      input.industry === undefined
+        ? current.industry
+        : normalizeOptionalString(input.industry),
+    region: input.region === undefined ? current.region : input.region,
+    customerType:
+      input.customerType === undefined
+        ? current.customerType
+        : input.customerType,
+    goal: input.goal ?? current.goal,
+    signalFocus: input.signalFocus ?? current.signalFocus,
+    status: input.status ?? current.status,
+    updatedAt: new Date().toISOString(),
+  }
+
+  targets[index] = next
+  writeTargets(targets)
+  return next
 }
 
 export function commercialTargetToMarketTarget(
@@ -95,31 +169,90 @@ export function commercialTargetToMarketTarget(
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
-  })
+function readTargets(): CommercialTarget[] {
+  const storage = browserStorage()
+  if (!storage) return []
 
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as {
-      error?: { message?: string }
-    }
-    throw new Error(
-      body.error?.message || `目标服务暂时不可用（${response.status}）`,
-    )
+  try {
+    const raw = storage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isCommercialTarget)
+  } catch (error) {
+    console.warn('[CommercialTargets] Unable to read local targets', error)
+    return []
   }
-
-  return response.json() as Promise<T>
 }
 
-function normalizeApiBaseUrl(value: string | undefined) {
-  const configuredBaseUrl = value?.trim() || '/api'
-  return configuredBaseUrl === '/'
-    ? ''
-    : configuredBaseUrl.replace(/\/+$/, '')
+function writeTargets(targets: CommercialTarget[]) {
+  const storage = browserStorage()
+  if (!storage) {
+    throw new Error('当前浏览器环境无法保存目标')
+  }
+
+  try {
+    storage.setItem(STORAGE_KEY, JSON.stringify(targets))
+  } catch (error) {
+    console.error('[CommercialTargets] Unable to persist local targets', error)
+    throw new Error('浏览器本地存储不可用，目标未保存')
+  }
+}
+
+function browserStorage(): Storage | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function createLocalId() {
+  const randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto)
+  if (randomUUID) return `target_${randomUUID()}`
+  return `target_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function requireText(value: string, field: string) {
+  const normalized = value.trim()
+  if (normalized.length < 2) throw new Error(`${field}至少需要 2 个字符`)
+  return normalized
+}
+
+function normalizeOptionalString(value: string | null | undefined) {
+  const normalized = value?.trim()
+  return normalized ? normalized : null
+}
+
+function isCommercialTarget(value: unknown): value is CommercialTarget {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const item = value as Record<string, unknown>
+
+  return (
+    typeof item.id === 'string' &&
+    Boolean(item.id) &&
+    typeof item.userId === 'string' &&
+    typeof item.name === 'string' &&
+    typeof item.product === 'string' &&
+    isNullableString(item.industry) &&
+    (item.region === null ||
+      (typeof item.region === 'string' && REGIONS.has(item.region as Region))) &&
+    (item.customerType === null ||
+      (typeof item.customerType === 'string' &&
+        CUSTOMER_TYPES.has(item.customerType as CustomerType))) &&
+    typeof item.goal === 'string' &&
+    GOALS.has(item.goal as CommercialGoal) &&
+    typeof item.signalFocus === 'string' &&
+    SIGNAL_FOCUSES.has(item.signalFocus as SignalFocus) &&
+    typeof item.status === 'string' &&
+    STATUSES.has(item.status as CommercialTargetStatus) &&
+    (item.lastRunAt === null || typeof item.lastRunAt === 'string') &&
+    typeof item.createdAt === 'string' &&
+    typeof item.updatedAt === 'string'
+  )
+}
+
+function isNullableString(value: unknown) {
+  return value === null || typeof value === 'string'
 }
