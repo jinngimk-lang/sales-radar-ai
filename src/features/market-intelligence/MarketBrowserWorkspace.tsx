@@ -233,7 +233,7 @@ export function MarketBrowserWorkspace({
           {status === 'running' || status === 'reviewing' ? (
             <div className="h-full overflow-y-auto">
               <WorkspaceLoading
-                title="爬虫正在研究公开网页"
+                title="正在研究公开网页"
                 description="正在发现并读取公开来源；完成后会直接打开第一个推荐网页。"
               />
             </div>
@@ -332,7 +332,7 @@ function BrowserChrome({
           onChange={(event) => onChange(event.target.value)}
           placeholder={
             status === 'running'
-              ? '爬虫正在打开公开网页…'
+              ? '正在打开公开网页…'
               : '输入或粘贴网址，按 Enter 打开'
           }
           aria-label="网页预览网址"
