@@ -34,6 +34,12 @@ test('market browser immediately shows source visuals without operator-token chr
   assert.doesNotMatch(browserWorkspace, /MarketLiveBrowserPanel|REVENUE_OPERATOR_TOKEN|Browserbase/)
 })
 
+test('market research loading copy stays user-facing and never exposes crawler implementation wording', () => {
+  assert.doesNotMatch(browserWorkspace, /爬虫/)
+  assert.match(browserWorkspace, /正在研究公开网页/)
+  assert.match(browserWorkspace, /正在打开公开网页…/)
+})
+
 test('settings and navigation are concise and expose the active marketplace operating sequence', () => {
   assert.doesNotMatch(layout, /item\.desc/)
   assert.doesNotMatch(layout, /真实来源模式/)
