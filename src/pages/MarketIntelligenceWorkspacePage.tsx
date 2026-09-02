@@ -11,6 +11,7 @@ import {
   commercialTargetToMarketTarget,
   getCommercialTarget,
 } from '@/services/commercial-targets'
+import { cacheMarketCommunicationCandidates } from '@/services/communication-candidate-cache'
 import { Button } from '@/components/ui/Button'
 import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
 import { AgentStatusBadge } from '@/components/ui/WorkspaceState'
@@ -151,6 +152,7 @@ export function MarketIntelligenceWorkspacePage() {
             : undefined,
       }
       const result = await runMarketResearch(researchInput)
+      cacheMarketCommunicationCandidates(result.signals)
       setSession(result)
       setSelectedSourceId(result.sources[0]?.id ?? null)
       const updatedSignals = await getMarketSignals()

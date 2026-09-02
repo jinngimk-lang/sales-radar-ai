@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
   ContactRound,
-  LoaderCircle,
   MessageSquareText,
   Search,
   ShieldCheck,
@@ -10,27 +9,26 @@ import {
 import { Link, useNavigate } from 'react-router-dom'
 import type { ChatSession } from '@/types'
 import { getChatSessions } from '@/services/api'
+import { getCachedCommunicationSessions } from '@/services/communication-candidate-cache'
 import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
 
 export function CommunicationWorkspacePage() {
   const navigate = useNavigate()
-  const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [sessions, setSessions] = useState<ChatSession[]>(() =>
+    getCachedCommunicationSessions(),
+  )
 
   useEffect(() => {
     let cancelled = false
+
     getChatSessions()
       .then((items) => {
-        if (!cancelled) setSessions(items)
+        if (cancelled || items.length === 0) return
+        setSessions(mergeSessions(items, getCachedCommunicationSessions()))
       })
-      .catch((cause) => {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : '暂时无法读取沟通对象')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
+      .catch(() => {
+        // Until the full backend is deployed, the locally cached public-source
+        // candidates remain the communication preparation surface.
       })
 
     return () => {
@@ -59,29 +57,25 @@ export function CommunicationWorkspacePage() {
       <div className="mb-4 flex items-center gap-2 rounded-2xl border border-brand-100 bg-brand-50/70 px-4 py-3 text-xs text-brand-800">
         <ShieldCheck className="h-4 w-4 shrink-0" />
         <span>
-          这里展示的是搜索/研究得到的对象与公开联系人证据，不把生成话术、打开外部渠道或预测意向冒充成真实沟通结果。
+          这里优先展示推荐和搜索保存的公开来源与联系人证据；后续接入发送 API 后，真实沟通仍以发送、回复或会议回执为准。
         </span>
       </div>
 
-      {error ? (
-        <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-          {error}
-        </div>
-      ) : null}
-
-      {loading ? (
-        <div className="flex min-h-72 items-center justify-center rounded-2xl border border-ink-200 bg-white">
-          <LoaderCircle className="h-5 w-5 animate-spin text-brand-600" />
-        </div>
-      ) : sessions.length === 0 ? (
+      {sessions.length === 0 ? (
         <EmptyCommunicationState />
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {sessions.map((session) => {
             const hasPublicContact = session.contacts.length > 0
+            const cachedCandidate = isCachedCandidate(session)
             const contactLabel = hasPublicContact
               ? `${session.contacts.length} 个公开联系人`
               : '尚未发现可归因公开联系人'
+            const actionLabel = cachedCandidate
+              ? hasPublicContact
+                ? '核对联系人'
+                : '补联系人证据'
+              : '准备沟通'
 
             return (
               <article
@@ -133,10 +127,10 @@ export function CommunicationWorkspacePage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => navigate(`/app/customer/${encodeURIComponent(session.id)}`)}
+                    onClick={() => openCommunicationCandidate(session, navigate)}
                     className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-ink-950 px-3.5 text-xs font-semibold text-white transition hover:bg-ink-800"
                   >
-                    准备沟通
+                    {actionLabel}
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -166,7 +160,7 @@ function EmptyCommunicationState() {
       <MessageSquareText className="h-9 w-9 text-ink-300" />
       <h2 className="mt-3 text-sm font-semibold text-ink-900">还没有可进入沟通准备的对象</h2>
       <p className="mt-2 max-w-md text-xs leading-5 text-ink-500">
-        先从推荐或主动搜索获得真实来源与对象记录，再进入客户详情核对公开联系人并准备沟通。
+        先从推荐或主动搜索获得真实来源与对象记录；这些公开数据会保留在当前浏览器中，供沟通准备继续使用。
       </p>
       <Link
         to="/app/discover"
@@ -177,4 +171,35 @@ function EmptyCommunicationState() {
       </Link>
     </div>
   )
+}
+
+function mergeSessions(primary: ChatSession[], secondary: ChatSession[]): ChatSession[] {
+  const merged = new Map<string, ChatSession>()
+  for (const item of primary) merged.set(item.id, item)
+  for (const item of secondary) {
+    if (!merged.has(item.id)) merged.set(item.id, item)
+  }
+  return Array.from(merged.values())
+}
+
+function isCachedCandidate(session: ChatSession): boolean {
+  return session.id.startsWith('search:') || session.id.startsWith('market:')
+}
+
+function openCommunicationCandidate(
+  session: ChatSession,
+  navigate: ReturnType<typeof useNavigate>,
+) {
+  if (!isCachedCandidate(session)) {
+    navigate(`/app/customer/${encodeURIComponent(session.id)}`)
+    return
+  }
+
+  if (session.contacts.length > 0 && (session.profileUrl || session.sourceUrl)) {
+    window.open(session.profileUrl || session.sourceUrl, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  const query = session.company || session.customerName
+  navigate(`/app/discover?q=${encodeURIComponent(query)}`)
 }

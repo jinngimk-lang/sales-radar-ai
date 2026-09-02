@@ -35,9 +35,6 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Live embedded crawler smoke
-        run: node scripts/embedded-crawler-live-smoke.mjs
-
       - name: Build
         run: npm run build
 
@@ -46,6 +43,10 @@ jobs:
 
       - name: Virtual Chrome click smoke
         run: node scripts/browser-smoke.mjs
+
+      - name: External embedded crawler probe
+        continue-on-error: true
+        run: node scripts/embedded-crawler-live-smoke.mjs
 
   backend:
     name: Backend
@@ -112,6 +113,11 @@ jobs:
           tests/revenue-live-loop.test.ts
           tests/server-startup.test.ts
           tests/source-provenance.test.ts
+          tests/provider-action-safety.test.ts
+          tests/external-record-link.test.ts
+          tests/sales-provider-orchestrator.test.ts
+          tests/communication-receipt.test.ts
+          tests/sales-provider-catalog.test.ts
 
       - name: Build
         run: npm run build

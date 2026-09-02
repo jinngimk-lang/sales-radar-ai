@@ -4,7 +4,7 @@ import test from 'node:test'
 
 const read = (path: string) => readFile(new URL(path, import.meta.url), 'utf8')
 
-const [home, composer, marketPage, marketTarget, browserWorkspace, account, layout, app] = await Promise.all([
+const [home, composer, marketPage, marketTarget, browserWorkspace, account, layout, app, ciWorkflow] = await Promise.all([
   read('./pages/AICommandCenterPage.tsx'),
   read('./features/command-center/CommandComposer.tsx'),
   read('./pages/MarketIntelligenceWorkspacePage.tsx'),
@@ -13,6 +13,7 @@ const [home, composer, marketPage, marketTarget, browserWorkspace, account, layo
   read('./pages/AccountPage.tsx'),
   read('./components/layout/AppLayout.tsx'),
   read('./App.tsx'),
+  read('../.github/workflows/ci.yml'),
 ])
 
 test('AI home is input-first and removes marketing-style authenticated hero content', () => {
@@ -31,6 +32,12 @@ test('market browser immediately shows source visuals without operator-token chr
   assert.match(browserWorkspace, /网页画面/)
   assert.match(browserWorkspace, /LiveWebPreview/)
   assert.doesNotMatch(browserWorkspace, /MarketLiveBrowserPanel|REVENUE_OPERATOR_TOKEN|Browserbase/)
+})
+
+test('market research loading copy stays user-facing and never exposes crawler implementation wording', () => {
+  assert.doesNotMatch(browserWorkspace, /爬虫/)
+  assert.match(browserWorkspace, /正在研究公开网页/)
+  assert.match(browserWorkspace, /正在打开公开网页…/)
 })
 
 test('settings and navigation are concise and expose the active marketplace operating sequence', () => {
@@ -59,4 +66,18 @@ test('market target carries a real commercial goal while assessment stays in the
   assert.match(marketTarget, /探索市场/)
   assert.match(marketPage, /goal: target\.goal/)
   assert.match(marketPage, /主动搜索/)
+})
+
+test('frontend CI keeps deterministic build and browser checks hard while external search remains an observable probe', () => {
+  const buildIndex = ciWorkflow.indexOf('- name: Build')
+  const browserIndex = ciWorkflow.indexOf('- name: Virtual Chrome click smoke')
+  const liveProbeIndex = ciWorkflow.indexOf('- name: External embedded crawler probe')
+
+  assert.ok(buildIndex >= 0, 'frontend Build step must exist')
+  assert.ok(browserIndex > buildIndex, 'browser smoke must run after Build')
+  assert.ok(liveProbeIndex > browserIndex, 'external crawler probe must run after deterministic gates')
+
+  const liveProbeBlock = ciWorkflow.slice(liveProbeIndex, liveProbeIndex + 220)
+  assert.match(liveProbeBlock, /continue-on-error:\s*true/)
+  assert.match(liveProbeBlock, /node scripts\/embedded-crawler-live-smoke\.mjs/)
 })

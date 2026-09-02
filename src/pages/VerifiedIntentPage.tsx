@@ -11,6 +11,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom'
 import type { ChatSession, LeadOutcome, LeadOutcomeStatus } from '@/types'
 import { getChatSessions, getLeadOutcome } from '@/services/api'
+import { getUserFacingApiError } from '@/services/api-errors'
 import { WorkspaceHeader } from '@/components/ui/WorkspaceHeader'
 
 const VERIFIED_INTENT_STATUSES = new Set<LeadOutcomeStatus>([
@@ -67,7 +68,7 @@ export function VerifiedIntentPage() {
         )
       } catch (cause) {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : '暂时无法读取意向记录')
+          setError(getUserFacingApiError(cause, '暂时无法读取意向记录'))
         }
       } finally {
         if (!cancelled) setLoading(false)
