@@ -43,16 +43,25 @@ test('revenue supervision keeps the full process and interactive Browserbase liv
   assert.doesNotMatch(panel, /pointer-events:\s*none|pointer-events-none/)
 })
 
-test('communication and intent translate missing full backend errors instead of exposing raw runtime copy', async () => {
-  const presenter = await readSource('../services/api-errors.ts')
+test('communication uses cached public-source candidates when the full backend is not deployed', async () => {
   const communication = await readSource('./CommunicationWorkspacePage.tsx')
+  const discover = await readSource('./DiscoverPage.tsx')
+  const market = await readSource('./MarketIntelligenceWorkspacePage.tsx')
+
+  assert.match(communication, /getCachedCommunicationSessions/)
+  assert.match(discover, /cacheSearchCommunicationCandidates\(result\.customers\)/)
+  assert.match(market, /cacheMarketCommunicationCandidates\(result\.signals\)/)
+  assert.doesNotMatch(communication, /getUserFacingApiError/)
+  assert.doesNotMatch(communication, /border-rose|bg-rose|text-rose/)
+})
+
+test('intent translates missing full backend errors instead of exposing raw runtime copy', async () => {
+  const presenter = await readSource('../services/api-errors.ts')
   const intent = await readSource('./VerifiedIntentPage.tsx')
 
   assert.match(presenter, /export function getUserFacingApiError/)
   assert.match(presenter, /BACKEND_NOT_CONFIGURED/)
   assert.match(presenter, /完整后端未连接，当前功能暂不可用/)
-  assert.match(communication, /getUserFacingApiError/)
   assert.match(intent, /getUserFacingApiError/)
-  assert.doesNotMatch(communication, /cause instanceof Error \? cause\.message/)
   assert.doesNotMatch(intent, /cause instanceof Error \? cause\.message/)
 })
