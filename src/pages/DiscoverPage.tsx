@@ -40,6 +40,7 @@ import {
   understandProduct,
   getProductProfiles,
 } from '@/services/api'
+import { cacheSearchCommunicationCandidates } from '@/services/communication-candidate-cache'
 import { FilterSidebar } from '@/components/discover/FilterSidebar'
 import { CustomerCard } from '@/components/discover/CustomerCard'
 import { OpportunityCard } from '@/components/discover/OpportunityCard'
@@ -229,6 +230,7 @@ export function DiscoverPage({
         },
       )
       if (searchRequestIdRef.current !== searchRequestId) return
+      cacheSearchCommunicationCandidates(result.customers)
       setSearchStrategy(result.strategy)
       setProductContext(result.productContext)
       setCustomers(result.customers)
